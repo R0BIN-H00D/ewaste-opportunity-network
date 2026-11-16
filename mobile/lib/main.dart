@@ -4,6 +4,7 @@ import 'core/constants/app_constants.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/account_providers.dart';
 import 'routes/app_router.dart';
+import 'widgets/saved_data_banner.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +24,7 @@ class EWasteApp extends ConsumerWidget {
       darkTheme: AppTheme.dark(),
       themeMode: ref.watch(themeModeProvider),
       routerConfig: ref.watch(routerProvider),
+      builder: (context, child) => SavedDataBanner(child: child ?? const SizedBox.shrink()),
     );
   }
 }

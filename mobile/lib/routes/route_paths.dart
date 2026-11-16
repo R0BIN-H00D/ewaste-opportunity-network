@@ -13,6 +13,7 @@ abstract class Routes {
   static const notifications = '/account/notifications';
   static const payments = '/account/payments';
   static const help = '/account/help';
+  static const verification = '/account/verification';
   static const browse = '/browse';
   static const myListings = '/my-listings';
   static const newListing = '/listings/new';
@@ -40,6 +41,69 @@ abstract class Routes {
   }
 
   static String request(String id) => '$requests/$id';
+
+  /// The refurbished shop and the orders placed on it (as buyer, or as seller for a refurbisher).
+  static const shop = '/shop';
+  static const productPattern = '/shop/:id';
+  static String product(String id) => '$shop/$id';
+  static const orders = '/orders';
+  static const orderPattern = '/orders/:id';
+  static String ordersWith(String status) => '$orders?status=$status';
+  static String order(String id) => '$orders/$id';
+
+  /// Student learning tasks: the open tasks, one task, the student's applications, one application, and experience with certificates.
+  static const opportunities = '/learning';
+  static const opportunityPattern = '/learning/:id';
+  static String opportunity(String id) => '$opportunities/$id';
+  static const myTasks = '/learning/mine';
+  static const newTask = '/learning/new';
+  static const taskEditPattern = '/learning/:id/edit';
+  static String taskEdit(String id) => '$opportunities/$id/edit';
+  static const applicantsPattern = '/learning/:id/applicants';
+  static String applicants(String id) => '$opportunities/$id/applicants';
+  static const applications = '/applications';
+  static const applicationPattern = '/applications/:id';
+  static String application(String id) => '$applications/$id';
+  static const experience = '/experience';
+
+  /// Donations: the marketplace and the person's own lists, one donation, offering a device, and registering an organisation to receive.
+  static const donations = '/donations';
+  static const donationPattern = '/donations/:id';
+  static String donation(String id) => '$donations/$id';
+  static const newDonation = '/donations/new';
+  static String offerDonation(String listing) => '$newDonation?listing=$listing';
+  static String donationsWith(String scope) => '$donations?as=$scope';
+  static const myDonations = '/donations?as=donor';
+  static const recipient = '/account/recipient';
+
+  /// Refurbishment: the feed of devices to refurbish, the jobs, and the refurbisher's own products.
+  static const refurbOpportunities = '/refurbish';
+  static const refurbJobs = '/refurbish/jobs';
+  static const refurbJobPattern = '/refurbish/jobs/:id';
+  static String refurbJob(String id) => '$refurbJobs/$id';
+  static String refurbJobsWith(String status) => '$refurbJobs?status=$status';
+  static const myProducts = '/my-products';
+  static const newProduct = '/my-products/new';
+  static String newProductFor(String job) => '$newProduct?job=$job';
+  static const editProductPattern = '/my-products/:id/edit';
+  static String editProduct(String id) => '$myProducts/$id/edit';
+
+  /// Recycling: the directory of centres, the form that sends devices to one, and the requests (sent or received).
+  static const recycling = '/recycling/centres';
+  static const centerPattern = '/recycling/centres/:id';
+  static const newRecycling = '/recycling/new';
+  static const recyclingRequests = '/recycling/requests';
+  static const recyclingReport = '/recycling/report';
+  static const recyclingRequestPattern = '/recycling/requests/:id';
+
+  /// The directory. [listing] is the device the person wants to recycle, carried along to the request form.
+  static String centersFor({String? listing}) => listing == null ? recycling : '$recycling?listing=$listing';
+  static String center(String id, {String? listing}) => listing == null ? '$recycling/$id' : '$recycling/$id?listing=$listing';
+  static String recycle({required String center, String? listing}) => listing == null ? '$newRecycling?center=$center' : '$newRecycling?center=$center&listing=$listing';
+
+  /// The recycling requests, optionally opened on one status (`requested`, `pickup_scheduled`, ...).
+  static String recyclingRequestsWith(String status) => '$recyclingRequests?status=$status';
+  static String recyclingRequest(String id) => '$recyclingRequests/$id';
 }
 
 /// Screens a signed-out person can open. Everything else needs a signed-in session.

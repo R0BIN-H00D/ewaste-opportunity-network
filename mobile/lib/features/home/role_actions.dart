@@ -24,31 +24,38 @@ List<QuickAction> actionsFor(UserRole role) {
         QuickAction(icon: Icons.search, title: 'Browse devices', subtitle: 'See what others are offering near you', route: Routes.browse),
         QuickAction(icon: Icons.handyman_outlined, title: 'Find a technician', subtitle: 'Repairs from people near you', route: Routes.technicians),
         QuickAction(icon: Icons.build_circle_outlined, title: 'My requests', subtitle: 'Quotes, pickups and repair progress', route: Routes.requests),
-        QuickAction(icon: Icons.recycling_outlined, title: 'Recycle', subtitle: 'Hand devices to a recycling centre'),
-        QuickAction(icon: Icons.volunteer_activism_outlined, title: 'Donations and shop', subtitle: 'Give devices away or buy refurbished'),
+        QuickAction(icon: Icons.recycling_outlined, title: 'Recycle', subtitle: 'Hand devices to a recycling centre', route: Routes.recycling),
+        QuickAction(icon: Icons.local_shipping_outlined, title: 'My recycling', subtitle: 'Pickups and what happened to your devices', route: Routes.recyclingRequests),
+        QuickAction(icon: Icons.storefront_outlined, title: 'Refurbished shop', subtitle: 'Buy checked, repaired devices from verified sellers', route: Routes.shop),
+        QuickAction(icon: Icons.shopping_bag_outlined, title: 'My orders', subtitle: 'What you ordered and where it is', route: Routes.orders),
+        QuickAction(icon: Icons.volunteer_activism_outlined, title: 'Donations', subtitle: 'Give devices away or ask for one', route: Routes.donations),
+        QuickAction(icon: Icons.card_giftcard_outlined, title: 'My donations', subtitle: 'Devices you offered and who asked for them', route: Routes.myDonations),
       ];
     case UserRole.technician:
       return const [
         QuickAction(icon: Icons.inbox_outlined, title: 'Repair requests', subtitle: 'New requests that match your skills', route: Routes.jobsBoard),
         QuickAction(icon: Icons.work_outline, title: 'My jobs', subtitle: 'Quotes, updates and finishing jobs', route: Routes.jobsActive),
+        QuickAction(icon: Icons.school_outlined, title: 'Student tasks', subtitle: 'Post supervised tasks and review applicants', route: Routes.myTasks),
       ];
     case UserRole.student:
       return const [
-        QuickAction(icon: Icons.school_outlined, title: 'Opportunities', subtitle: 'Supervised tasks you can join'),
-        QuickAction(icon: Icons.assignment_turned_in_outlined, title: 'My applications', subtitle: 'Track what you applied for'),
-        QuickAction(icon: Icons.workspace_premium_outlined, title: 'Certificates', subtitle: 'Earned when a task is completed'),
+        QuickAction(icon: Icons.school_outlined, title: 'Opportunities', subtitle: 'Supervised tasks you can join', route: Routes.opportunities),
+        QuickAction(icon: Icons.assignment_turned_in_outlined, title: 'My applications', subtitle: 'Track what you applied for', route: Routes.applications),
+        QuickAction(icon: Icons.workspace_premium_outlined, title: 'Certificates', subtitle: 'Earned when a task is completed', route: Routes.experience),
       ];
     case UserRole.refurbisher:
       return const [
-        QuickAction(icon: Icons.build_circle_outlined, title: 'Refurbishment jobs', subtitle: 'Offers, repairs and finished work'),
-        QuickAction(icon: Icons.storefront_outlined, title: 'My products', subtitle: 'List refurbished devices for sale'),
-        QuickAction(icon: Icons.shopping_bag_outlined, title: 'Orders', subtitle: 'Orders you have received'),
+        QuickAction(icon: Icons.search_outlined, title: 'Devices to refurbish', subtitle: 'Owners looking for a refurbisher', route: Routes.refurbOpportunities),
+        QuickAction(icon: Icons.build_circle_outlined, title: 'Refurbishment jobs', subtitle: 'Offers, repairs and finished work', route: Routes.refurbJobs),
+        QuickAction(icon: Icons.storefront_outlined, title: 'My products', subtitle: 'List refurbished devices for sale', route: Routes.myProducts),
+        QuickAction(icon: Icons.shopping_bag_outlined, title: 'Orders', subtitle: 'Orders you have received', route: Routes.orders),
       ];
     case UserRole.recycler:
       return const [
-        QuickAction(icon: Icons.inbox_outlined, title: 'Recycling requests', subtitle: 'Devices waiting for collection'),
-        QuickAction(icon: Icons.local_shipping_outlined, title: 'Pickups', subtitle: 'Scheduled collections'),
-        QuickAction(icon: Icons.scale_outlined, title: 'Materials', subtitle: 'Record what you recovered, by weight'),
+        QuickAction(icon: Icons.inbox_outlined, title: 'Recycling requests', subtitle: 'Devices waiting for collection', route: Routes.recyclingRequests),
+        QuickAction(icon: Icons.local_shipping_outlined, title: 'Pickups', subtitle: 'Scheduled collections', route: '${Routes.recyclingRequests}?status=pickup_scheduled'),
+        QuickAction(icon: Icons.bar_chart_outlined, title: 'Activity report', subtitle: 'Requests and materials recovered, by period', route: Routes.recyclingReport),
+        QuickAction(icon: Icons.scale_outlined, title: 'Materials', subtitle: 'Record what you recovered, by weight', route: '${Routes.recyclingRequests}?status=received_at_center'),
       ];
     case UserRole.admin:
       return const [

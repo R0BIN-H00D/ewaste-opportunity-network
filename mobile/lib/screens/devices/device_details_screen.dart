@@ -198,12 +198,42 @@ class _BodyState extends ConsumerState<_Body> {
                     label: const Text('Find a technician'),
                   ),
                 ],
+                if (l.isLive && l.preferredService == 'recycling') ...[
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: () => context.push(Routes.centersFor(listing: l.id)),
+                    icon: const Icon(Icons.recycling_outlined),
+                    label: const Text('Send to a recycling centre'),
+                  ),
+                ],
+                if (l.isLive && l.preferredService == 'donation' && l.condition != 'for_spare_parts') ...[
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: () => context.push(Routes.offerDonation(l.id)),
+                    icon: const Icon(Icons.volunteer_activism_outlined),
+                    label: const Text('Offer as a donation'),
+                  ),
+                ],
                 if (l.status == 'in_service') ...[
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
-                    onPressed: () => context.push(Routes.requests),
-                    icon: const Icon(Icons.build_circle_outlined),
-                    label: const Text('See the repair request'),
+                    onPressed: () => context.push(
+                      l.preferredService == 'recycling'
+                          ? Routes.recyclingRequests
+                          : l.preferredService == 'donation'
+                              ? Routes.donationsWith('donor')
+                              : Routes.requests,
+                    ),
+                    icon: Icon(l.preferredService == 'recycling'
+                        ? Icons.recycling_outlined
+                        : l.preferredService == 'donation'
+                            ? Icons.volunteer_activism_outlined
+                            : Icons.build_circle_outlined),
+                    label: Text(l.preferredService == 'recycling'
+                        ? 'See the recycling request'
+                        : l.preferredService == 'donation'
+                            ? 'See the donation'
+                            : 'See the repair request'),
                   ),
                 ],
                 const SizedBox(height: 12),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/network/api_exception.dart';
 import '../core/storage/key_value_store.dart';
@@ -21,13 +22,25 @@ class AuthController extends Notifier<AuthState> {
   @override
   AuthState build() {
     // When the server refuses the refresh token the person is signed out, wherever they are in the app.
-    ref.read(apiClientProvider).onSessionExpired = () => state = const AuthState(status: AuthStatus.unauthenticated);
+    ref.read(apiClientProvider).onSessionExpired = () {
+      _forgetSavedData();
+      state = const AuthState(status: AuthStatus.unauthenticated);
+    };
     return const AuthState();
   }
 
   AuthRepository get _repo => ref.read(authRepositoryProvider);
 
-  AuthState _signedIn(Me me) => AuthState(status: AuthStatus.authenticated, me: me);
+  AuthState _signedIn(Me me) {
+    ref.read(apiClientProvider).useCacheFor(me.user.id);
+    return AuthState(status: AuthStatus.authenticated, me: me);
+  }
+
+  /// Saved lists belong to the person who was signed in; they are wiped when that person leaves.
+  void _forgetSavedData() {
+    unawaited(ref.read(apiClientProvider).endCacheSession());
+    ref.read(savedDataSinceProvider.notifier).state = null;
+  }
 
   /// Called once at start-up. Never throws: if nobody can be restored the app simply shows the sign-in screens.
   /// (Offline start-up keeps the saved token, so the next launch with a connection signs in by itself.)
@@ -65,6 +78,7 @@ class AuthController extends Notifier<AuthState> {
 
   Future<void> signOut() async {
     await _repo.logout();
+    _forgetSavedData();
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 

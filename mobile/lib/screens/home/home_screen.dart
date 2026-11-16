@@ -6,6 +6,7 @@ import '../../features/home/role_actions.dart';
 import '../../models/user.dart';
 import '../../providers/auth_controller.dart';
 import '../../providers/core_providers.dart';
+import '../../routes/route_paths.dart';
 import '../../widgets/glass_container.dart';
 import '../../widgets/message_banner.dart';
 
@@ -60,7 +61,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             const SizedBox(height: 12),
           ],
-          if (notice != null) ...[MessageBanner(message: notice, tone: BannerTone.info), const SizedBox(height: 12)],
+          if (notice != null) ...[
+            MessageBanner(
+              message: notice,
+              tone: BannerTone.info,
+              action: TextButton(onPressed: () => context.push(Routes.verification), child: const Text('Open')),
+            ),
+            const SizedBox(height: 12),
+          ],
           if (!user.role.isProvider && user.role != UserRole.admin) ...[_GreenScoreCard(score: me.greenScore), const SizedBox(height: 20)],
           Semantics(header: true, child: Text('What you can do', style: theme.textTheme.titleLarge)),
           const SizedBox(height: 12),

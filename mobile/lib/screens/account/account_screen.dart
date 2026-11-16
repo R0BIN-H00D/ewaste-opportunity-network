@@ -97,6 +97,7 @@ class AccountScreen extends ConsumerWidget {
                 children: [
                   tile(Icons.notifications_none_rounded, 'Notifications', 'Updates about your devices and requests', Routes.notifications, badge: unread),
                   tile(Icons.person_outline_rounded, 'Profile', 'Name, phone and your area', Routes.profile),
+                  if (user.role.isProvider) tile(Icons.verified_user_outlined, 'Verification', 'Your documents and approval', Routes.verification),
                   tile(Icons.receipt_long_outlined, 'Transaction history', 'What you paid and were paid', Routes.payments),
                   tile(Icons.tune_rounded, 'Settings', 'Theme and messages', Routes.settings),
                   tile(Icons.help_outline_rounded, 'Help and support', 'Common questions and how to reach us', Routes.help),

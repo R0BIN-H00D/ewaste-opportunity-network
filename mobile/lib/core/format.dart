@@ -146,9 +146,243 @@ String formatDateTime(DateTime? value) {
   return '${d.day} ${_months[d.month - 1]} ${d.year}, $hour12:$minutes ${d.hour < 12 ? 'AM' : 'PM'}';
 }
 
+/// When saved data was kept: "3:05 PM" for today, otherwise the date and time. [now] is for tests.
+String formatSavedAt(DateTime saved, {DateTime? now}) {
+  final s = saved.toLocal();
+  final n = (now ?? DateTime.now()).toLocal();
+  if (s.year == n.year && s.month == n.month && s.day == n.day) {
+    final hour12 = s.hour % 12 == 0 ? 12 : s.hour % 12;
+    return '$hour12:${s.minute.toString().padLeft(2, '0')} ${s.hour < 12 ? 'AM' : 'PM'}';
+  }
+  return formatDateTime(s);
+}
+
 /// "16 Nov 2026".
 String formatDate(DateTime? value) {
   if (value == null) return '';
   final d = value.toLocal();
   return '${d.day} ${_months[d.month - 1]} ${d.year}';
 }
+
+/// Kinds of verification document (mirrors `DOC_TYPES` on the server).
+const Map<String, String> docTypeLabels = {
+  'id_proof': 'ID proof',
+  'qualification': 'Qualification certificate',
+  'student_id': 'Student ID',
+  'business': 'Business registration',
+  'authorization': 'Authorisation or licence',
+  'other': 'Other document',
+};
+
+/// Where a provider's approval stands (mirrors `VERIFICATION_STATUS`).
+const Map<String, String> verificationLabels = {
+  'not_submitted': 'Not submitted',
+  'pending': 'Under review',
+  'approved': 'Approved',
+  'rejected': 'Not approved',
+  'resubmission_required': 'More needed',
+};
+
+/// Where a recycling request stands, worded for the person who sent it (mirrors `RECYCLING_STATUS`).
+const Map<String, String> recyclingStatusLabels = {
+  'requested': 'Waiting for the centre',
+  'accepted': 'Accepted',
+  'pickup_scheduled': 'Pickup scheduled',
+  'collected': 'Handed over',
+  'received_at_center': 'Received at the centre',
+  'processed': 'Processed',
+  'completed': 'Completed',
+  'rejected': 'Declined',
+  'cancelled': 'Cancelled',
+};
+
+/// The same steps worded for the recycling centre, where the sender's wording would be wrong.
+const Map<String, String> recyclingCenterStatusLabels = {
+  'requested': 'New request',
+  'collected': 'Collected',
+  'received_at_center': 'Received',
+};
+
+/// A recycling status in words for whoever is looking.
+String recyclingStatusLabel(String status, {bool center = false}) =>
+    (center ? recyclingCenterStatusLabels[status] : null) ?? recyclingStatusLabels[status] ?? status;
+
+/// Recycling requests that can no longer change.
+const finalRecyclingStatuses = {'completed', 'rejected', 'cancelled'};
+
+/// What a centre can recover (mirrors `MATERIAL_TYPES`).
+const LabelPairs materialTypes = [
+  ('copper', 'Copper'),
+  ('aluminium', 'Aluminium'),
+  ('iron', 'Iron'),
+  ('plastics', 'Plastics'),
+  ('glass', 'Glass'),
+  ('other', 'Other'),
+];
+
+/// Kilograms the way people read them: "12 kg", "0.45 kg". No trailing zeros.
+String formatKg(num value) {
+  final text = value == value.roundToDouble() ? value.round().toString() : value.toStringAsFixed(3).replaceFirst(RegExp(r'0+$'), '');
+  return '$text kg';
+}
+
+/// The disclosed grade of a refurbished product (mirrors `PRODUCT_CONDITIONS`, BR-11).
+const LabelPairs productConditions = [
+  ('like_new', 'Like new'),
+  ('excellent', 'Excellent'),
+  ('good', 'Good'),
+  ('fair', 'Fair'),
+];
+
+const LabelPairs productSorts = [
+  ('newest', 'Newest'),
+  ('price_asc', 'Price: low to high'),
+  ('price_desc', 'Price: high to low'),
+  ('rating', 'Top rated'),
+];
+
+/// Payment is made to the seller directly; the app never handles money (BR-10).
+const LabelPairs paymentMethods = [
+  ('cod', 'Cash on delivery'),
+  ('offline', 'Pay the seller directly'),
+];
+
+/// Where an order stands, worded for the buyer (mirrors `ORDER_STATUS`).
+const Map<String, String> orderStatusLabels = {
+  'placed': 'Waiting for the seller',
+  'confirmed': 'Confirmed',
+  'ready': 'Ready',
+  'delivered': 'Handed over',
+  'completed': 'Completed',
+  'cancelled': 'Cancelled',
+};
+
+/// The same steps worded for the seller.
+const Map<String, String> sellerOrderStatusLabels = {
+  'placed': 'New order',
+  'delivered': 'Waiting for the buyer to confirm',
+};
+
+String orderStatusLabel(String status, {bool seller = false}) => (seller ? sellerOrderStatusLabels[status] : null) ?? orderStatusLabels[status] ?? status;
+
+/// "Refurbished · Good": the label and the disclosed grade always travel together (BR-11).
+String refurbishedLabel(String condition) => 'Refurbished · ${labelOf(productConditions, condition)}';
+
+/// Where a donation stands (mirrors the donation workflow in the API).
+const Map<String, String> donationStatusLabels = {
+  'open': 'Open',
+  'requested': 'Requests received',
+  'accepted': 'Recipient chosen',
+  'handover_scheduled': 'Handover arranged',
+  'completed': 'Completed',
+  'cancelled': 'Cancelled',
+};
+
+/// The same steps worded for someone who asked for the device.
+const Map<String, String> recipientDonationStatusLabels = {
+  'open': 'Open',
+  'requested': 'Waiting for the donor',
+  'accepted': 'You were chosen',
+  'handover_scheduled': 'Handover arranged',
+};
+
+String donationStatusLabel(String status, {bool recipient = false}) => (recipient ? recipientDonationStatusLabels[status] : null) ?? donationStatusLabels[status] ?? status;
+
+const Map<String, String> donationRequestStatusLabels = {
+  'pending': 'Waiting for a decision',
+  'accepted': 'Chosen',
+  'rejected': 'Not chosen',
+  'withdrawn': 'Withdrawn',
+};
+
+const LabelPairs orgTypes = [
+  ('school', 'School'),
+  ('college', 'College'),
+  ('ngo', 'NGO'),
+  ('trust', 'Trust'),
+  ('company', 'Company'),
+  ('other', 'Other'),
+];
+
+const LabelPairs difficulties = [
+  ('beginner', 'Beginner'),
+  ('intermediate', 'Intermediate'),
+  ('advanced', 'Advanced'),
+];
+
+/// Where a student's application stands, worded for the student.
+const Map<String, String> applicationStatusLabels = {
+  'applied': 'Waiting for review',
+  'accepted': 'Accepted',
+  'in_progress': 'In progress',
+  'completed': 'Completed',
+  'rejected': 'Not selected',
+  'withdrawn': 'Withdrawn',
+};
+
+String applicationStatusLabel(String status) => applicationStatusLabels[status] ?? status;
+
+/// Why a student cannot apply, in plain words (mirrors `BLOCK_MESSAGE` in the API).
+const Map<String, String> applyBlockMessages = {
+  'not_verified': 'Your student account must be verified by an administrator first.',
+  'already_applied': 'You have already applied to this task.',
+  'closed': 'This task is closed.',
+  'filled': 'All places on this task are taken.',
+  'deadline_passed': 'The application deadline has passed.',
+};
+
+/// "2 hours", "1.5 hours", "1 hour". Whole numbers have no decimal.
+String formatHours(num hours) {
+  final whole = hours == hours.roundToDouble();
+  final text = whole ? hours.round().toString() : hours.toStringAsFixed(1);
+  return '$text ${hours == 1 ? 'hour' : 'hours'}';
+}
+
+/// Where a refurbishment job stands, worded for the refurbisher.
+const Map<String, String> refurbStatusLabels = {
+  'offered': 'Offer sent',
+  'accepted': 'Offer accepted',
+  'collected': 'Collected',
+  'assessment': 'Being assessed',
+  'in_progress': 'Being refurbished',
+  'testing': 'Being tested',
+  'ready_to_list': 'Ready to sell',
+  'listed': 'On sale',
+  'cancelled': 'Cancelled',
+};
+
+/// The same steps worded for the owner of the device.
+const Map<String, String> ownerRefurbStatusLabels = {
+  'offered': 'Offer received',
+  'accepted': 'You accepted',
+  'collected': 'With the refurbisher',
+  'assessment': 'Being assessed',
+  'in_progress': 'Being refurbished',
+  'testing': 'Being tested',
+  'ready_to_list': 'Almost ready to sell',
+  'listed': 'On sale',
+  'cancelled': 'Cancelled',
+};
+
+String refurbStatusLabel(String status, {bool owner = false}) => (owner ? ownerRefurbStatusLabels[status] : null) ?? refurbStatusLabels[status] ?? status;
+
+/// The label for the button that moves a job on, by the step it leads to.
+const Map<String, String> refurbAdvanceLabels = {
+  'assessment': 'Start the assessment',
+  'in_progress': 'Start refurbishing',
+  'testing': 'Move to testing',
+  'ready_to_list': 'Mark ready to sell',
+};
+
+const LabelPairs productStatuses = [
+  ('active', 'On sale'),
+  ('hidden', 'Hidden'),
+  ('sold', 'Sold out'),
+];
+
+/// The states of a task a supervisor posted (mirrors the opportunity status).
+const LabelPairs opportunityStatuses = [
+  ('open', 'Open'),
+  ('closed', 'Closed'),
+  ('filled', 'Full'),
+];

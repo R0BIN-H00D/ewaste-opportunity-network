@@ -8,6 +8,34 @@ import '../screens/account/notifications_screen.dart';
 import '../screens/account/payments_screen.dart';
 import '../screens/account/profile_screen.dart';
 import '../screens/account/settings_screen.dart';
+import '../screens/account/verification_screen.dart';
+import '../screens/donations/donation_details_screen.dart';
+import '../screens/donations/donations_screen.dart';
+import '../screens/donations/offer_donation_screen.dart';
+import '../screens/donations/recipient_screen.dart';
+import '../screens/learning/applicants_screen.dart';
+import '../screens/learning/my_tasks_screen.dart';
+import '../screens/learning/opportunity_form_screen.dart';
+import '../screens/learning/application_details_screen.dart';
+import '../screens/learning/applications_screen.dart';
+import '../screens/learning/experience_screen.dart';
+import '../screens/learning/opportunities_screen.dart';
+import '../screens/learning/opportunity_details_screen.dart';
+import '../screens/marketplace/marketplace_screen.dart';
+import '../screens/marketplace/order_details_screen.dart';
+import '../screens/marketplace/orders_screen.dart';
+import '../screens/marketplace/product_details_screen.dart';
+import '../screens/recycling/center_details_screen.dart';
+import '../screens/recycling/centers_screen.dart';
+import '../screens/recycling/recycling_report_screen.dart';
+import '../screens/refurbishment/my_products_screen.dart';
+import '../screens/refurbishment/product_form_screen.dart';
+import '../screens/refurbishment/refurb_job_details_screen.dart';
+import '../screens/refurbishment/refurb_jobs_screen.dart';
+import '../screens/refurbishment/refurb_opportunities_screen.dart';
+import '../screens/recycling/recycle_screen.dart';
+import '../screens/recycling/recycling_details_screen.dart';
+import '../screens/recycling/recycling_requests_screen.dart';
 import '../screens/app_shell.dart';
 import '../screens/auth/forgot_password_screen.dart';
 import '../screens/devices/device_details_screen.dart';
@@ -100,6 +128,39 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: Routes.notifications, builder: (_, __) => const NotificationsPage()),
       GoRoute(path: Routes.payments, builder: (_, __) => const PaymentsPage()),
       GoRoute(path: Routes.help, builder: (_, __) => const HelpPage()),
+      GoRoute(path: Routes.verification, builder: (_, __) => const VerificationPage()),
+      GoRoute(path: Routes.donations, builder: (_, state) => DonationsPage(initialScope: state.uri.queryParameters['as'] ?? '')),
+      GoRoute(path: Routes.newDonation, builder: (_, state) => OfferDonationScreen(listingId: state.uri.queryParameters['listing'] ?? '')),
+      GoRoute(path: Routes.donationPattern, builder: (_, state) => DonationDetailsScreen(id: state.pathParameters['id']!)),
+      GoRoute(path: Routes.recipient, builder: (_, __) => const RecipientScreen()),
+      GoRoute(path: Routes.opportunities, builder: (_, __) => const OpportunitiesPage()),
+      GoRoute(path: Routes.myTasks, builder: (_, __) => const MyTasksPage()),
+      GoRoute(path: Routes.newTask, builder: (_, __) => const OpportunityFormScreen()),
+      GoRoute(path: Routes.taskEditPattern, builder: (_, state) => OpportunityFormScreen(opportunityId: state.pathParameters['id']!)),
+      GoRoute(path: Routes.applicantsPattern, builder: (_, state) => ApplicantsScreen(opportunityId: state.pathParameters['id']!)),
+      GoRoute(path: Routes.opportunityPattern, builder: (_, state) => OpportunityDetailsScreen(id: state.pathParameters['id']!)),
+      GoRoute(path: Routes.applications, builder: (_, state) => ApplicationsPage(initialStatus: state.uri.queryParameters['status'] ?? '')),
+      GoRoute(path: Routes.applicationPattern, builder: (_, state) => ApplicationDetailsScreen(id: state.pathParameters['id']!)),
+      GoRoute(path: Routes.experience, builder: (_, __) => const ExperienceScreen()),
+      GoRoute(path: Routes.recyclingReport, builder: (_, __) => const RecyclingReportScreen()),
+      GoRoute(path: Routes.refurbOpportunities, builder: (_, __) => const RefurbOpportunitiesPage()),
+      GoRoute(path: Routes.refurbJobs, builder: (_, state) => RefurbJobsPage(initialStatus: state.uri.queryParameters['status'] ?? '')),
+      GoRoute(path: Routes.refurbJobPattern, builder: (_, state) => RefurbJobDetailsScreen(id: state.pathParameters['id']!)),
+      GoRoute(path: Routes.myProducts, builder: (_, __) => const MyProductsPage()),
+      GoRoute(path: Routes.newProduct, builder: (_, state) => ProductFormScreen(jobId: state.uri.queryParameters['job'])),
+      GoRoute(path: Routes.editProductPattern, builder: (_, state) => ProductFormScreen(productId: state.pathParameters['id']!)),
+      GoRoute(path: Routes.shop, builder: (_, __) => const MarketplacePage()),
+      GoRoute(path: Routes.productPattern, builder: (_, state) => ProductDetailsScreen(id: state.pathParameters['id']!)),
+      GoRoute(path: Routes.orders, builder: (_, state) => OrdersPage(initialStatus: state.uri.queryParameters['status'] ?? '')),
+      GoRoute(path: Routes.orderPattern, builder: (_, state) => OrderDetailsScreen(id: state.pathParameters['id']!)),
+      GoRoute(path: Routes.recycling, builder: (_, state) => CentersPage(listingId: state.uri.queryParameters['listing'])),
+      GoRoute(path: Routes.centerPattern, builder: (_, state) => CenterDetailsScreen(id: state.pathParameters['id']!, listingId: state.uri.queryParameters['listing'])),
+      GoRoute(
+        path: Routes.newRecycling,
+        builder: (_, state) => RecycleScreen(centerId: state.uri.queryParameters['center'] ?? '', listingId: state.uri.queryParameters['listing']),
+      ),
+      GoRoute(path: Routes.recyclingRequests, builder: (_, state) => RecyclingRequestsPage(initialStatus: state.uri.queryParameters['status'] ?? '')),
+      GoRoute(path: Routes.recyclingRequestPattern, builder: (_, state) => RecyclingDetailsScreen(id: state.pathParameters['id']!)),
       // The signed-in app: one shell with a floating glass bottom bar. Role-specific tabs are added with each role's screens.
       StatefulShellRoute.indexedStack(
         builder: (_, __, shell) => AppShell(navigationShell: shell),

@@ -23,16 +23,31 @@ void main() {
     expect(byTitle['Browse devices'], Routes.browse);
     expect(byTitle['Find a technician'], Routes.technicians);
     expect(byTitle['My requests'], Routes.requests);
-    expect(byTitle['Recycle'], isNull);
+    expect(byTitle['Recycle'], Routes.recycling);
+    expect(byTitle['My recycling'], Routes.recyclingRequests);
     final tech = {for (final a in actionsFor(UserRole.technician)) a.title: a.route};
     expect(tech['Repair requests'], Routes.jobsBoard);
     expect(tech['My jobs'], Routes.jobsActive);
+    expect(tech['Student tasks'], Routes.myTasks);
+    final recycler = {for (final a in actionsFor(UserRole.recycler)) a.title: a.route};
+    expect(recycler['Recycling requests'], Routes.recyclingRequests);
+    expect(recycler['Pickups'], Routes.recyclingRequestsWith('pickup_scheduled'));
+    expect(recycler['Activity report'], Routes.recyclingReport);
+    expect(recycler['Materials'], Routes.recyclingRequestsWith('received_at_center'));
     // Roles whose screens are still to come keep saying "Soon".
-    for (final role in [UserRole.student, UserRole.refurbisher, UserRole.recycler]) {
-      for (final a in actionsFor(role)) {
-        expect(a.route, isNull, reason: '${role.name}: ${a.title}');
-      }
-    }
+    expect(byTitle['Refurbished shop'], Routes.shop);
+    expect(byTitle['My orders'], Routes.orders);
+    expect(byTitle['Donations'], Routes.donations);
+    expect(byTitle['My donations'], Routes.myDonations);
+    final refurbisher = {for (final a in actionsFor(UserRole.refurbisher)) a.title: a.route};
+    expect(refurbisher['Orders'], Routes.orders);
+    expect(refurbisher['Devices to refurbish'], Routes.refurbOpportunities);
+    expect(refurbisher['Refurbishment jobs'], Routes.refurbJobs);
+    expect(refurbisher['My products'], Routes.myProducts);
+    final student = {for (final a in actionsFor(UserRole.student)) a.title: a.route};
+    expect(student['Opportunities'], Routes.opportunities);
+    expect(student['My applications'], Routes.applications);
+    expect(student['Certificates'], Routes.experience);
   });
 
   test('administrators are pointed to the web dashboard', () {

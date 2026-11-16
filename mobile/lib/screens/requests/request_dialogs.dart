@@ -4,19 +4,21 @@ import '../../services/request_repository.dart';
 import '../../widgets/star_rating.dart';
 
 /// The review form after a completed service. Only the overall stars are required. `null` if the person backs out.
-Future<ReviewInput?> askReview(BuildContext context, {String? technicianName}) {
+/// [subject] is who is being reviewed, in a word ('technician', 'seller'); [technicianName] is their name when known.
+Future<ReviewInput?> askReview(BuildContext context, {String? technicianName, String subject = 'technician'}) {
   return showModalBottomSheet<ReviewInput>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (ctx) => _ReviewSheet(technicianName: technicianName),
+    builder: (ctx) => _ReviewSheet(technicianName: technicianName, subject: subject),
   );
 }
 
 class _ReviewSheet extends StatefulWidget {
-  const _ReviewSheet({this.technicianName});
+  const _ReviewSheet({this.technicianName, this.subject = 'technician'});
 
   final String? technicianName;
+  final String subject;
 
   @override
   State<_ReviewSheet> createState() => _ReviewSheetState();
@@ -68,9 +70,9 @@ class _ReviewSheetState extends State<_ReviewSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('How did ${widget.technicianName ?? 'the technician'} do?', style: theme.textTheme.titleLarge),
+            Text('How did ${widget.technicianName ?? 'the ${widget.subject}'} do?', style: theme.textTheme.titleLarge),
             const SizedBox(height: 4),
-            Text('Your review helps other people choose a technician.', style: theme.textTheme.bodyMedium),
+            Text('Your review helps other people choose a ${widget.subject}.', style: theme.textTheme.bodyMedium),
             const SizedBox(height: 12),
             Text('Overall rating', style: theme.textTheme.titleSmall),
             StarRating(

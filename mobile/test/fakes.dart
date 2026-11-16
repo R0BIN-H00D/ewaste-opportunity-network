@@ -1,16 +1,34 @@
 import 'package:ewaste_opportunity/core/network/api_exception.dart';
 import 'package:ewaste_opportunity/core/storage/key_value_store.dart';
+import 'package:ewaste_opportunity/models/donation.dart';
 import 'package:ewaste_opportunity/models/listing.dart';
+import 'package:ewaste_opportunity/models/learning.dart';
+import 'package:ewaste_opportunity/models/refurbishment.dart';
 import 'package:ewaste_opportunity/models/listing_input.dart';
+import 'package:ewaste_opportunity/models/marketplace.dart';
 import 'package:ewaste_opportunity/models/page_result.dart';
+import 'package:ewaste_opportunity/models/recycling.dart';
+import 'package:ewaste_opportunity/models/recycling_report.dart';
 import 'package:ewaste_opportunity/models/service_request.dart';
 import 'package:ewaste_opportunity/models/technician.dart';
+import 'package:ewaste_opportunity/models/verification.dart';
 import 'package:ewaste_opportunity/services/api_client.dart';
 import 'package:ewaste_opportunity/services/device_repository.dart';
+import 'package:ewaste_opportunity/services/donation_repository.dart';
+import 'package:ewaste_opportunity/services/learning_repository.dart';
+import 'package:ewaste_opportunity/services/marketplace_repository.dart';
+import 'package:ewaste_opportunity/services/refurbishment_repository.dart';
 import 'package:ewaste_opportunity/services/photo_picker.dart';
+import 'package:ewaste_opportunity/services/recycling_repository.dart';
 import 'package:ewaste_opportunity/services/request_repository.dart';
 import 'package:ewaste_opportunity/services/technician_repository.dart';
+import 'package:ewaste_opportunity/services/verification_repository.dart';
+import 'models/donation_models_test.dart';
+import 'models/learning_models_test.dart';
+import 'models/refurbishment_models_test.dart';
 import 'models/listing_test.dart';
+import 'models/marketplace_models_test.dart';
+import 'models/recycling_models_test.dart';
 import 'models/request_models_test.dart';
 
 Listing sampleListing({String id = 'l1', String title = 'Old Samsung phone', bool isOwner = false, String status = 'listed'}) =>
@@ -196,4 +214,679 @@ class FakeRequestRepository extends RequestRepository {
   @override
   Future<ServiceRequest> startDelivery(String id, {DateTime? returnDate, String? returnSlot}) async =>
       _done('deliver:${returnDate == null ? 'no-date' : 'date'}:${returnSlot ?? ''}');
+}
+
+
+Map<String, dynamic> verificationDocJson({String id = 'd1', String docType = 'id_proof', String status = 'pending', String? reason}) => {
+      '_id': id,
+      'docType': docType,
+      'status': status,
+      'reason': reason,
+      'submittedAt': '2026-11-10T09:00:00.000Z',
+      'file': {'mime': 'image/jpeg', 'bytes': 120000, 'originalName': 'id.jpg'},
+    };
+
+Map<String, dynamic> verificationJson({String status = 'not_submitted', String? reason, List<Map<String, dynamic>> documents = const []}) => {
+      'status': status,
+      'reason': reason,
+      'allowedDocTypes': ['id_proof', 'qualification', 'other'],
+      'documents': documents,
+    };
+
+/// A [VerificationRepository] that never touches the network and records what was sent.
+class FakeVerificationRepository extends VerificationRepository {
+  FakeVerificationRepository({VerificationStatus? current}) : current = current ?? VerificationStatus.fromJson(verificationJson()), super(ApiClient(store: MemoryKeyValueStore()));
+
+  VerificationStatus current;
+  ApiException? error;
+  final calls = <String>[];
+
+  @override
+  Future<VerificationStatus> status() async {
+    final e = error;
+    if (e != null) throw e;
+    return current;
+  }
+
+  @override
+  Future<void> submit(String docType, List<PickedPhoto> photos, {void Function(double progress)? onProgress}) async {
+    calls.add('submit:$docType:${photos.length}');
+    current = VerificationStatus.fromJson(verificationJson(status: 'pending', documents: [verificationDocJson(docType: docType)]));
+  }
+
+  @override
+  Future<void> remove(String id) async {
+    calls.add('remove:$id');
+    current = VerificationStatus.fromJson(verificationJson());
+  }
+}
+
+
+RecyclingCenter sampleCenter({String id = 'ce1', String name = 'GreenCycle Recyclers'}) => RecyclingCenter.fromJson(centerJson(id: id, name: name, detail: true));
+
+RecyclingRequest sampleRecycling({
+  String id = 'rr1',
+  String status = 'requested',
+  String role = 'requester',
+  List<String> actions = const [],
+  bool address = true,
+  List<Map<String, dynamic>> materials = const [],
+  bool byUser = false,
+  bool byCenter = false,
+  String? cancelReason,
+  Map<String, dynamic>? pickup,
+}) =>
+    RecyclingRequest.fromJson(
+      recyclingJson(id: id, status: status, role: role, actions: actions, address: address, materials: materials, byUser: byUser, byCenter: byCenter, cancelReason: cancelReason, pickup: pickup),
+    );
+
+/// A [RecyclingRepository] that never touches the network. Every action records itself in [calls] and answers with [result].
+class FakeRecyclingRepository extends RecyclingRepository {
+  FakeRecyclingRepository({RecyclingRequest? current, this.centerList = const [], this.pages = const {}, this.pageCount = 1})
+      : current = current ?? sampleRecycling(),
+        super(ApiClient(store: MemoryKeyValueStore()));
+
+  RecyclingRequest current;
+  List<RecyclingCenter> centerList;
+  Map<int, List<RecyclingRequest>> pages;
+  int pageCount;
+
+  /// What the next action answers with. Defaults to [current].
+  RecyclingRequest? result;
+  ApiException? actionError;
+  final calls = <String>[];
+  final centerQueries = <CenterQuery>[];
+  final listCalls = <({String? status, int page})>[];
+
+  RecyclingRequest _done(String call) {
+    final e = actionError;
+    if (e != null) throw e;
+    calls.add(call);
+    return result ?? current;
+  }
+
+  @override
+  Future<PageResult<RecyclingCenter>> centers(CenterQuery query) async {
+    centerQueries.add(query);
+    final e = actionError;
+    if (e != null) throw e;
+    return PageResult(items: query.page == 1 ? centerList : const [], page: query.page, pages: 1, total: centerList.length);
+  }
+
+  @override
+  Future<RecyclingCenter> center(String id) async {
+    for (final c in centerList) {
+      if (c.id == id) return c;
+    }
+    return sampleCenter(id: id);
+  }
+
+  @override
+  Future<RecyclingRequest> create({
+    required String centerId,
+    required List<String> categoryIds,
+    required int deviceCount,
+    required String area,
+    required String address,
+    DateTime? preferredDate,
+    String? notes,
+    String? listingId,
+    List<PickedPhoto> photos = const [],
+  }) async {
+    final e = actionError;
+    if (e != null) throw e;
+    calls.add('create:$centerId:${categoryIds.join('|')}:$deviceCount:$area:$address:${notes ?? ''}:${photos.length}:${listingId ?? '-'}');
+    return sampleRecycling(id: 'rr-new');
+  }
+
+  @override
+  Future<PageResult<RecyclingRequest>> list({String? as, String? status, int page = 1}) async {
+    listCalls.add((status: status, page: page));
+    final items = pages[page] ?? const <RecyclingRequest>[];
+    return PageResult(items: items, page: page, pages: pageCount, total: pages.values.fold(0, (n, l) => n + l.length));
+  }
+
+  @override
+  Future<RecyclingRequest> get(String id) async => current;
+
+  @override
+  Future<RecyclingRequest> accept(String id) async => _done('accept');
+
+  @override
+  Future<RecyclingRequest> reject(String id, String reason) async => _done('reject:$reason');
+
+  @override
+  Future<RecyclingRequest> markReceived(String id) async => _done('received');
+
+  @override
+  Future<RecyclingRequest> markProcessed(String id) async => _done('processed');
+
+  @override
+  Future<RecyclingRequest> complete(String id) async => _done('complete');
+
+  @override
+  Future<RecyclingRequest> schedulePickup(String id, {required DateTime date, String? timeSlot, String? notes}) async => _done('pickup');
+
+  @override
+  Future<RecyclingRequest> confirmHandover(String id, {bool acknowledgeChecklist = false}) async => _done('handover:${acknowledgeChecklist ? 'checklist' : 'plain'}');
+
+  @override
+  Future<RecyclingRequest> saveMaterials(String id, List<RecoveredMaterial> materials, {String? reportNotes}) async =>
+      _done('materials:${materials.map((m) => '${m.type}=${m.actualKg ?? '-'}/${m.estimatedKg ?? '-'}').join(',')}:${reportNotes ?? ''}');
+
+  @override
+  Future<RecyclingRequest> cancel(String id, {String? reason}) async => _done('cancel:${reason ?? ''}');
+
+  RecyclingReport? reportData;
+  final reportCalls = <({DateTime? from, DateTime? to})>[];
+
+  @override
+  Future<RecyclingReport> report({DateTime? from, DateTime? to, String? category}) async {
+    reportCalls.add((from: from, to: to));
+    return reportData ?? const RecyclingReport(center: 'GreenCycle Recyclers');
+  }
+
+}
+
+
+Product sampleProduct({String id = 'p1', String title = 'Refurbished ThinkPad', int stock = 3, String status = 'active', bool isMine = false}) =>
+    Product.fromJson(productJson(id: id, title: title, detail: true, stock: stock, status: status, isMine: isMine));
+
+Order sampleOrder({
+  String id = 'o1',
+  String status = 'placed',
+  String role = 'buyer',
+  List<String> actions = const [],
+  bool canReview = false,
+  bool reviewed = false,
+  String? cancelReason,
+  String paymentStatus = 'pending',
+}) =>
+    Order.fromJson(orderJson(id: id, status: status, role: role, actions: actions, canReview: canReview, reviewed: reviewed, cancelReason: cancelReason, paymentStatus: paymentStatus));
+
+/// A [MarketplaceRepository] that never touches the network. Every action records itself in [calls] and answers with [result].
+class FakeMarketplaceRepository extends MarketplaceRepository {
+  FakeMarketplaceRepository({Order? current, Product? product, this.productPages = const {}, this.pages = const {}, this.pageCount = 1})
+      : current = current ?? sampleOrder(),
+        shown = product ?? sampleProduct(),
+        super(ApiClient(store: MemoryKeyValueStore()));
+
+  Order current;
+  Product shown;
+  Map<int, List<Product>> productPages;
+  Map<int, List<Order>> pages;
+  int pageCount;
+
+  /// What the next action answers with. Defaults to [current].
+  Order? result;
+  ApiException? actionError;
+  final calls = <String>[];
+  final productQueries = <ProductQuery>[];
+  final listCalls = <({String? status, int page})>[];
+
+  Order _done(String call) {
+    final e = actionError;
+    if (e != null) throw e;
+    calls.add(call);
+    return result ?? current;
+  }
+
+  @override
+  Future<PageResult<Product>> products(ProductQuery query) async {
+    productQueries.add(query);
+    final items = productPages[query.page] ?? const <Product>[];
+    return PageResult(items: items, page: query.page, pages: 1, total: items.length);
+  }
+
+  @override
+  Future<Product> product(String id) async => shown;
+
+  @override
+  Future<void> enquire(String productId, String message) async {
+    final e = actionError;
+    if (e != null) throw e;
+    calls.add('enquire:$productId:$message');
+  }
+
+  @override
+  Future<Order> placeOrder({required String productId, int quantity = 1, String paymentMethod = 'cod', String? deliveryArea, String? notes}) async {
+    final e = actionError;
+    if (e != null) throw e;
+    calls.add('place:$productId:$quantity:$paymentMethod:${deliveryArea ?? ''}:${notes ?? ''}');
+    return sampleOrder(id: 'o-new');
+  }
+
+  /// The seller's own products, by page.
+  Map<int, List<Product>> minePages = const {};
+  final mineCalls = <String?>[];
+  final inputs = <ProductInput>[];
+
+  @override
+  Future<PageResult<Product>> mine({String? status, int page = 1}) async {
+    mineCalls.add(status);
+    final items = minePages[page] ?? const <Product>[];
+    return PageResult(items: items, page: page, pages: 1, total: items.length);
+  }
+
+  @override
+  Future<Product> createProduct(ProductInput input) async {
+    final e = actionError;
+    if (e != null) throw e;
+    inputs.add(input);
+    calls.add('create:${input.title}');
+    return sampleProduct(id: 'p-new', title: input.title ?? 'New product', isMine: true);
+  }
+
+  @override
+  Future<Product> updateProduct(String id, ProductInput input) async {
+    final e = actionError;
+    if (e != null) throw e;
+    inputs.add(input);
+    calls.add('update:$id');
+    return sampleProduct(id: id, title: input.title ?? 'Product', isMine: true);
+  }
+
+  @override
+  Future<void> removeProduct(String id) async {
+    final e = actionError;
+    if (e != null) throw e;
+    calls.add('remove:$id');
+  }
+
+  @override
+  Future<PageResult<Order>> orders({String? as, String? status, int page = 1}) async {
+    listCalls.add((status: status, page: page));
+    final items = pages[page] ?? const <Order>[];
+    return PageResult(items: items, page: page, pages: pageCount, total: pages.values.fold(0, (n, l) => n + l.length));
+  }
+
+  @override
+  Future<Order> order(String id) async => current;
+
+  @override
+  Future<Order> confirm(String id) async => _done('confirm');
+
+  @override
+  Future<Order> markReady(String id) async => _done('ready');
+
+  @override
+  Future<Order> markDelivered(String id) async => _done('delivered');
+
+  @override
+  Future<Order> complete(String id) async => _done('complete');
+
+  @override
+  Future<Order> cancel(String id, {String? reason}) async => _done('cancel:${reason ?? ''}');
+
+  @override
+  Future<Order> review(String id, ReviewInput input) async => _done('review:${input.toJson()}');
+}
+
+
+Donation sampleDonation({
+  String id = 'd1',
+  String status = 'open',
+  String role = 'visitor',
+  List<String> actions = const [],
+  int? pendingRequests,
+  Map<String, dynamic>? myRequest,
+  List<Map<String, dynamic>> requests = const [],
+  bool withRecipient = false,
+  Map<String, dynamic>? pickup,
+  bool donorConfirmed = false,
+  bool recipientConfirmed = false,
+  String? cancelReason,
+  String? refNo,
+}) =>
+    Donation.fromJson(donationJson(
+      id: id,
+      status: status,
+      role: role,
+      actions: actions,
+      pendingRequests: pendingRequests,
+      myRequest: myRequest,
+      requests: requests,
+      withRecipient: withRecipient,
+      pickup: pickup,
+      donorConfirmed: donorConfirmed,
+      recipientConfirmed: recipientConfirmed,
+      cancelReason: cancelReason,
+      refNo: refNo,
+    ));
+
+/// A [DonationRepository] that never touches the network. Every action records itself in [calls] and answers with [result].
+class FakeDonationRepository extends DonationRepository {
+  FakeDonationRepository({Donation? current, this.pages = const {}, this.pageCount = 1, this.recipient = const RecipientStatus()})
+      : current = current ?? sampleDonation(),
+        super(ApiClient(store: MemoryKeyValueStore()));
+
+  Donation current;
+  Map<int, List<Donation>> pages;
+  int pageCount;
+  RecipientStatus recipient;
+
+  /// What the next action answers with. Defaults to [current].
+  Donation? result;
+  ApiException? actionError;
+  final calls = <String>[];
+  final queries = <DonationQuery>[];
+
+  Donation _done(String call) {
+    final e = actionError;
+    if (e != null) throw e;
+    calls.add(call);
+    return result ?? current;
+  }
+
+  @override
+  Future<PageResult<Donation>> donations(DonationQuery query) async {
+    queries.add(query);
+    final items = pages[query.page] ?? const <Donation>[];
+    return PageResult(items: items, page: query.page, pages: pageCount, total: pages.values.fold(0, (n, l) => n + l.length));
+  }
+
+  @override
+  Future<Donation> donation(String id) async => current;
+
+  @override
+  Future<Donation> offer({required String listingId, String? description}) async {
+    final e = actionError;
+    if (e != null) throw e;
+    calls.add('offer:$listingId:${description?.trim() ?? ''}');
+    return sampleDonation(id: 'd-new');
+  }
+
+  @override
+  Future<Donation> request(String id, {required String justification, String? intendedUse}) async => _done('request:$justification:${intendedUse?.trim() ?? ''}');
+
+  @override
+  Future<Donation> withdraw(String id) async => _done('withdraw');
+
+  @override
+  Future<Donation> decide(String id, String requestId, {required bool accept}) async => _done('decide:$requestId:$accept');
+
+  @override
+  Future<Donation> scheduleHandover(String id, {required DateTime date, String? timeSlot, String? notes}) async => _done('handover-time');
+
+  @override
+  Future<Donation> confirmHandover(String id, {bool acknowledgeChecklist = false}) async => _done(acknowledgeChecklist ? 'confirm:checklist' : 'confirm:plain');
+
+  @override
+  Future<Donation> cancel(String id, {String? reason}) async => _done('cancel:${reason ?? ''}');
+
+  @override
+  Future<DonationConfirmation> confirmation(String id) async => const DonationConfirmation(
+        refNo: 'DON-2026-0001',
+        deviceTitle: 'Old Dell laptop',
+        donorName: 'Ravi Kumar',
+        recipientName: 'Meena',
+        recipientOrg: 'Sunrise School',
+        statement: 'No payment was made or processed.',
+      );
+
+  @override
+  Future<RecipientStatus> recipientStatus() async => recipient;
+
+  @override
+  Future<RecipientStatus> applyAsRecipient({required String orgType, required String orgName, required String registrationNo}) async {
+    final e = actionError;
+    if (e != null) throw e;
+    calls.add('apply:$orgType:${orgName.trim()}:${registrationNo.trim()}');
+    recipient = RecipientStatus(isOrg: true, orgType: orgType, orgName: orgName, registrationNo: registrationNo, status: 'pending');
+    return recipient;
+  }
+}
+
+
+Opportunity sampleOpportunity({String id = 'o1', String? applyBlock, Map<String, dynamic>? myApplication, String? viewerRole = 'student', int seatsLeft = 2}) =>
+    Opportunity.fromJson(opportunityJson(id: id, applyBlock: applyBlock, myApplication: myApplication, viewerRole: viewerRole, seatsLeft: seatsLeft));
+
+Application sampleApplication({String id = 'a1', String status = 'applied', List<String> actions = const ['withdraw'], double hours = 0, String? feedback, String? certificate}) =>
+    Application.fromJson(applicationJson(id: id, status: status, actions: actions, hours: hours, feedback: feedback, certificate: certificate));
+
+/// A task as its supervisor sees it: no apply block, with the applicant counts.
+Opportunity sampleTask({String id = 'o1', String status = 'open', Map<String, int> counts = const {'applied': 2, 'accepted': 1}}) =>
+    Opportunity.fromJson({...opportunityJson(id: id, viewerRole: 'supervisor', status: status), 'counts': counts});
+
+/// An application as the supervisor sees it, with the student's public details.
+Application sampleApplicant({String id = 'a1', String status = 'applied', List<String> actions = const ['accept', 'reject']}) => Application.fromJson({
+      ...applicationJson(id: id, status: status, actions: actions),
+      'viewerRole': 'supervisor',
+      'student': {'_id': 's1', 'name': 'Priya', 'college': 'NIT Trichy', 'course': 'ECE', 'yearOfStudy': 3, 'hoursCompleted': 6, 'skills': ['testing']},
+    });
+
+/// A [LearningRepository] that never touches the network. Every action records itself in [calls] and answers with [result].
+class FakeLearningRepository extends LearningRepository {
+  FakeLearningRepository({
+    Opportunity? opportunity,
+    Application? current,
+    this.opportunityPages = const {},
+    this.pages = const {},
+    this.pageCount = 1,
+    Experience? experience,
+    this.certificateList = const [],
+  })  : shown = opportunity ?? sampleOpportunity(),
+        current = current ?? sampleApplication(),
+        experienceData = experience ?? const Experience(summary: StudentSummary()),
+        super(ApiClient(store: MemoryKeyValueStore()));
+
+  Opportunity shown;
+  Application current;
+  Map<int, List<Opportunity>> opportunityPages;
+  Map<int, List<Application>> pages;
+  int pageCount;
+  Experience experienceData;
+  List<Certificate> certificateList;
+
+  /// What the next action answers with. Defaults to [current].
+  Application? result;
+  ApiException? actionError;
+  final calls = <String>[];
+  final opportunityQueries = <OpportunityQuery>[];
+  final listCalls = <({String? status, int page})>[];
+
+  @override
+  Future<PageResult<Opportunity>> opportunities(OpportunityQuery query) async {
+    opportunityQueries.add(query);
+    final items = opportunityPages[query.page] ?? const <Opportunity>[];
+    return PageResult(items: items, page: query.page, pages: pageCount, total: items.length);
+  }
+
+  @override
+  Future<Opportunity> opportunity(String id) async => shown;
+
+  @override
+  Future<Application> apply(String opportunityId, {String? message}) async {
+    final e = actionError;
+    if (e != null) throw e;
+    calls.add('apply:$opportunityId:${message?.trim() ?? ''}');
+    return sampleApplication(id: 'a-new');
+  }
+
+  @override
+  Future<PageResult<Application>> applications({String? status, int page = 1}) async {
+    listCalls.add((status: status, page: page));
+    final items = pages[page] ?? const <Application>[];
+    return PageResult(items: items, page: page, pages: pageCount, total: items.length);
+  }
+
+  @override
+  Future<Application> application(String id) async => current;
+
+  @override
+  Future<Application> withdraw(String id, {String? reason}) async {
+    final e = actionError;
+    if (e != null) throw e;
+    calls.add('withdraw:${reason ?? ''}');
+    return result ?? current;
+  }
+
+  @override
+  Future<Experience> experience() async => experienceData;
+
+  @override
+  Future<List<Certificate>> certificates() async => certificateList;
+
+  /// The supervisor's own tasks, by page, and the applicants on a task.
+  Map<int, List<Opportunity>> minePages = const {};
+  List<Application> applicantList = const [];
+  final mineCalls = <String?>[];
+  final applicantCalls = <String?>[];
+  final inputs = <OpportunityInput>[];
+
+  @override
+  Future<PageResult<Opportunity>> myOpportunities({String? status, int page = 1}) async {
+    mineCalls.add(status);
+    final items = minePages[page] ?? const <Opportunity>[];
+    return PageResult(items: items, page: page, pages: 1, total: items.length);
+  }
+
+  @override
+  Future<Opportunity> createOpportunity(OpportunityInput input) async {
+    final e = actionError;
+    if (e != null) throw e;
+    inputs.add(input);
+    calls.add('post:${input.title}');
+    return sampleTask(id: 'o-new');
+  }
+
+  @override
+  Future<Opportunity> updateOpportunity(String id, OpportunityInput input) async {
+    final e = actionError;
+    if (e != null) throw e;
+    inputs.add(input);
+    calls.add('edit:$id');
+    return sampleTask(id: id);
+  }
+
+  @override
+  Future<Opportunity> setOpportunityOpen(String id, {required bool open}) async {
+    final e = actionError;
+    if (e != null) throw e;
+    calls.add(open ? 'open:$id' : 'close:$id');
+    return sampleTask(id: id, status: open ? 'open' : 'closed');
+  }
+
+  @override
+  Future<PageResult<Application>> applicants(String opportunityId, {String? status, int page = 1}) async {
+    applicantCalls.add(status);
+    return PageResult(items: applicantList, page: page, pages: 1, total: applicantList.length);
+  }
+
+  Application _done(String call) {
+    final e = actionError;
+    if (e != null) throw e;
+    calls.add(call);
+    return result ?? current;
+  }
+
+  @override
+  Future<Application> decide(String id, {required bool accept, String? feedback}) async => _done('${accept ? 'accept' : 'reject'}:${feedback ?? ''}');
+
+  @override
+  Future<Application> start(String id) async => _done('start');
+
+  @override
+  Future<Application> complete(String id, {required double hours, String? feedback}) async => _done('complete:$hours:${feedback ?? ''}');
+
+}
+
+
+RefurbOpportunity sampleRefurbOpportunity({String id = 'l1', bool hasOffered = false}) => RefurbOpportunity.fromJson(refurbOpportunityJson(id: id, hasOffered: hasOffered));
+
+RefurbJob sampleRefurbJob({
+  String id = 'j1',
+  String status = 'offered',
+  String role = 'refurbisher',
+  List<String> actions = const ['withdraw'],
+  Map<String, dynamic>? pickup,
+  bool ownerConfirmed = false,
+  bool refurbisherConfirmed = false,
+  List<String> photoStages = const [],
+  String? nextStatus,
+  double amount = 500,
+}) =>
+    RefurbJob.fromJson(refurbJobJson(
+      id: id,
+      status: status,
+      role: role,
+      actions: actions,
+      pickup: pickup,
+      ownerConfirmed: ownerConfirmed,
+      refurbisherConfirmed: refurbisherConfirmed,
+      photoStages: photoStages,
+      nextStatus: nextStatus,
+      amount: amount,
+    ));
+
+/// A [RefurbishmentRepository] that never touches the network. Every action records itself in [calls] and answers with [result].
+class FakeRefurbishmentRepository extends RefurbishmentRepository {
+  FakeRefurbishmentRepository({RefurbJob? current, this.opportunityPages = const {}, this.pages = const {}, this.pageCount = 1})
+      : current = current ?? sampleRefurbJob(),
+        super(ApiClient(store: MemoryKeyValueStore()));
+
+  RefurbJob current;
+  Map<int, List<RefurbOpportunity>> opportunityPages;
+  Map<int, List<RefurbJob>> pages;
+  int pageCount;
+
+  /// What the next action answers with. Defaults to [current].
+  RefurbJob? result;
+  ApiException? actionError;
+  final calls = <String>[];
+  final opportunityQueries = <RefurbOpportunityQuery>[];
+  final listCalls = <({String? as, String? status, int page})>[];
+
+  RefurbJob _done(String call) {
+    final e = actionError;
+    if (e != null) throw e;
+    calls.add(call);
+    return result ?? current;
+  }
+
+  @override
+  Future<PageResult<RefurbOpportunity>> opportunities(RefurbOpportunityQuery query) async {
+    opportunityQueries.add(query);
+    final items = opportunityPages[query.page] ?? const <RefurbOpportunity>[];
+    return PageResult(items: items, page: query.page, pages: pageCount, total: items.length);
+  }
+
+  @override
+  Future<RefurbJob> makeOffer({required String listingId, double? amount, String? message}) async {
+    final e = actionError;
+    if (e != null) throw e;
+    calls.add('offer:$listingId:${amount ?? ''}:${message?.trim() ?? ''}');
+    return sampleRefurbJob(id: 'j-new');
+  }
+
+  @override
+  Future<PageResult<RefurbJob>> jobs({String? as, String? status, int page = 1}) async {
+    listCalls.add((as: as, status: status, page: page));
+    final items = pages[page] ?? const <RefurbJob>[];
+    return PageResult(items: items, page: page, pages: pageCount, total: items.length);
+  }
+
+  @override
+  Future<RefurbJob> job(String id) async => current;
+
+  @override
+  Future<RefurbJob> decide(String id, {required bool accept}) async => _done(accept ? 'accept' : 'reject');
+
+  @override
+  Future<RefurbJob> withdraw(String id) async => _done('withdraw');
+
+  @override
+  Future<RefurbJob> scheduleHandover(String id, {required DateTime date, String? timeSlot, String? notes}) async => _done('schedule');
+
+  @override
+  Future<RefurbJob> confirmHandover(String id, {bool acknowledgeChecklist = false}) async => _done('confirm:$acknowledgeChecklist');
+
+  @override
+  Future<RefurbJob> advance(String id, {required String status, String? note}) async => _done('advance:$status:${note ?? ''}');
+
+  @override
+  Future<RefurbJob> addPhotos(String id, {required String stage, required List<PickedPhoto> photos, String? note}) async => _done('photos:$stage:${photos.length}:${note ?? ''}');
+
+  @override
+  Future<RefurbJob> cancel(String id, {String? reason}) async => _done('cancel:${reason ?? ''}');
 }

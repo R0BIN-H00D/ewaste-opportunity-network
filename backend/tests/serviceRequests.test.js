@@ -153,6 +153,18 @@ describe('repair workflow (happy path, FR-SVC)', () => {
     expect(q.statusHistory.map((h) => h.status)).toEqual(expect.arrayContaining(['request_submitted', 'technician_assigned', 'device_collected', 'quotation_submitted', 'customer_approval_pending', 'repair_in_progress', 'repair_completed', 'service_completed']));
   });
 
+  it('keeps each progress update together with its own photos', async () => {
+    const { id } = await toRepair();
+    const progress = () => request(app).post(`/api/service-requests/${id}/progress`).set(authHeader(tech));
+    expect((await progress().field('note', 'Screen ordered').attach('photos', PNG, { filename: 'a.png', contentType: 'image/png' })).status).toBe(200);
+    expect((await progress().field('note', 'Screen fitted, testing')).status).toBe(200);
+
+    const r = (await api.get(owner, id)).body.data;
+    expect(r.progressUpdates.map((u) => [u.text, u.photos.length])).toEqual([['Screen ordered', 1], ['Screen fitted, testing', 0]]);
+    expect(r.progressPhotos).toHaveLength(1); // the flat lists stay for older clients
+    expect(r.repairNotes.map((n) => n.text)).toEqual(['Screen ordered', 'Screen fitted, testing']);
+  });
+
   it('starting delivery can say when the device comes back, and the owner sees it', async () => {
     const { id } = await toRepair();
     expect((await api.complete(tech, id)).status).toBe(200);
@@ -276,6 +288,20 @@ describe('rules that must hold', () => {
     p.date = new Date(Date.now() + 3600 * 1000);
     await p.save();
     expect((await api.post(owner, id, 'pickup', { date: tomorrow() })).body.code).toBe('RESCHEDULE_TOO_LATE');
+  });
+
+  it('cancelling after the technician has the device asks them to return it', async () => {
+    const id = await toDiagnosis(); // both handovers confirmed, device with the technician
+    expect((await api.post(owner, id, 'cancel', { reason: 'Changed my mind' })).status).toBe(200);
+    const sent = await Notification.findOne({ user: tech.id, type: 'request.cancelled' }).lean();
+    expect(sent.body).toBe('Changed my mind You still have the device. Please arrange to return it to the owner.');
+
+    // the cancel released the listing, so it can be requested again; cancelling before pickup sends no return note
+    const early = await createTargeted();
+    await Notification.deleteMany({});
+    expect((await api.post(owner, early, 'cancel')).status).toBe(200);
+    const plain = await Notification.findOne({ user: tech.id, type: 'request.cancelled' }).lean();
+    expect(plain.body).toBeUndefined();
   });
 
   it('cancelling releases the listing so it can be requested again', async () => {

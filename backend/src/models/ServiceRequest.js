@@ -20,6 +20,8 @@ const schema = baseSchema({
   diagnosisNotes: String,
   repairNotes: [new Schema({ text: String, by: { type: ObjectId, ref: 'User' }, at: { type: Date, default: Date.now } }, { _id: false })],
   progressPhotos: [photoSchema],
+  // Each progress update as one item, so its photos stay with its note (repairNotes/progressPhotos keep the flat lists).
+  progressUpdates: [new Schema({ text: String, photos: [photoSchema], by: { type: ObjectId, ref: 'User' }, at: { type: Date, default: Date.now } }, { _id: false })],
   completionPhotos: [photoSchema],
   activeQuotation: { type: ObjectId, ref: 'Quotation' },
   pickup: { type: ObjectId, ref: 'PickupSchedule' },

@@ -51,7 +51,9 @@ String nextStepHint(ServiceRequest r) {
     case 'rejected':
       return 'The technician could not take this one. Your device is listed again, so you can ask someone else.';
     case 'cancelled':
-      return 'This request was cancelled. Your device is listed again.';
+      return r.technicianHasDevice
+          ? 'This request was cancelled. ${r.technicianName ?? 'The technician'} still has your device and has been asked to return it.'
+          : 'This request was cancelled. Your device is listed again.';
     default:
       return '';
   }
@@ -182,7 +184,9 @@ class _BodyState extends ConsumerState<_Body> {
       context,
       title: 'Cancel this request?',
       confirmLabel: 'Cancel request',
-      message: 'Your device is listed again so you can ask someone else.',
+      message: r.technicianHasDevice
+          ? '${r.technicianName ?? 'The technician'} still has your device. They will be asked to return it, and you arrange the handover with them. Your device is then listed again.'
+          : 'Your device is listed again so you can ask someone else.',
     );
     if (answer == null) return;
     await _act((repo) => repo.cancel(r.id, reason: answer.reason), done: 'Request cancelled');
@@ -264,7 +268,7 @@ class _BodyState extends ConsumerState<_Body> {
           ),
         ),
         if (showQuote) ...[const SizedBox(height: 16), _QuoteCard(quotation: q)],
-        if (r.repairNotes.isNotEmpty || r.progressPhotos.isNotEmpty) ...[const SizedBox(height: 16), _RepairUpdates(request: r)],
+        if (r.progressUpdates.isNotEmpty || r.repairNotes.isNotEmpty || r.progressPhotos.isNotEmpty) ...[const SizedBox(height: 16), _RepairUpdates(request: r)],
         if (r.status == 'device_collection_pending' || r.status == 'device_delivery_pending') ...[const SizedBox(height: 16), _HandoverCard(request: r)],
         if (buttons.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -362,7 +366,8 @@ class _HandoverCard extends StatelessWidget {
   }
 }
 
-/// What the technician has posted while checking or repairing: their notes (newest first), then their photos.
+/// What the technician has posted while checking or repairing, newest first: each update with its own photos, or for
+/// older requests the notes followed by all the photos.
 class _RepairUpdates extends StatelessWidget {
   const _RepairUpdates({required this.request});
 
@@ -371,6 +376,35 @@ class _RepairUpdates extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final grouped = request.progressUpdates.reversed.toList();
+    if (grouped.isNotEmpty) {
+      return GlassContainer(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Semantics(header: true, child: Text('Repair updates', style: theme.textTheme.titleLarge)),
+            for (final u in grouped)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (u.text.isNotEmpty) Text(u.text, style: theme.textTheme.bodyLarge),
+                    if (u.at != null) Text(formatDateTime(u.at), style: theme.textTheme.bodyMedium?.copyWith(fontSize: 12)),
+                    if (u.photos.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Semantics(
+                        label: '${u.photos.length} ${u.photos.length == 1 ? 'photo' : 'photos'} with this update',
+                        child: _StepPhotos(photos: u.photos),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+          ],
+        ),
+      );
+    }
     final notes = request.repairNotes.reversed.toList();
     final photos = request.progressPhotos;
     return GlassContainer(

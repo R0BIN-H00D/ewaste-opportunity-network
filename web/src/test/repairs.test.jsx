@@ -244,6 +244,12 @@ describe('request details: customer', () => {
     expect(screen.queryByRole('button', { name: 'Approve quotation' })).not.toBeInTheDocument();
   });
 
+  it('shows when the device comes back, once the technician has said', async () => {
+    requestApi.get.mockResolvedValue(request({ status: 'device_delivery_pending', returnSchedule: { date: '2030-01-10T11:30:00.000Z', timeSlot: '5 pm - 7 pm' }, actions: ['confirm_handover'] }));
+    renderApp('/dashboard/requests/r1', signedIn(USER));
+    expect(await screen.findByText(/Return: .*\(5 pm - 7 pm\)/)).toBeInTheDocument();
+  });
+
   it('needs a reason to decline and can cancel the whole request', async () => {
     requestApi.get.mockResolvedValue(request({ status: 'customer_approval_pending', activeQuotation: quotation(), actions: ['approve_quotation', 'reject_quotation'] }));
     requestApi.decide.mockResolvedValue(request({ status: 'cancelled', actions: [] }));
@@ -377,6 +383,28 @@ describe('request details: technician', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Mark as completed' }));
     expect(await screen.findByText('Add at least one photo of the repaired device.')).toBeInTheDocument();
     expect(requestApi.setStatus).not.toHaveBeenCalled();
+  });
+
+  it('arranging delivery asks when the device comes back and sends it', async () => {
+    requestApi.get.mockResolvedValue(asTechnician({ status: 'repair_completed', activeQuotation: quotation({ status: 'accepted' }), actions: ['start_delivery'] }));
+    requestApi.setStatus.mockResolvedValue(asTechnician({ status: 'device_delivery_pending', actions: ['confirm_handover'] }));
+    renderApp('/dashboard/requests/r1', signedIn(TECHNICIAN_USER));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Arrange delivery' }));
+    expect(requestApi.setStatus).not.toHaveBeenCalled(); // no date yet
+
+    const tomorrow = new Date(Date.now() + 86400000);
+    const pad = (n) => String(n).padStart(2, '0');
+    const local = `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}T17:00`;
+    fireEvent.change(screen.getByLabelText('When will you bring it back?'), { target: { value: local } });
+    fireEvent.change(screen.getByLabelText('Time window (optional)'), { target: { value: '17:00-19:00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Arrange delivery' }));
+
+    await waitFor(() => expect(requestApi.setStatus).toHaveBeenCalled());
+    const [, status, body] = requestApi.setStatus.mock.calls[0];
+    expect(status).toBe('device_delivery_pending');
+    expect(body.returnSlot).toBe('17:00-19:00');
+    expect(new Date(body.returnDate).getTime()).toBe(new Date(local).getTime());
   });
 
   it('reveals the exact pickup point after accepting', async () => {

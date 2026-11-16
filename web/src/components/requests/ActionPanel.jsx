@@ -230,9 +230,20 @@ export default function ActionPanel({ request, onChanged }) {
       {has('add_progress') && <ProgressForm request={request} run={run} busy={busy} />}
       {has('complete_repair') && <ProgressForm request={request} run={run} busy={busy} completing />}
       {has('start_delivery') && (
-        <Box title="Repair done: arrange the return" icon={PackageCheck}>
-          {simple('Arrange delivery', () => requestApi.setStatus(request._id, 'device_delivery_pending'), 'Delivery arranged')}
-        </Box>
+        <SchedulePickup
+          title="Repair done: arrange the return"
+          icon={PackageCheck}
+          dateLabel="When will you bring it back?"
+          notesLabel="Note for the customer (optional)"
+          notesAs="input"
+          submitLabel="Arrange delivery"
+          hint="The customer sees this time and confirms the handover when they have the device."
+          busy={busy}
+          onSubmit={({ date, timeSlot, notes }) => run(
+            () => requestApi.setStatus(request._id, 'device_delivery_pending', { returnDate: date, returnSlot: timeSlot, note: notes }),
+            'Delivery arranged',
+          )}
+        />
       )}
       {has('confirm_completion') && (
         <Box title="Happy with the repair?" icon={CheckCircle2}>

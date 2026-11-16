@@ -155,6 +155,29 @@ void main() {
       expect(ServiceRequest.fromJson(requestJson()).repairNotes, isEmpty);
     });
 
+    test('reads each progress update with its own photos, skipping empty ones', () {
+      final json = requestJson(status: 'repair_in_progress')
+        ..['progressUpdates'] = [
+          {'text': 'Battery ordered', 'photos': [{'url': '/u/a.jpg'}], 'at': '2026-11-16T09:00:00.000Z'},
+          {'text': '  ', 'photos': <Object>[]},
+          {'photos': [{'url': '/u/b.jpg'}, {'url': '/u/c.jpg'}]},
+        ];
+      final updates = ServiceRequest.fromJson(json).progressUpdates;
+      expect(updates.map((u) => [u.text, u.photos.length]), [['Battery ordered', 1], ['', 2]]);
+      expect(updates.first.at, DateTime.utc(2026, 11, 16, 9));
+    });
+
+    test('knows when the technician holds the device', () {
+      Map<String, dynamic> withHandover(Map<String, Object> collect, Map<String, Object> delivery, {bool onSite = false}) =>
+          requestJson(status: 'cancelled', onSite: onSite)..['handover'] = {'collect': collect, 'delivery': delivery};
+      const both = {'owner': true, 'provider': true};
+      const none = {'owner': false, 'provider': false};
+      expect(ServiceRequest.fromJson(withHandover(both, none)).technicianHasDevice, isTrue);
+      expect(ServiceRequest.fromJson(withHandover({'owner': true, 'provider': false}, none)).technicianHasDevice, isFalse); // pickup not finished
+      expect(ServiceRequest.fromJson(withHandover(both, both)).technicianHasDevice, isFalse); // already returned
+      expect(ServiceRequest.fromJson(withHandover(both, none, onSite: true)).technicianHasDevice, isFalse);
+    });
+
     test('reads when the device is due back, if the technician said', () {
       final json = requestJson(status: 'device_delivery_pending')..['returnSchedule'] = {'date': '2026-11-18T11:30:00.000Z', 'timeSlot': '5 pm - 7 pm'};
       final r = ServiceRequest.fromJson(json);

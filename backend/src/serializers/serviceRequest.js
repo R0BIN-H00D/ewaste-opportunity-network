@@ -41,6 +41,7 @@ function serializeRequest(r, { role, invited = false }) {
     diagnosisNotes: r.diagnosisNotes,
     repairNotes: r.repairNotes || [],
     progressPhotos: r.progressPhotos || [],
+    progressUpdates: (r.progressUpdates || []).map((u) => ({ text: u.text, photos: u.photos || [], at: u.at })),
     completionPhotos: r.completionPhotos || [],
     handover: {
       collect: { owner: Boolean(r.handover?.collect?.byOwner), provider: Boolean(r.handover?.collect?.byProvider), checklistAcknowledged: Boolean(r.handover?.collect?.checklistAcknowledgedAt) },

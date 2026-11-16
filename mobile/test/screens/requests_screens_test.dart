@@ -232,6 +232,39 @@ void main() {
       expect(find.text('Confirm the handover when you have your device back.'), findsOneWidget);
     });
 
+    testWidgets('cancelling while the technician has the device says it must come back', (tester) async {
+      Map<String, dynamic> held(String status, List<String> actions) => requestJson(status: status, actions: actions)
+        ..['handover'] = {
+          'collect': {'owner': true, 'provider': true, 'checklistAcknowledged': true},
+          'delivery': {'owner': false, 'provider': false},
+        };
+      final repo = FakeRequestRepository(current: ServiceRequest.fromJson(held('diagnosis_in_progress', ['cancel'])))
+        ..result = ServiceRequest.fromJson(held('cancelled', []));
+      await _pump(tester, const RequestDetailsScreen(id: 'r1'), repo);
+
+      await _tap(tester, find.text('Cancel request'));
+      expect(find.textContaining('Ravi Kumar still has your device'), findsOneWidget);
+      await _tap(tester, _inDialog('Cancel request'));
+      expect(find.textContaining('still has your device and has been asked to return it'), findsOneWidget);
+    });
+
+    testWidgets('grouped updates keep each photo under its own note', (tester) async {
+      final json = requestJson(status: 'repair_in_progress')
+        ..['progressUpdates'] = [
+          {'text': 'Battery ordered', 'photos': [{'url': '/u/a.jpg'}], 'at': '2026-11-16T09:00:00.000Z'},
+          {'text': 'Battery fitted, testing', 'photos': <Object>[], 'at': '2026-11-16T12:00:00.000Z'},
+        ];
+      await _pump(tester, const RequestDetailsScreen(id: 'r1'), FakeRequestRepository(current: ServiceRequest.fromJson(json)));
+
+      final photo = find.byWidgetPredicate((w) => w is ListingPhotoView && w.semanticLabel == 'Repair photo');
+      expect(photo, findsOneWidget);
+      final newest = tester.getTopLeft(find.text('Battery fitted, testing')).dy;
+      final oldest = tester.getTopLeft(find.text('Battery ordered')).dy;
+      final photoTop = tester.getTopLeft(photo).dy;
+      expect(newest, lessThan(oldest)); // newest first
+      expect(photoTop, greaterThan(oldest)); // the photo sits under the note it came with
+    });
+
     testWidgets('no updates, no updates card', (tester) async {
       await _pump(tester, const RequestDetailsScreen(id: 'r1'), FakeRequestRepository(current: sampleRequest(status: 'repair_in_progress')));
       expect(find.text('Repair updates'), findsNothing);

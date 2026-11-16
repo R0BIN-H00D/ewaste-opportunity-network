@@ -418,10 +418,13 @@ async function addProgress(id, user, { note }, files = []) {
     throw ApiError.validation([{ field: 'photos', message: `At most ${MAX_PROGRESS_PHOTOS} progress photos per request` }]);
   }
   const stored = await storage.saveMany(files, { folder: `service/${request._id}` });
+  const at = new Date();
+  const photos = stored.map(storage.toPhoto);
   const update = {
     $push: {
-      ...(note ? { repairNotes: { text: note, by: user.id, at: new Date() } } : {}),
-      ...(stored.length ? { progressPhotos: { $each: stored.map(storage.toPhoto) } } : {}),
+      ...(note ? { repairNotes: { text: note, by: user.id, at } } : {}),
+      ...(photos.length ? { progressPhotos: { $each: photos } } : {}),
+      progressUpdates: { ...(note ? { text: note } : {}), photos, by: user.id, at },
     },
   };
   const updated = await ServiceRequest.findOneAndUpdate({ _id: request._id, status: request.status }, update, { new: true });
@@ -498,7 +501,10 @@ async function cancelRequest(id, user, reason) {
   await applyTransition(request, 'cancelled', role, { by: user.id, note: reason });
   await Quotation.updateMany({ serviceRequest: request._id, status: 'submitted' }, { $set: { status: 'rejected', decidedAt: new Date() } });
   await unlockListing(request);
-  if (request.technician) await notify(request.technician, { type: 'request.cancelled', title: 'A request was cancelled', body: reason, data: { id: request._id, deepLink: linkTo(request._id) } });
+  // Cancelled while the technician holds the device (allowed up to quote approval): ask them to give it back.
+  const holdsDevice = !request.onSite && request.handover?.collect?.byOwner && request.handover?.collect?.byProvider;
+  const body = [reason, holdsDevice ? 'You still have the device. Please arrange to return it to the owner.' : null].filter(Boolean).join(' ') || undefined;
+  if (request.technician) await notify(request.technician, { type: 'request.cancelled', title: 'A request was cancelled', body, data: { id: request._id, deepLink: linkTo(request._id) } });
   return fetchView(id, user, { role });
 }
 

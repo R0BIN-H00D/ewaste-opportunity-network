@@ -66,7 +66,7 @@ async function overview(now = new Date()) {
     Order.countDocuments({}),
     Report.countDocuments({ status: 'open' }),
     Complaint.countDocuments({ status: { $in: ['open', 'assigned', 'in_review'] } }),
-    AdminLog.find({}).sort({ createdAt: -1 }).limit(8).populate('admin', 'name').lean(),
+    AdminLog.find({}).sort({ createdAt: -1, _id: -1 }).limit(8).populate('admin', 'name').lean(), // _id breaks same-millisecond ties
   ]);
   const listings = Object.fromEntries(listingRows.map((r) => [r._id, r.n]));
   const providers = providerPending.reduce((a, b) => a + b, 0);

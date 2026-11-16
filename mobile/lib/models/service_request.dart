@@ -119,6 +119,7 @@ class ServiceRequest {
     this.history = const [],
     this.repairNotes = const [],
     this.progressPhotos = const [],
+    this.progressUpdates = const [],
     this.handover = const Handover(),
     this.pickup,
     this.returnSchedule,
@@ -143,8 +144,9 @@ class ServiceRequest {
   final Quotation? quotation;
   final List<RequestStep> history;
 
-  /// Updates the technician posts while checking or repairing. The server keeps notes and photos apart
-  /// (photos carry no time), so they are shown side by side rather than matched up.
+  /// Updates the technician posts while checking or repairing, each with its own photos. Requests from before the
+  /// server grouped them only have the flat [repairNotes] and [progressPhotos], which are shown side by side instead.
+  final List<({String text, List<ListingPhoto> photos, DateTime? at})> progressUpdates;
   final List<({String text, DateTime? at})> repairNotes;
   final List<ListingPhoto> progressPhotos;
   final Handover handover;
@@ -161,6 +163,10 @@ class ServiceRequest {
 
   bool get isFinished => status == 'service_completed' || status == 'rejected' || status == 'cancelled';
 
+  /// The technician holds the device: both sides confirmed the pickup and the return has not been confirmed by both.
+  bool get technicianHasDevice =>
+      !onSite && handover.collectOwner && handover.collectProvider && !(handover.deliveryOwner && handover.deliveryProvider);
+
   factory ServiceRequest.fromJson(Map<String, dynamic> json) {
     final listing = _map(json['listing']);
     final category = _map(listing['category']);
@@ -173,6 +179,8 @@ class ServiceRequest {
     final history = json['statusHistory'];
     final notes = json['repairNotes'];
     final progress = json['progressPhotos'];
+    final updates = json['progressUpdates'];
+    List<ListingPhoto> photosOf(Object? list) => list is List ? [for (final p in list) if (p is Map) ListingPhoto.fromJson(p.cast<String, dynamic>())] : const [];
     final actions = json['actions'];
     final subtitle = [category['name'], listing['brand'], listing['model']].whereType<String>().where((s) => s.trim().isNotEmpty).join(' · ');
     final area = [listing['addressArea'], listing['city']].whereType<String>().where((s) => s.trim().isNotEmpty).join(', ');
@@ -194,7 +202,14 @@ class ServiceRequest {
       repairNotes: notes is List
           ? [for (final n in notes) if (n is Map && n['text'] is String && (n['text'] as String).trim().isNotEmpty) (text: (n['text'] as String).trim(), at: _date(n['at']))]
           : const [],
-      progressPhotos: progress is List ? [for (final p in progress) if (p is Map) ListingPhoto.fromJson(p.cast<String, dynamic>())] : const [],
+      progressPhotos: photosOf(progress),
+      progressUpdates: updates is List
+          ? [
+              for (final u in updates)
+                if (u is Map && ((u['text'] is String && (u['text'] as String).trim().isNotEmpty) || photosOf(u['photos']).isNotEmpty))
+                  (text: ((u['text'] as String?) ?? '').trim(), photos: photosOf(u['photos']), at: _date(u['at'])),
+            ]
+          : const [],
       handover: Handover.fromJson(_map(json['handover'])),
       pickup: pickup is Map ? PickupInfo(date: _date(pickup['date']), timeSlot: pickup['timeSlot'] as String?, status: pickup['status'] as String?) : null,
       returnSchedule: back is Map && _date(back['date']) != null ? PickupInfo(date: _date(back['date']), timeSlot: back['timeSlot'] as String?) : null,

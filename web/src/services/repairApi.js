@@ -18,8 +18,10 @@ export const requestApi = {
   create: (body) => data(api.post('/service-requests', body)),
   list: (params, signal) => page(api.get('/service-requests', { params: clean(params), signal })),
   get: (id, signal) => data(api.get(`/service-requests/${id}`, { signal })),
-  // Simple status moves. `photos` (File[]) is only used when completing the repair.
-  setStatus: (id, status, { note, photos = [] } = {}) => data(api.put(`/service-requests/${id}/status`, toForm({ status, note }, photos), UPLOAD)),
+  // Simple status moves. `photos` (File[]) is only used when completing the repair; `returnDate` (ISO) and `returnSlot`
+  // only when starting delivery.
+  setStatus: (id, status, { note, photos = [], returnDate, returnSlot } = {}) =>
+    data(api.put(`/service-requests/${id}/status`, toForm({ status, note, returnDate, returnSlot }, photos), UPLOAD)),
   quote: (id, body) => data(api.post(`/service-requests/${id}/quotation`, body)),
   quotations: (id, signal) => data(api.get(`/service-requests/${id}/quotations`, { signal })),
   decide: (id, quotationId, body) => data(api.put(`/service-requests/${id}/quotation/${quotationId}/decision`, body)),

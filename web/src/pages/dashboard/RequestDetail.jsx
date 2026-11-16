@@ -113,6 +113,9 @@ export default function RequestDetail() {
           {r.pickup && (
             <p className="flex items-center gap-2 text-sm text-ink dark:text-[#E8F1EB]"><CalendarClock size={16} aria-hidden />Pickup: {formatDate(r.pickup.date)}{r.pickup.timeSlot ? ` (${r.pickup.timeSlot})` : ''}</p>
           )}
+          {r.returnSchedule?.date && (
+            <p className="flex items-center gap-2 text-sm text-ink dark:text-[#E8F1EB]"><CalendarClock size={16} aria-hidden />Return: {formatDate(r.returnSchedule.date)}{r.returnSchedule.timeSlot ? ` (${r.returnSchedule.timeSlot})` : ''}</p>
+          )}
           <PhotoGrid photos={r.progressPhotos} label="Progress photo" />
           <PhotoGrid photos={r.completionPhotos} label="Photo of the repaired device" />
         </GlassCard>

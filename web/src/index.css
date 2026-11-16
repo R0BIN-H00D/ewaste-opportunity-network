@@ -1,0 +1,141 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== Design tokens (docs/design.md B.2 / B.3) ===== */
+:root {
+  --c-bg: #f5f8f5;
+  --c-text: #1f2937;
+  --c-text-muted: #6b7280;
+  --c-surface-solid: #ffffff;
+  --glass-bg: rgba(255, 255, 255, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.45);
+  --glass-blur: 16px;
+  --glass-shadow: 0 8px 32px rgba(20, 83, 45, 0.1);
+  --scrim: rgba(11, 23, 18, 0.45);
+  --grad-hero:
+    radial-gradient(60% 60% at 20% 10%, rgba(16, 185, 129, 0.25), transparent 60%),
+    radial-gradient(50% 50% at 85% 20%, rgba(163, 230, 53, 0.2), transparent 60%),
+    linear-gradient(180deg, #f5f8f5 0%, #eaf3ec 100%);
+}
+.dark {
+  --c-bg: #0b1712;
+  --c-text: #e8f1eb;
+  --c-text-muted: #9fb2a7;
+  --c-surface-solid: #12241c;
+  --glass-bg: rgba(20, 35, 28, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --grad-hero:
+    radial-gradient(60% 60% at 20% 10%, rgba(16, 185, 129, 0.18), transparent 60%),
+    radial-gradient(50% 50% at 85% 20%, rgba(163, 230, 53, 0.1), transparent 60%),
+    linear-gradient(180deg, #0b1712 0%, #0e1f17 100%);
+}
+
+@layer base {
+  html { color-scheme: light; }
+  html.dark { color-scheme: dark; }
+  body {
+    @apply font-sans antialiased;
+    background: var(--c-bg);
+    color: var(--c-text);
+  }
+  h1, h2, h3, h4 { @apply font-display tracking-tight; }
+  :focus-visible { outline: 2px solid #047857; outline-offset: 2px; }
+  .dark :focus-visible { outline-color: #34d399; }
+}
+
+@layer components {
+  /* Glass surfaces. Use sparingly: nav, stat cards, filters, modals (<= 3 blurred layers per view). */
+  .glass {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+    backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+    border-radius: 24px;
+  }
+  .glass-strong {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+    backdrop-filter: blur(24px) saturate(150%);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    border-radius: 24px;
+  }
+  .glass-subtle {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+  }
+  .btn {
+    @apply inline-flex items-center whitespace-nowrap justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold
+      transition duration-200 ease-standard active:scale-[.97] disabled:opacity-50 disabled:pointer-events-none;
+    min-height: 44px;
+  }
+  .btn-primary { @apply bg-primary text-white shadow-e1 hover:bg-primary-700; }
+  .dark .btn-primary { @apply bg-primary-tint text-canvas-dark hover:brightness-110; }
+  .btn-glass { @apply glass-subtle hover:shadow-e1; }
+  /* Form controls */
+  .input {
+    @apply w-full rounded-xl border border-black/15 bg-white/80 px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted
+      transition duration-200 ease-standard focus:border-secondary-strong;
+    min-height: 44px;
+  }
+  .dark .input { @apply border-white/15 bg-white/5 text-white; }
+  .dark .input::placeholder { color: #9fb2a7; }
+  .input[aria-invalid='true'] { @apply border-danger; }
+  .input:disabled { @apply opacity-60; }
+  .skeleton {
+    @apply rounded-md;
+    background: linear-gradient(90deg, rgba(107,114,128,.12) 25%, rgba(107,114,128,.22) 37%, rgba(107,114,128,.12) 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease infinite;
+  }
+}
+
+/* No blur support, or user asked for less transparency: fall back to solid surfaces. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass, .glass-strong, .glass-subtle { background: var(--c-surface-solid); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass, .glass-strong, .glass-subtle {
+    background: var(--c-surface-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+@keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+.float-slow { animation: floaty 6s ease-in-out infinite; }
+.float-slower { animation: floaty 8s ease-in-out infinite reverse; }
+@keyframes shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+
+/* Chart colours (data-viz default palette, validated in both modes). Series are always assigned in this order, never cycled. */
+.viz-root {
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
+  --viz-4: #eda100;
+  --viz-surface: #fcfcfb;
+  --viz-grid: rgba(11, 11, 11, 0.1);
+  --viz-text: #52514e;
+}
+.dark .viz-root {
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-3: #199e70;
+  --viz-4: #c98500;
+  --viz-surface: #12241c;
+  --viz-grid: rgba(255, 255, 255, 0.12);
+  --viz-text: #c3c2b7;
+}

@@ -1,0 +1,32 @@
+# dependencies
+node_modules/
+.pnp*
+# env & secrets
+.env
+.env.*
+!.env.example
+google-services.json
+GoogleService-Info.plist
+firebase-service-account*.json
+*.jks
+*.keystore
+key.properties
+# builds
+dist/
+build/
+coverage/
+.dart_tool/
+.flutter-plugins*
+.packages
+*.apk
+*.aab
+# uploads (local dev storage)
+backend/uploads/
+# logs / os / ide
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

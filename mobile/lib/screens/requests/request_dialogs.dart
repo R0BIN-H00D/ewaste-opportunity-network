@@ -1,5 +1,106 @@
 import 'package:material_ui/material_ui.dart';
 import '../../core/request_validation.dart';
+import '../../services/request_repository.dart';
+import '../../widgets/star_rating.dart';
+
+/// The review form after a completed service. Only the overall stars are required. `null` if the person backs out.
+Future<ReviewInput?> askReview(BuildContext context, {String? technicianName}) {
+  return showModalBottomSheet<ReviewInput>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (ctx) => _ReviewSheet(technicianName: technicianName),
+  );
+}
+
+class _ReviewSheet extends StatefulWidget {
+  const _ReviewSheet({this.technicianName});
+
+  final String? technicianName;
+
+  @override
+  State<_ReviewSheet> createState() => _ReviewSheetState();
+}
+
+class _ReviewSheetState extends State<_ReviewSheet> {
+  final _comment = TextEditingController();
+  int _rating = 0;
+  int _quality = 0;
+  int _communication = 0;
+  int _timeliness = 0;
+  String? _error;
+
+  @override
+  void dispose() {
+    _comment.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_rating == 0) {
+      setState(() => _error = 'Choose a star rating.');
+      return;
+    }
+    int? opt(int n) => n == 0 ? null : n;
+    Navigator.pop(
+      context,
+      ReviewInput(rating: _rating, quality: opt(_quality), communication: opt(_communication), timeliness: opt(_timeliness), comment: _comment.text),
+    );
+  }
+
+  Widget _aspect(String label, int value, ValueChanged<int> onChanged) => Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Row(
+          children: [
+            Expanded(child: Text(label)),
+            StarRating(value: value, size: 24, label: label, onChanged: onChanged),
+          ],
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.viewInsetsOf(context).bottom),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('How did ${widget.technicianName ?? 'the technician'} do?', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 4),
+            Text('Your review helps other people choose a technician.', style: theme.textTheme.bodyMedium),
+            const SizedBox(height: 12),
+            Text('Overall rating', style: theme.textTheme.titleSmall),
+            StarRating(
+              value: _rating,
+              label: 'Overall rating',
+              onChanged: (n) => setState(() {
+                _rating = n;
+                _error = null;
+              }),
+            ),
+            if (_error != null) Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+            const SizedBox(height: 8),
+            _aspect('Quality of work', _quality, (n) => setState(() => _quality = n)),
+            _aspect('Communication', _communication, (n) => setState(() => _communication = n)),
+            _aspect('Timeliness', _timeliness, (n) => setState(() => _timeliness = n)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _comment,
+              maxLines: 3,
+              maxLength: 1000,
+              decoration: const InputDecoration(labelText: 'Your review (optional)', helperText: 'Only your first name and last initial are shown.'),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(width: double.infinity, child: FilledButton(onPressed: _submit, child: const Text('Send review'))),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 /// A yes/no question. Returns `true` only when the person confirms.
 Future<bool> askConfirm(BuildContext context, {required String title, required String message, required String confirmLabel, String cancelLabel = 'Not now'}) async {

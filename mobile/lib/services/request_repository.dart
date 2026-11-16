@@ -78,4 +78,33 @@ class RequestRepository {
       });
 
   Future<ServiceRequest> confirmCompletion(String id) => guard(() async => _one(await _dio.post<dynamic>('/service-requests/$id/confirm-completion')));
+
+  /// Reviews the technician once the service is completed (one review per request, BR-04), then answers with the
+  /// request again so `reviewed` is up to date.
+  Future<ServiceRequest> review(String id, ReviewInput input) => guard(() async {
+        await _dio.post<dynamic>('/reviews', data: {'contextType': 'service', 'contextId': id, ...input.toJson()});
+        return _one(await _dio.get<dynamic>('/service-requests/$id'));
+      });
+}
+
+/// What the person rated: the overall stars are required, the three aspects and the comment are optional.
+class ReviewInput {
+  const ReviewInput({required this.rating, this.quality, this.communication, this.timeliness, this.comment});
+
+  final int rating;
+  final int? quality;
+  final int? communication;
+  final int? timeliness;
+  final String? comment;
+
+  Map<String, dynamic> toJson() {
+    final text = comment?.trim() ?? '';
+    return {
+      'rating': rating,
+      if (quality != null) 'quality': quality,
+      if (communication != null) 'communication': communication,
+      if (timeliness != null) 'timeliness': timeliness,
+      if (text.isNotEmpty) 'comment': text,
+    };
+  }
 }

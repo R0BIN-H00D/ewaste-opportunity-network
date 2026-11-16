@@ -192,6 +192,12 @@ class _BodyState extends ConsumerState<_Body> {
     await _act((repo) => repo.cancel(r.id, reason: answer.reason), done: 'Request cancelled');
   }
 
+  Future<void> _review() async {
+    final input = await askReview(context, technicianName: r.technicianName);
+    if (input == null) return;
+    await _act((repo) => repo.review(r.id, input), done: 'Thank you for your review');
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -206,6 +212,7 @@ class _BodyState extends ConsumerState<_Body> {
       if (r.can('schedule_pickup')) FilledButton.icon(onPressed: _busy ? null : _pickup, icon: const Icon(Icons.event_outlined), label: Text(r.pickup == null ? 'Choose pickup time' : 'Change pickup time')),
       if (r.can('confirm_handover')) FilledButton.icon(onPressed: _busy ? null : _handover, icon: const Icon(Icons.handshake_outlined), label: const Text('Confirm handover')),
       if (r.can('confirm_completion')) FilledButton.icon(onPressed: _busy ? null : _complete, icon: const Icon(Icons.task_alt), label: const Text('Confirm repair is done')),
+      if (r.can('review')) FilledButton.icon(onPressed: _busy ? null : _review, icon: const Icon(Icons.star_outline_rounded), label: Text('Review ${r.technicianName ?? 'the technician'}')),
       if (r.can('cancel')) OutlinedButton.icon(onPressed: _busy ? null : _cancel, icon: const Icon(Icons.cancel_outlined), label: const Text('Cancel request')),
     ];
 

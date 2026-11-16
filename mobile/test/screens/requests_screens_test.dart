@@ -265,6 +265,29 @@ void main() {
       expect(photoTop, greaterThan(oldest)); // the photo sits under the note it came with
     });
 
+    testWidgets('a completed request can be reviewed; the overall stars are required', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repo = FakeRequestRepository(current: sampleRequest(status: 'service_completed', actions: ['review']))
+        ..result = sampleRequest(status: 'service_completed');
+      await _pump(tester, const RequestDetailsScreen(id: 'r1'), repo);
+
+      await _tap(tester, find.text('Review Ravi Kumar'));
+      expect(find.text('How did Ravi Kumar do?'), findsOneWidget);
+      await _tap(tester, find.text('Send review'));
+      expect(find.text('Choose a star rating.'), findsOneWidget);
+      expect(repo.calls, isEmpty);
+
+      await _tap(tester, find.bySemanticsLabel('Overall rating, 4 stars'));
+      await _tap(tester, find.bySemanticsLabel('Timeliness, 5 stars'));
+      await tester.enterText(find.widgetWithText(TextField, 'Your review (optional)'), 'Quick and careful');
+      await _tap(tester, find.text('Send review'));
+
+      expect(repo.calls, ['review:{rating: 4, timeliness: 5, comment: Quick and careful}']);
+      expect(find.text('Thank you for your review'), findsOneWidget);
+      expect(find.text('Review Ravi Kumar'), findsNothing); // the button goes once it is reviewed
+      semantics.dispose();
+    });
+
     testWidgets('no updates, no updates card', (tester) async {
       await _pump(tester, const RequestDetailsScreen(id: 'r1'), FakeRequestRepository(current: sampleRequest(status: 'repair_in_progress')));
       expect(find.text('Repair updates'), findsNothing);

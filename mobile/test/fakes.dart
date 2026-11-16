@@ -166,4 +166,7 @@ class FakeRequestRepository extends RequestRepository {
 
   @override
   Future<ServiceRequest> confirmCompletion(String id) async => _done('complete');
+
+  @override
+  Future<ServiceRequest> review(String id, ReviewInput input) async => _done('review:${input.toJson()}');
 }

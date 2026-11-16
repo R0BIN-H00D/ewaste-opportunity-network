@@ -27,6 +27,7 @@ router.use('/students', require('./students.routes'));
 router.use('/pickups', require('./pickups.routes'));
 router.use('/complaints', require('./complaint.routes'));
 router.use('/announcements', require('./announcement.routes'));
+router.use('/notifications', require('./notification.routes'));
 router.use('/admin', require('./admin.routes'));
 
 // Planned modules (501 until implemented) — keep LAST.

@@ -16,4 +16,36 @@ async function notify(userIds, { type, title, body, data = {} }) {
   }
 }
 
-module.exports = { notify };
+/* ---------- the person's own notification centre (P8-05, in-app part) ---------- */
+const { parsePagination, buildMeta } = require('../utils/pagination');
+const ApiError = require('../utils/ApiError');
+
+const view = (n) => ({ _id: n._id, type: n.type, title: n.title, body: n.body, data: n.data || {}, readAt: n.readAt || null, createdAt: n.createdAt });
+
+/** Newest first. `unread=true` lists only unread ones. Meta carries the unread count for a badge. */
+async function listMine(user, query = {}) {
+  const pg = parsePagination(query, { defaultLimit: 20, maxLimit: 50 });
+  const filter = { user: user.id, ...(query.unread === 'true' ? { readAt: null } : {}) };
+  const [rows, total, unread] = await Promise.all([
+    Notification.find(filter).sort({ createdAt: -1, _id: -1 }).skip(pg.skip).limit(pg.limit).lean(),
+    Notification.countDocuments(filter),
+    Notification.countDocuments({ user: user.id, readAt: null }),
+  ]);
+  return { items: rows.map(view), meta: { ...buildMeta(pg, total), unread } };
+}
+
+const unreadCount = async (user) => ({ unread: await Notification.countDocuments({ user: user.id, readAt: null }) });
+
+/** Marks one of the person's notifications read. Someone else's id is "not found", never "forbidden". */
+async function markRead(user, id) {
+  const n = await Notification.findOneAndUpdate({ _id: id, user: user.id }, [{ $set: { readAt: { $ifNull: ['$readAt', '$$NOW'] } } }], { new: true }).lean();
+  if (!n) throw ApiError.notFound('Notification not found');
+  return view(n);
+}
+
+async function markAllRead(user) {
+  const res = await Notification.updateMany({ user: user.id, readAt: null }, { $set: { readAt: new Date() } });
+  return { updated: res.modifiedCount, unread: 0 };
+}
+
+module.exports = { notify, listMine, unreadCount, markRead, markAllRead };

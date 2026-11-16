@@ -1,6 +1,9 @@
 import 'package:ewaste_opportunity/core/network/api_exception.dart';
 import 'package:ewaste_opportunity/core/storage/key_value_store.dart';
+import 'package:ewaste_opportunity/models/account.dart';
+import 'package:ewaste_opportunity/models/page_result.dart';
 import 'package:ewaste_opportunity/models/user.dart';
+import 'package:ewaste_opportunity/services/account_repository.dart';
 import 'package:ewaste_opportunity/services/api_client.dart';
 import 'package:ewaste_opportunity/services/auth_repository.dart';
 
@@ -26,6 +29,78 @@ Me sampleMe({UserRole role = UserRole.user, bool emailVerified = true, int? gree
       greenScore: greenScore,
       verificationStatus: verificationStatus,
     );
+
+/// An [AccountRepository] that never touches the network and records what was asked of it.
+class FakeAccountRepository extends AccountRepository {
+  FakeAccountRepository({this.profileResult = const OwnProfile(), this.notes = const [], this.paymentList = const [], this.summary = const PaymentSummary()})
+      : super(ApiClient(store: MemoryKeyValueStore()));
+
+  OwnProfile profileResult;
+  List<NotificationItem> notes;
+  List<PaymentRecord> paymentList;
+  PaymentSummary summary;
+  ApiException? error;
+  final calls = <String>[];
+
+  void _fail() {
+    final e = error;
+    if (e != null) throw e;
+  }
+
+  @override
+  Future<OwnProfile> profile() async => profileResult;
+
+  @override
+  Future<AppUser> updateAccount({required String name, String? phone}) async {
+    _fail();
+    calls.add('account:$name:${phone ?? ''}');
+    return AppUser(id: 'u1', name: name.trim(), email: 'asha@example.com', role: UserRole.user, status: 'active', emailVerified: true, phone: phone);
+  }
+
+  @override
+  Future<OwnProfile> updateProfile({String? bio, String? addressArea, String? city, String? state, String? pincode}) async {
+    _fail();
+    calls.add('profile:$addressArea:$city:$state:$pincode:$bio');
+    return profileResult;
+  }
+
+  @override
+  Future<OwnProfile> updatePreferences({bool? emailNotifications, bool? pushNotifications, String? theme}) async {
+    calls.add('prefs:${emailNotifications ?? '-'}:${pushNotifications ?? '-'}:${theme ?? '-'}');
+    return profileResult;
+  }
+
+  @override
+  Future<({PageResult<NotificationItem> page, int unread})> notifications({int page = 1, bool unreadOnly = false}) async =>
+      (page: PageResult(items: notes, page: 1, pages: 1, total: notes.length), unread: notes.where((n) => !n.isRead).length);
+
+  @override
+  Future<int> unreadCount() async => notes.where((n) => !n.isRead).length;
+
+  @override
+  Future<void> markRead(String id) async {
+    calls.add('read:$id');
+    notes = [for (final n in notes) n.id == id ? n.markedRead() : n];
+  }
+
+  @override
+  Future<void> markAllRead() async {
+    calls.add('read-all');
+    notes = [for (final n in notes) n.markedRead()];
+  }
+
+  @override
+  Future<PageResult<PaymentRecord>> payments({int page = 1}) async => PageResult(items: paymentList, page: 1, pages: 1, total: paymentList.length);
+
+  @override
+  Future<PaymentSummary> paymentSummary() async => summary;
+
+  @override
+  Future<void> contact({required String name, required String email, required String subject, required String message}) async {
+    _fail();
+    calls.add('contact:$name:$email:$subject:$message');
+  }
+}
 
 /// An [AuthRepository] that never touches the network.
 class FakeAuthRepository extends AuthRepository {

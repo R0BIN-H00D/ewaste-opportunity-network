@@ -3,6 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_controller.dart';
 import '../screens/account/account_screen.dart';
+import '../screens/account/help_screen.dart';
+import '../screens/account/notifications_screen.dart';
+import '../screens/account/payments_screen.dart';
+import '../screens/account/profile_screen.dart';
+import '../screens/account/settings_screen.dart';
 import '../screens/app_shell.dart';
 import '../screens/auth/forgot_password_screen.dart';
 import '../screens/devices/device_details_screen.dart';
@@ -84,6 +89,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: Routes.requests, builder: (_, __) => const RequestsPage()),
       GoRoute(path: Routes.requestPattern, builder: (_, state) => RequestDetailsScreen(id: state.pathParameters['id']!)),
+      GoRoute(path: Routes.profile, builder: (_, __) => const ProfilePage()),
+      GoRoute(path: Routes.settings, builder: (_, __) => const SettingsPage()),
+      GoRoute(path: Routes.notifications, builder: (_, __) => const NotificationsPage()),
+      GoRoute(path: Routes.payments, builder: (_, __) => const PaymentsPage()),
+      GoRoute(path: Routes.help, builder: (_, __) => const HelpPage()),
       // The signed-in app: one shell with a floating glass bottom bar. Role-specific tabs are added with each role's screens.
       StatefulShellRoute.indexedStack(
         builder: (_, __, shell) => AppShell(navigationShell: shell),

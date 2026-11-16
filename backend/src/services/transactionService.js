@@ -71,7 +71,7 @@ async function listTransactions(user, query) {
   const mine = { $or: [{ payer: user.id }, { payee: user.id }] };
   const filter = { ...(query.direction === 'paid' ? { payer: user.id } : query.direction === 'received' ? { payee: user.id } : mine), ...(query.type ? { type: query.type } : {}), ...(query.status ? { status: query.status } : {}) };
   const [rows, total] = await Promise.all([
-    Transaction.find(filter).sort({ createdAt: -1 }).skip(pg.skip).limit(pg.limit).populate('payer', 'name').populate('payee', 'name').lean(),
+    Transaction.find(filter).sort({ createdAt: -1, _id: -1 }).skip(pg.skip).limit(pg.limit).populate('payer', 'name').populate('payee', 'name').lean(),
     Transaction.countDocuments(filter),
   ]);
   const subjectOf = await subjectsFor(rows);

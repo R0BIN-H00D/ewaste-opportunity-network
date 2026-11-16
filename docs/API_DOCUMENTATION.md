@@ -114,6 +114,13 @@ The platform records payments made offline between people; it never processes mo
 - `GET /api/transactions/summary` → `{ received{count,total}, paid{count,total}, awaitingConfirmation }` (disputed payments are excluded).
 - `PUT /api/transactions/:id/confirm` `{ reference? }` — payee only: `recorded` → `confirmed`. Non-participants get `404`, the payer `403`, an already confirmed payment `409`.
 
+## Notifications (Bearer, your own only)
+The in-app notification centre (P8-05, in-app part). Every service request, quotation, handover and similar event writes one through `notificationService.notify()`. Push (FCM) and email channels will be added later without changing these routes.
+- `GET /api/notifications?unread=true&page&limit` — newest first (limit ≤ 50, default 20). Each item: `{ _id, type, title, body?, data{ id, deepLink }, readAt|null, createdAt }`. `meta` carries `page, limit, total, pages` and `unread` (the total unread count, for a badge).
+- `GET /api/notifications/unread-count` → `{ unread }`.
+- `PUT /api/notifications/read-all` → `{ updated, unread: 0 }`.
+- `PUT /api/notifications/:id/read` — marks one read (reading twice keeps the first time). Someone else's id, an unknown id and a malformed id all return `404`.
+
 ## Donations
 Recipients are General Users whose organisation (school, college, NGO, charity) is approved. Free transfer only: no money moves (BR-10). Statuses: `open → requested → accepted → handover_scheduled → completed`, plus `cancelled`. Every response carries `viewerRole` (`donor|recipient|requester|admin|visitor`) and `actions`; clients render controls from that list.
 - `GET /api/donations?q&category&condition&city&page&limit` — public: open or requested donations. Donor appears as "Asha R."; no exact location. `as=donor|recipient` needs a Bearer token (`401` otherwise).
@@ -228,7 +235,7 @@ Every state change is written to the audit log (`AdminLog`) with the admin, the 
 - `GET /api/announcements` — public (`optionalAuth`; `Cache-Control: no-cache`). The announcements showing now for everyone, or for the signed-in role; newest 5; fields `_id`, `title`, `body`, `startsAt`.
 
 ## Planned (currently `501 NOT_IMPLEMENTED`)
-`chat, notifications, geo` (P8) · `analytics` (public impact figures and the Green Score; the administrator analytics already live under `/api/admin/analytics`), `ai, education` (P9).
+`chat, geo` (P8) · `analytics` (public impact figures and the Green Score; the administrator analytics already live under `/api/admin/analytics`), `ai, education` (P9).
 
 ## CORS
 

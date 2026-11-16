@@ -68,6 +68,13 @@ class AuthController extends Notifier<AuthState> {
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
+  /// Takes the account the server answered with after an edit (name, phone), so every screen shows it at once.
+  void adoptUser(AppUser user) {
+    final me = state.me;
+    if (me == null || me.user.id != user.id) return;
+    state = _signedIn(me.copyWith(user: user));
+  }
+
   /// Reloads the signed-in person's data (for example after verifying an email). Failures keep what is already shown.
   Future<void> reload() async {
     try {

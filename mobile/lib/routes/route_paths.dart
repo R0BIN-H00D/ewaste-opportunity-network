@@ -8,6 +8,11 @@ abstract class Routes {
   static const resetPassword = '/reset-password';
   static const home = '/home';
   static const account = '/account';
+  static const profile = '/account/profile';
+  static const settings = '/account/settings';
+  static const notifications = '/account/notifications';
+  static const payments = '/account/payments';
+  static const help = '/account/help';
   static const browse = '/browse';
   static const myListings = '/my-listings';
   static const newListing = '/listings/new';

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'core/constants/app_constants.dart';
 import 'core/theme/app_theme.dart';
+import 'providers/account_providers.dart';
 import 'routes/app_router.dart';
 
 void main() {
@@ -20,7 +21,7 @@ class EWasteApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-      themeMode: ThemeMode.system,
+      themeMode: ref.watch(themeModeProvider),
       routerConfig: ref.watch(routerProvider),
     );
   }

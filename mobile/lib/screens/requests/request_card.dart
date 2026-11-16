@@ -32,8 +32,10 @@ class RequestCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final r = request;
-    final who = r.technicianName != null ? r.technicianName! : 'Open request';
-    final status = requestStatusLabels[r.status] ?? r.status;
+    // The technician sees who asked; the owner sees who is doing the work (or that the request is still open).
+    final asTechnician = r.isTechnicianView;
+    final who = asTechnician ? (r.customerName ?? 'Customer') : (r.technicianName ?? 'Open request');
+    final status = requestStatusLabel(r.status, technician: asTechnician);
     return Semantics(
       button: true,
       label: '${r.deviceTitle}. $status. $who.',
@@ -60,7 +62,7 @@ class RequestCard extends StatelessWidget {
                         const SizedBox(height: 2),
                         Row(
                           children: [
-                            Icon(r.technicianName != null ? Icons.handyman_outlined : Icons.campaign_outlined, size: 14, color: theme.textTheme.bodyMedium?.color),
+                            Icon(asTechnician ? Icons.person_outline : (r.technicianName != null ? Icons.handyman_outlined : Icons.campaign_outlined), size: 14, color: theme.textTheme.bodyMedium?.color),
                             const SizedBox(width: 4),
                             Expanded(child: Text(who, style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
                           ],

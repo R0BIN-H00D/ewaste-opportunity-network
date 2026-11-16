@@ -24,8 +24,14 @@ void main() {
     expect(byTitle['Find a technician'], Routes.technicians);
     expect(byTitle['My requests'], Routes.requests);
     expect(byTitle['Recycle'], isNull);
-    for (final a in actionsFor(UserRole.technician)) {
-      expect(a.route, isNull, reason: a.title);
+    final tech = {for (final a in actionsFor(UserRole.technician)) a.title: a.route};
+    expect(tech['Repair requests'], Routes.jobsBoard);
+    expect(tech['My jobs'], Routes.jobsActive);
+    // Roles whose screens are still to come keep saying "Soon".
+    for (final role in [UserRole.student, UserRole.refurbisher, UserRole.recycler]) {
+      for (final a in actionsFor(role)) {
+        expect(a.route, isNull, reason: '${role.name}: ${a.title}');
+      }
     }
   });
 

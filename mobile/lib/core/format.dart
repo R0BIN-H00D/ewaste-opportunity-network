@@ -119,6 +119,19 @@ const Map<String, String> requestStatusLabels = {
   'cancelled': 'Cancelled',
 };
 
+/// The same steps worded for the technician, where the owner's wording would be wrong ("Your approval needed").
+const Map<String, String> technicianStatusLabels = {
+  'request_submitted': 'New request',
+  'technician_assigned': 'Accepted',
+  'diagnosis_in_progress': 'Diagnosing',
+  'customer_approval_pending': 'Waiting for approval',
+  'device_delivery_pending': 'Returning the device',
+};
+
+/// A status in words for whoever is looking: the technician's wording where it differs, otherwise the owner's.
+String requestStatusLabel(String status, {bool technician = false}) =>
+    (technician ? technicianStatusLabels[status] : null) ?? requestStatusLabels[status] ?? status;
+
 /// Requests that can no longer change.
 const finalRequestStatuses = {'service_completed', 'rejected', 'cancelled'};
 

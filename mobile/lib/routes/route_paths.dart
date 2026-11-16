@@ -21,6 +21,11 @@ abstract class Routes {
   static const technicians = '/technicians';
   static const technicianPattern = '/technicians/:id';
   static const newRequest = '/requests/new';
+  static const jobs = '/jobs';
+
+  /// A technician's jobs opened on one tab: `board` (new requests), `active` (in progress) or `all`.
+  static const jobsBoard = '$jobs?tab=board';
+  static const jobsActive = '$jobs?tab=active';
   static const requests = '/requests';
   static const requestPattern = '/requests/:id';
 

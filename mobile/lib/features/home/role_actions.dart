@@ -29,9 +29,8 @@ List<QuickAction> actionsFor(UserRole role) {
       ];
     case UserRole.technician:
       return const [
-        QuickAction(icon: Icons.inbox_outlined, title: 'Repair requests', subtitle: 'New requests that match your skills'),
-        QuickAction(icon: Icons.request_quote_outlined, title: 'Quotes', subtitle: 'Send and track your quotes'),
-        QuickAction(icon: Icons.work_outline, title: 'My jobs', subtitle: 'Update progress and finish jobs'),
+        QuickAction(icon: Icons.inbox_outlined, title: 'Repair requests', subtitle: 'New requests that match your skills', route: Routes.jobsBoard),
+        QuickAction(icon: Icons.work_outline, title: 'My jobs', subtitle: 'Quotes, updates and finishing jobs', route: Routes.jobsActive),
       ];
     case UserRole.student:
       return const [

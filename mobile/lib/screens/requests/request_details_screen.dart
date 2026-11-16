@@ -19,9 +19,46 @@ import '../../widgets/skeleton.dart';
 import '../../widgets/state_views.dart';
 import 'request_card.dart';
 import 'request_dialogs.dart';
+import 'technician_forms.dart';
 
-/// What happens next, in plain words, for the device owner.
+/// What happens next, in plain words, for the technician.
+String technicianHint(ServiceRequest r) {
+  switch (r.status) {
+    case 'request_submitted':
+      return r.can('accept') ? 'A customer asked for your help. Accept to see where the device is, or decline with a reason.' : 'Waiting for the request to be accepted.';
+    case 'technician_assigned':
+      return r.onSite ? 'Start the diagnosis when you are at the device.' : 'Agree a pickup time so you can collect the device.';
+    case 'device_collection_pending':
+      return 'Collect the device at the pickup time. Then you and the owner each confirm the handover.';
+    case 'device_collected':
+      return 'Start the diagnosis, then send a quote.';
+    case 'diagnosis_in_progress':
+      return 'Find out what is wrong and send a quote. Post updates as you go.';
+    case 'quotation_submitted':
+    case 'customer_approval_pending':
+      return 'Waiting for the owner to approve your quote. Nothing starts until they do.';
+    case 'repair_in_progress':
+      return 'Repair the device, post updates, and mark it done with a photo when it is finished.';
+    case 'repair_completed':
+      return r.onSite ? 'Waiting for the owner to confirm the repair.' : 'Bring the device back and tell the owner when to expect it.';
+    case 'device_delivery_pending':
+      return 'Hand the device back and confirm the handover. The owner confirms too.';
+    case 'device_delivered':
+      return 'Waiting for the owner to confirm the repair is done.';
+    case 'service_completed':
+      return 'All done. The owner pays you directly, as agreed in the quote.';
+    case 'rejected':
+      return 'You declined this request.';
+    case 'cancelled':
+      return r.technicianHasDevice ? 'The owner cancelled this request. You still have the device: please arrange to return it.' : 'The owner cancelled this request.';
+    default:
+      return '';
+  }
+}
+
+/// What happens next, in plain words, for whoever is looking.
 String nextStepHint(ServiceRequest r) {
+  if (r.isTechnicianView) return technicianHint(r);
   switch (r.status) {
     case 'request_submitted':
       return r.technicianName != null ? 'Waiting for ${r.technicianName} to accept.' : 'Waiting for a suitable technician to accept.';
@@ -159,6 +196,18 @@ class _BodyState extends ConsumerState<_Body> {
 
   Future<void> _handover() async {
     final collecting = r.status == 'device_collection_pending';
+    if (r.isTechnicianView) {
+      // The data-protection checklist is the owner's; the technician just confirms the device changed hands.
+      final ok = await askConfirm(
+        context,
+        title: collecting ? 'Have you got the device?' : 'Handed it back?',
+        message: collecting ? 'Confirm that ${r.customerName ?? 'the owner'} has handed the device over to you.' : 'Confirm that you have handed the device back to ${r.customerName ?? 'the owner'}.',
+        confirmLabel: collecting ? 'Yes, I have it' : 'Yes, I handed it back',
+      );
+      if (!ok) return;
+      await _act((repo) => repo.confirmHandover(r.id), done: 'Handover confirmed');
+      return;
+    }
     if (collecting) {
       if (!await askHandoverChecklist(context)) return;
     } else {
@@ -192,6 +241,42 @@ class _BodyState extends ConsumerState<_Body> {
     await _act((repo) => repo.cancel(r.id, reason: answer.reason), done: 'Request cancelled');
   }
 
+  /* ---------- the technician's actions ---------- */
+
+  Future<void> _accept() => _act((repo) => repo.accept(r.id), done: 'You accepted the job');
+
+  Future<void> _declineJob() async {
+    final answer = await askReason(context, title: 'Decline this job?', confirmLabel: 'Decline job', required: true, message: 'The owner sees your reason and can ask someone else.');
+    if (answer == null) return;
+    await _act((repo) => repo.decline(r.id, answer.reason), done: 'Job declined');
+  }
+
+  Future<void> _startDiagnosis() => _act((repo) => repo.startDiagnosis(r.id), done: 'Diagnosis started');
+
+  Future<void> _quote() async {
+    final input = await askQuote(context, revising: r.can('revise_quotation'));
+    if (input == null) return;
+    await _act((repo) => repo.submitQuotation(r.id, input), done: 'Quote sent');
+  }
+
+  Future<void> _postUpdate() async {
+    final input = await askUpdate(context);
+    if (input == null) return;
+    await _act((repo) => repo.addProgress(r.id, note: input.note, photos: input.photos), done: 'Update posted');
+  }
+
+  Future<void> _finishRepair() async {
+    final input = await askUpdate(context, completing: true);
+    if (input == null) return;
+    await _act((repo) => repo.completeRepair(r.id, note: input.note, photos: input.photos), done: 'Repair marked as done');
+  }
+
+  Future<void> _bringBack() async {
+    final when = await askReturnTime(context);
+    if (when == null) return;
+    await _act((repo) => repo.startDelivery(r.id, returnDate: when.date, returnSlot: when.slot), done: 'Delivery started');
+  }
+
   Future<void> _review() async {
     final input = await askReview(context, technicianName: r.technicianName);
     if (input == null) return;
@@ -201,12 +286,22 @@ class _BodyState extends ConsumerState<_Body> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final status = requestStatusLabels[r.status] ?? r.status;
+    final status = requestStatusLabel(r.status, technician: r.isTechnicianView);
     final q = r.quotation;
-    final showQuote = q != null && (r.can('approve_quotation') || q.status == 'accepted' || r.status == 'repair_in_progress' || r.status == 'repair_completed' || r.status == 'service_completed');
+    final asTechnician = r.isTechnicianView;
+    // The technician always sees their own quote (and what became of it); the owner sees it once there is something to decide or it is approved.
+    final showQuote = q != null && (asTechnician || r.can('approve_quotation') || q.status == 'accepted' || r.status == 'repair_in_progress' || r.status == 'repair_completed' || r.status == 'service_completed');
     final hint = nextStepHint(r);
 
     final buttons = <Widget>[
+      if (r.can('accept')) FilledButton.icon(onPressed: _busy ? null : _accept, icon: const Icon(Icons.check), label: const Text('Accept this job')),
+      if (r.can('reject')) OutlinedButton.icon(onPressed: _busy ? null : _declineJob, icon: const Icon(Icons.close), label: const Text('Decline')),
+      if (r.can('start_diagnosis')) FilledButton.icon(onPressed: _busy ? null : _startDiagnosis, icon: const Icon(Icons.search), label: const Text('Start diagnosis')),
+      if (r.can('submit_quotation') || r.can('revise_quotation'))
+        FilledButton.icon(onPressed: _busy ? null : _quote, icon: const Icon(Icons.request_quote_outlined), label: Text(r.can('revise_quotation') ? 'Send a revised quote' : 'Send quote')),
+      if (r.can('add_progress')) OutlinedButton.icon(onPressed: _busy ? null : _postUpdate, icon: const Icon(Icons.add_comment_outlined), label: const Text('Post an update')),
+      if (r.can('complete_repair')) FilledButton.icon(onPressed: _busy ? null : _finishRepair, icon: const Icon(Icons.task_alt), label: const Text('Mark repair as done')),
+      if (r.can('start_delivery')) FilledButton.icon(onPressed: _busy ? null : _bringBack, icon: const Icon(Icons.local_shipping_outlined), label: const Text('Bring the device back')),
       if (r.can('approve_quotation') && q != null) FilledButton.icon(onPressed: _busy ? null : () => _approve(q), icon: const Icon(Icons.check), label: Text('Approve ${formatPrice(q.amount)}')),
       if (r.can('reject_quotation') && q != null) OutlinedButton.icon(onPressed: _busy ? null : () => _decline(q), icon: const Icon(Icons.close), label: const Text('Decline quote')),
       if (r.can('schedule_pickup')) FilledButton.icon(onPressed: _busy ? null : _pickup, icon: const Icon(Icons.event_outlined), label: Text(r.pickup == null ? 'Choose pickup time' : 'Change pickup time')),
@@ -226,7 +321,8 @@ class _BodyState extends ConsumerState<_Body> {
             type: MaterialType.transparency,
             child: InkWell(
               borderRadius: BorderRadius.circular(16),
-              onTap: r.listingId == null ? null : () => context.push(Routes.listing(r.listingId!)),
+              // The device page is the owner's listing view; a technician sees the device here instead.
+              onTap: r.listingId == null || asTechnician ? null : () => context.push(Routes.listing(r.listingId!)),
               child: Row(
                 children: [
                   ClipRRect(borderRadius: BorderRadius.circular(14), child: SizedBox(width: 72, height: 72, child: ListingPhotoView(photo: r.devicePhoto))),
@@ -255,10 +351,14 @@ class _BodyState extends ConsumerState<_Body> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _fact(theme, 'Technician', r.technicianName ?? 'Not chosen yet'),
+              if (asTechnician) ...[
+                _fact(theme, 'Customer', r.customerName ?? 'Not shown'),
+                if (r.deviceArea.isNotEmpty) ...[const Divider(height: 20), _fact(theme, 'Area', r.deviceArea)],
+              ] else
+                _fact(theme, 'Technician', r.technicianName ?? 'Not chosen yet'),
               const Divider(height: 20),
               // How the repair is done, which holds for the whole request (not where the device is right now).
-              _fact(theme, 'Repair', r.onSite ? 'At your place' : 'Collected and returned'),
+              _fact(theme, 'Repair', r.onSite ? (asTechnician ? 'At the customer\'s place' : 'At your place') : (asTechnician ? 'Collect and return' : 'Collected and returned')),
               if (r.pickup?.date != null) ...[
                 const Divider(height: 20),
                 _fact(theme, 'Pickup', formatDateTime(r.pickup!.date) + (r.pickup!.timeSlot == null ? '' : ' · ${r.pickup!.timeSlot}')),
@@ -274,7 +374,7 @@ class _BodyState extends ConsumerState<_Body> {
             ],
           ),
         ),
-        if (showQuote) ...[const SizedBox(height: 16), _QuoteCard(quotation: q)],
+        if (showQuote) ...[const SizedBox(height: 16), _QuoteCard(quotation: q, technician: asTechnician)],
         if (r.progressUpdates.isNotEmpty || r.repairNotes.isNotEmpty || r.progressPhotos.isNotEmpty) ...[const SizedBox(height: 16), _RepairUpdates(request: r)],
         if (r.status == 'device_collection_pending' || r.status == 'device_delivery_pending') ...[const SizedBox(height: 16), _HandoverCard(request: r)],
         if (buttons.isNotEmpty) ...[
@@ -283,7 +383,7 @@ class _BodyState extends ConsumerState<_Body> {
           if (_busy) const Padding(padding: EdgeInsets.only(top: 4), child: LinearProgressIndicator()),
         ],
         const SizedBox(height: 16),
-        _Timeline(steps: r.history),
+        _Timeline(steps: r.history, technician: asTechnician),
       ],
     );
   }
@@ -298,22 +398,26 @@ class _BodyState extends ConsumerState<_Body> {
 }
 
 class _QuoteCard extends StatelessWidget {
-  const _QuoteCard({required this.quotation});
+  const _QuoteCard({required this.quotation, this.technician = false});
 
   final Quotation quotation;
+
+  /// The technician's own view of the quote: "Your quote", and the owner pays them.
+  final bool technician;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final q = quotation;
     final decided = q.status == 'accepted';
+    final title = decided ? 'Approved quote' : (technician ? (q.status == 'rejected' ? 'Quote declined' : 'Your quote') : 'Quote to review');
     return GlassContainer(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Expanded(child: Semantics(header: true, child: Text(decided ? 'Approved quote' : 'Quote to review', style: theme.textTheme.titleLarge))),
+              Expanded(child: Semantics(header: true, child: Text(title, style: theme.textTheme.titleLarge))),
               if (q.version > 1) StatusBadge('Revised (v${q.version})', tone: BadgeTone.amber),
             ],
           ),
@@ -332,7 +436,7 @@ class _QuoteCard extends StatelessWidget {
           if (q.validUntil != null && !decided) Text('Valid until ${formatDate(q.validUntil)}', style: theme.textTheme.bodyMedium),
           if (q.notes != null && q.notes!.trim().isNotEmpty) ...[const SizedBox(height: 8), Text(q.notes!, style: theme.textTheme.bodyLarge)],
           const SizedBox(height: 8),
-          Text('You pay the technician directly.', style: theme.textTheme.bodyMedium),
+          Text(technician ? 'The owner pays you directly.' : 'You pay the technician directly.', style: theme.textTheme.bodyMedium),
         ],
       ),
     );
@@ -351,6 +455,7 @@ class _HandoverCard extends StatelessWidget {
     final h = request.handover;
     final owner = collecting ? h.collectOwner : h.deliveryOwner;
     final provider = collecting ? h.collectProvider : h.deliveryProvider;
+    final asTechnician = request.isTechnicianView;
     Widget line(String who, bool done) => Row(
           children: [
             Icon(done ? Icons.check_circle : Icons.radio_button_unchecked, size: 20, color: done ? theme.colorScheme.primary : theme.disabledColor),
@@ -362,11 +467,18 @@ class _HandoverCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Semantics(header: true, child: Text(collecting ? 'Handing over your device' : 'Getting your device back', style: theme.textTheme.titleLarge)),
+          Semantics(
+            header: true,
+            child: Text(
+              asTechnician ? (collecting ? 'Collecting the device' : 'Handing the device back') : (collecting ? 'Handing over your device' : 'Getting your device back'),
+              style: theme.textTheme.titleLarge,
+            ),
+          ),
           const SizedBox(height: 8),
-          line('You', owner),
+          // Each person sees themselves as "You" and the other side by name.
+          line('You', asTechnician ? provider : owner),
           const SizedBox(height: 4),
-          line(request.technicianName ?? 'The technician', provider),
+          line(asTechnician ? (request.customerName ?? 'The owner') : (request.technicianName ?? 'The technician'), asTechnician ? owner : provider),
         ],
       ),
     );
@@ -487,9 +599,12 @@ class _StepPhotos extends StatelessWidget {
 }
 
 class _Timeline extends StatelessWidget {
-  const _Timeline({required this.steps});
+  const _Timeline({required this.steps, this.technician = false});
 
   final List<RequestStep> steps;
+
+  /// Word the steps for the technician ("Waiting for approval") instead of the owner ("Your approval needed").
+  final bool technician;
 
   @override
   Widget build(BuildContext context) {
@@ -505,7 +620,7 @@ class _Timeline extends StatelessWidget {
           for (var i = 0; i < latestFirst.length; i++)
             Semantics(
               label: [
-                '${requestStatusLabels[latestFirst[i].status] ?? latestFirst[i].status}. ${formatDateTime(latestFirst[i].at)}.',
+                '${requestStatusLabel(latestFirst[i].status, technician: technician)}. ${formatDateTime(latestFirst[i].at)}.',
                 if (latestFirst[i].note != null && latestFirst[i].note!.trim().isNotEmpty) '${latestFirst[i].note!.trim()}.',
                 if (latestFirst[i].photos.isNotEmpty) '${latestFirst[i].photos.length} ${latestFirst[i].photos.length == 1 ? 'photo' : 'photos'}.',
               ].join(' '),
@@ -524,7 +639,7 @@ class _Timeline extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(requestStatusLabels[latestFirst[i].status] ?? latestFirst[i].status, style: theme.textTheme.bodyLarge?.copyWith(fontWeight: i == 0 ? FontWeight.w700 : FontWeight.w500)),
+                          Text(requestStatusLabel(latestFirst[i].status, technician: technician), style: theme.textTheme.bodyLarge?.copyWith(fontWeight: i == 0 ? FontWeight.w700 : FontWeight.w500)),
                           Text(formatDateTime(latestFirst[i].at), style: theme.textTheme.bodyMedium?.copyWith(fontSize: 12)),
                           if (latestFirst[i].note != null && latestFirst[i].note!.trim().isNotEmpty) Text(latestFirst[i].note!, style: theme.textTheme.bodyMedium),
                           if (latestFirst[i].photos.isNotEmpty) ...[

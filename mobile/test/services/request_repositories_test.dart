@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:ewaste_opportunity/core/network/api_exception.dart';
 import 'package:ewaste_opportunity/core/storage/key_value_store.dart';
 import 'package:ewaste_opportunity/services/api_client.dart';
+import 'package:ewaste_opportunity/services/photo_picker.dart';
 import 'package:ewaste_opportunity/services/request_repository.dart';
 import 'package:ewaste_opportunity/services/technician_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -158,6 +160,97 @@ void main() {
         RequestRepository(rig.client).create(listingId: 'l1', issue: 'Broken'),
         throwsA(isA<ApiException>().having((e) => e.code, 'code', 'LISTING_UNAVAILABLE').having((e) => e.statusCode, 'status', 409)),
       );
+    });
+
+    test('a technician asks for their jobs or the board of new requests', () async {
+      final rig = _rig((o) async => _json(200, {'success': true, 'data': [requestJson()], 'meta': {'page': 1, 'pages': 1, 'total': 1}}));
+      final repo = RequestRepository(rig.client);
+      await repo.list(as: 'board');
+      await repo.list(as: 'technician', activeOnly: true);
+      expect(rig.api.requests[0].queryParameters['as'], 'board');
+      expect(rig.api.requests[0].queryParameters.containsKey('active'), isFalse);
+      expect(rig.api.requests[1].queryParameters, containsPair('as', 'technician'));
+      expect(rig.api.requests[1].queryParameters['active'], 'true');
+    });
+
+    test('accepting, declining and starting the diagnosis are status moves; a decline carries its reason', () async {
+      final rig = _rig(_request);
+      final repo = RequestRepository(rig.client);
+      await repo.accept('r1');
+      await repo.decline('r1', '  Too far away ');
+      await repo.startDiagnosis('r1');
+      for (final sent in rig.api.requests) {
+        expect(sent.method, 'PUT');
+        expect(sent.path, '/service-requests/r1/status');
+      }
+      expect(rig.api.requests[0].data, {'status': 'technician_assigned'});
+      expect(rig.api.requests[1].data, {'status': 'rejected', 'note': 'Too far away'});
+      expect(rig.api.requests[2].data, {'status': 'diagnosis_in_progress'});
+    });
+
+    test('a quote sends the total, the lines, the days, an expiry date and trimmed notes', () async {
+      final rig = _rig(_request);
+      await RequestRepository(rig.client).submitQuotation(
+        'r1',
+        const QuotationInput(amount: 2500, lines: [(label: ' Screen ', amount: 2000), (label: 'Labour', amount: 500)], etaDays: 3, validDays: 5, notes: '  Genuine part '),
+      );
+      final sent = rig.api.requests.single;
+      expect(sent.method, 'POST');
+      expect(sent.path, '/service-requests/r1/quotation');
+      final body = sent.data as Map<String, dynamic>;
+      expect(body['amount'], 2500);
+      expect(body['breakdown'], [
+        {'label': 'Screen', 'amount': 2000},
+        {'label': 'Labour', 'amount': 500},
+      ]);
+      expect(body['etaDays'], 3);
+      expect(body['notes'], 'Genuine part');
+      final until = DateTime.parse(body['validUntil'] as String);
+      expect(until.difference(DateTime.now().toUtc()).inHours, inInclusiveRange(4 * 24 + 23, 5 * 24));
+    });
+
+    test('a bare quote leaves out the lines, the days and the notes', () async {
+      final rig = _rig(_request);
+      await RequestRepository(rig.client).submitQuotation('r1', const QuotationInput(amount: 300));
+      expect((rig.api.requests.single.data as Map).keys.toSet(), {'amount', 'validUntil'});
+    });
+
+    test('a progress update and the finished repair go up as multipart with their photos', () async {
+      final dir = Directory.systemTemp.createTempSync('photos');
+      addTearDown(() {
+        try {
+          dir.deleteSync(recursive: true);
+        } on FileSystemException {
+          // Windows keeps the file open while the unread upload stream holds it; the OS clears the temp folder later.
+        }
+      });
+      final file = File('${dir.path}/done.jpg')..writeAsBytesSync([1, 2, 3]);
+      final photo = PickedPhoto(path: file.path, name: 'done.jpg', mime: 'image/jpeg', bytes: 3);
+
+      final rig = _rig(_request);
+      final repo = RequestRepository(rig.client);
+      await repo.addProgress('r1', note: ' Part ordered ', photos: [photo]);
+      await repo.completeRepair('r1', note: '', photos: [photo]);
+
+      final update = rig.api.requests[0];
+      expect(update.method, 'POST');
+      expect(update.path, '/service-requests/r1/progress');
+      final form = update.data as FormData;
+      expect(form.fields.map((e) => '${e.key}=${e.value}'), ['note=Part ordered']);
+      expect(form.files.single.key, 'photos');
+      expect(form.files.single.value.filename, 'done.jpg');
+
+      final done = rig.api.requests[1];
+      expect(done.method, 'PUT');
+      expect(done.path, '/service-requests/r1/status');
+      expect((done.data as FormData).fields.map((e) => '${e.key}=${e.value}'), ['status=repair_completed']); // an empty note is left out
+      expect((done.data as FormData).files, hasLength(1));
+    });
+
+    test('starting delivery sends when the device comes back, as a UTC time', () async {
+      final rig = _rig(_request);
+      await RequestRepository(rig.client).startDelivery('r1', returnDate: DateTime.utc(2026, 11, 18, 11, 30), returnSlot: ' 17:00-19:00 ');
+      expect(rig.api.requests.single.data, {'status': 'device_delivery_pending', 'returnDate': '2026-11-18T11:30:00.000Z', 'returnSlot': '17:00-19:00'});
     });
   });
 }

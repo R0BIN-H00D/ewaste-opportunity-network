@@ -1,3 +1,4 @@
+import 'package:ewaste_opportunity/core/format.dart';
 import 'package:ewaste_opportunity/models/service_request.dart';
 import 'package:ewaste_opportunity/models/technician.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -165,6 +166,24 @@ void main() {
       final updates = ServiceRequest.fromJson(json).progressUpdates;
       expect(updates.map((u) => [u.text, u.photos.length]), [['Battery ordered', 1], ['', 2]]);
       expect(updates.first.at, DateTime.utc(2026, 11, 16, 9));
+    });
+
+    test('knows whose view it is and who asked', () {
+      final owner = ServiceRequest.fromJson(requestJson());
+      expect(owner.viewerRole, 'customer');
+      expect(owner.isTechnicianView, isFalse);
+      expect(owner.customerName, 'Asha');
+
+      final tech = ServiceRequest.fromJson(requestJson()..['viewerRole'] = 'technician');
+      expect(tech.isTechnicianView, isTrue);
+      expect(ServiceRequest.fromJson(requestJson()..['customer'] = null).customerName, isNull);
+    });
+
+    test('statuses are worded for the technician where the owner\'s wording would be wrong', () {
+      expect(requestStatusLabel('customer_approval_pending'), 'Your approval needed');
+      expect(requestStatusLabel('customer_approval_pending', technician: true), 'Waiting for approval');
+      expect(requestStatusLabel('repair_in_progress', technician: true), 'Repair in progress'); // the same for both
+      expect(requestStatusLabel('mystery'), 'mystery');
     });
 
     test('knows when the technician holds the device', () {

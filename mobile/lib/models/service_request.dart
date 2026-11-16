@@ -115,6 +115,8 @@ class ServiceRequest {
     this.deviceArea = '',
     this.technicianId,
     this.technicianName,
+    this.customerName,
+    this.viewerRole = 'customer',
     this.quotation,
     this.history = const [],
     this.repairNotes = const [],
@@ -141,7 +143,15 @@ class ServiceRequest {
   final String deviceArea;
   final String? technicianId;
   final String? technicianName;
+
+  /// Who asked for the repair. Shown to the technician.
+  final String? customerName;
+
+  /// `customer`, `technician` or `admin`: whose view of the request this is. The same screen serves both people.
+  final String viewerRole;
   final Quotation? quotation;
+
+  bool get isTechnicianView => viewerRole == 'technician';
   final List<RequestStep> history;
 
   /// Updates the technician posts while checking or repairing, each with its own photos. Requests from before the
@@ -173,6 +183,7 @@ class ServiceRequest {
     final device = _map(listing['device']);
     final photos = device['photos'];
     final technician = _map(json['technician']);
+    final customer = _map(json['customer']);
     final quotation = json['activeQuotation'];
     final pickup = json['pickup'];
     final back = json['returnSchedule'];
@@ -197,6 +208,8 @@ class ServiceRequest {
       deviceArea: area,
       technicianId: technician['_id'] as String?,
       technicianName: technician['name'] as String?,
+      customerName: customer['name'] as String?,
+      viewerRole: (json['viewerRole'] as String?) ?? 'customer',
       quotation: quotation is Map ? Quotation.fromJson(quotation.cast<String, dynamic>()) : null,
       history: history is List ? [for (final h in history) if (h is Map) RequestStep.fromJson(h.cast<String, dynamic>())] : const [],
       repairNotes: notes is List

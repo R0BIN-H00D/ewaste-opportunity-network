@@ -18,6 +18,8 @@ import '../screens/auth/register_screen.dart';
 import '../screens/auth/reset_password_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/onboarding_screen.dart';
+import '../providers/technicians_controller.dart';
+import '../screens/requests/jobs_screen.dart';
 import '../screens/requests/request_details_screen.dart';
 import '../screens/requests/requests_screen.dart';
 import '../screens/technicians/request_repair_screen.dart';
@@ -88,6 +90,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) => RequestRepairScreen(listingId: state.uri.queryParameters['listing'], technicianId: state.uri.queryParameters['technician']),
       ),
       GoRoute(path: Routes.requests, builder: (_, __) => const RequestsPage()),
+      GoRoute(
+        path: Routes.jobs,
+        builder: (_, state) => JobsPage(initial: JobsFilter.values.firstWhere((f) => f.name == state.uri.queryParameters['tab'], orElse: () => JobsFilter.board)),
+      ),
       GoRoute(path: Routes.requestPattern, builder: (_, state) => RequestDetailsScreen(id: state.pathParameters['id']!)),
       GoRoute(path: Routes.profile, builder: (_, __) => const ProfilePage()),
       GoRoute(path: Routes.settings, builder: (_, __) => const SettingsPage()),

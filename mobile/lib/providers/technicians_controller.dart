@@ -54,6 +54,29 @@ class RequestsController extends PagedNotifier<ServiceRequest> {
 
 final requestsProvider = NotifierProvider<RequestsController, Paged<ServiceRequest>>(RequestsController.new);
 
+/// What a technician is looking at: new requests they could take, the jobs in progress, or every job.
+enum JobsFilter { board, active, all }
+
+final jobsFilterProvider = StateProvider<JobsFilter>((ref) => JobsFilter.board);
+
+/// A technician's jobs. Changing the filter or the signed-in person starts the list again.
+class JobsController extends PagedNotifier<ServiceRequest> {
+  @override
+  Paged<ServiceRequest> build() {
+    ref.watch(jobsFilterProvider);
+    ref.watch(authControllerProvider.select((s) => s.user?.id));
+    return start();
+  }
+
+  @override
+  Future<PageResult<ServiceRequest>> fetch(int page) {
+    final filter = ref.read(jobsFilterProvider);
+    return ref.read(requestRepositoryProvider).list(page: page, as: filter == JobsFilter.board ? 'board' : 'technician', activeOnly: filter == JobsFilter.active);
+  }
+}
+
+final jobsProvider = NotifierProvider<JobsController, Paged<ServiceRequest>>(JobsController.new);
+
 /// How often an open request on screen is fetched again, so steps the other side takes show up without a pull to refresh.
 final requestPollIntervalProvider = Provider<Duration>((ref) => const Duration(seconds: 15));
 
@@ -90,7 +113,10 @@ class RequestController extends AutoDisposeFamilyAsyncNotifier<ServiceRequest, S
       final fresh = await ref.read(requestRepositoryProvider).get(arg);
       if (asOf != _writes) return; // an action or refresh answered while this was in flight; its answer is newer
       state = AsyncData(fresh);
-      if (fresh.status != current.status) ref.invalidate(requestsProvider);
+      if (fresh.status != current.status) {
+        ref.invalidate(requestsProvider);
+        ref.invalidate(jobsProvider);
+      }
     } catch (_) {
       // Offline or a server hiccup: try again on the next tick.
     }
@@ -101,7 +127,8 @@ class RequestController extends AutoDisposeFamilyAsyncNotifier<ServiceRequest, S
     final updated = await action(ref.read(requestRepositoryProvider));
     _writes++;
     state = AsyncData(updated);
-    ref.invalidate(requestsProvider); // the list shows the status too
+    ref.invalidate(requestsProvider); // the lists show the status too
+    ref.invalidate(jobsProvider);
   }
 
   /// Fetches the request again, for pull-to-refresh and after a "someone else changed it" answer.

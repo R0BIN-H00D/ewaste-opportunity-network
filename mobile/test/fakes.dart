@@ -126,6 +126,9 @@ class FakeRequestRepository extends RequestRepository {
   final calls = <String>[];
   final listCalls = <({bool activeOnly, int page})>[];
 
+  /// Whose list each `list` call asked for (`customer`, `technician` or `board`).
+  final asCalls = <String>[];
+
   ServiceRequest _done(String call) {
     calls.add(call);
     final e = actionError;
@@ -142,8 +145,9 @@ class FakeRequestRepository extends RequestRepository {
   }
 
   @override
-  Future<PageResult<ServiceRequest>> list({bool activeOnly = false, int page = 1, int limit = 10}) async {
+  Future<PageResult<ServiceRequest>> list({bool activeOnly = false, int page = 1, int limit = 10, String as = 'customer'}) async {
     listCalls.add((activeOnly: activeOnly, page: page));
+    asCalls.add(as);
     final items = pages[page] ?? const <ServiceRequest>[];
     return PageResult(items: items, page: page, pages: pageCount, total: pages.values.fold(0, (n, l) => n + l.length));
   }
@@ -169,4 +173,27 @@ class FakeRequestRepository extends RequestRepository {
 
   @override
   Future<ServiceRequest> review(String id, ReviewInput input) async => _done('review:${input.toJson()}');
+
+  @override
+  Future<ServiceRequest> accept(String id) async => _done('accept');
+
+  @override
+  Future<ServiceRequest> decline(String id, String reason) async => _done('decline:$reason');
+
+  @override
+  Future<ServiceRequest> startDiagnosis(String id) async => _done('diagnose');
+
+  @override
+  Future<ServiceRequest> submitQuotation(String id, QuotationInput input) async =>
+      _done('quote:${input.amount}:${input.lines.map((l) => '${l.label}=${l.amount}').join(',')}:${input.etaDays ?? '-'}:${input.validDays}:${input.notes ?? ''}');
+
+  @override
+  Future<ServiceRequest> addProgress(String id, {String? note, List<PickedPhoto> photos = const []}) async => _done('progress:${note ?? ''}:${photos.length}');
+
+  @override
+  Future<ServiceRequest> completeRepair(String id, {String? note, required List<PickedPhoto> photos}) async => _done('complete-repair:${note ?? ''}:${photos.length}');
+
+  @override
+  Future<ServiceRequest> startDelivery(String id, {DateTime? returnDate, String? returnSlot}) async =>
+      _done('deliver:${returnDate == null ? 'no-date' : 'date'}:${returnSlot ?? ''}');
 }

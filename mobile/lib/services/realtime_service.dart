@@ -28,6 +28,18 @@ class TypingEvent {
   final bool typing;
 }
 
+/// Something this person can see has changed on the server (a listing, a request, an order...). It carries no data, only what
+/// changed: the app fetches it again through the normal API, which applies the usual permission checks.
+class DataChange {
+  const DataChange({required this.resource, required this.id, required this.action});
+
+  final String resource;
+  final String id;
+
+  /// created, updated or deleted.
+  final String action;
+}
+
 /// A notification the server has just created for me, with how many are unread now.
 class NotificationPush {
   const NotificationPush({required this.notification, required this.unread});
@@ -43,6 +55,9 @@ abstract class RealtimeService {
   Stream<ReadEvent> get reads;
   Stream<TypingEvent> get typing;
   Stream<NotificationPush> get notifications;
+
+  /// Changes to records this person can see, so every screen can stay current without reloading.
+  Stream<DataChange> get changes;
 
   /// True while connected.
   Stream<bool> get connection;
@@ -68,6 +83,8 @@ class NoRealtime implements RealtimeService {
   Stream<TypingEvent> get typing => const Stream.empty();
   @override
   Stream<NotificationPush> get notifications => const Stream.empty();
+  @override
+  Stream<DataChange> get changes => const Stream.empty();
   @override
   Stream<bool> get connection => const Stream.empty();
   @override
@@ -103,6 +120,7 @@ class SocketRealtimeService implements RealtimeService {
   final _reads = StreamController<ReadEvent>.broadcast();
   final _typing = StreamController<TypingEvent>.broadcast();
   final _notifications = StreamController<NotificationPush>.broadcast();
+  final _changes = StreamController<DataChange>.broadcast();
   final _connection = StreamController<bool>.broadcast();
 
   @override
@@ -113,6 +131,8 @@ class SocketRealtimeService implements RealtimeService {
   Stream<TypingEvent> get typing => _typing.stream;
   @override
   Stream<NotificationPush> get notifications => _notifications.stream;
+  @override
+  Stream<DataChange> get changes => _changes.stream;
   @override
   Stream<bool> get connection => _connection.stream;
   @override
@@ -162,6 +182,14 @@ class SocketRealtimeService implements RealtimeService {
       _notifications.add(NotificationPush(notification: NotificationItem.fromJson(_map(json['notification'])), unread: (json['unread'] as num?)?.toInt() ?? 0));
     });
 
+    socket.on('data:changed', (data) {
+      final json = _map(data);
+      final resource = json['resource'];
+      final id = json['id'];
+      if (resource is! String || id is! String) return;
+      _changes.add(DataChange(resource: resource, id: id, action: (json['action'] as String?) ?? 'updated'));
+    });
+
     socket.connect();
   }
 
@@ -191,7 +219,7 @@ class SocketRealtimeService implements RealtimeService {
     _disposed = true;
     _socket?.dispose();
     _socket = null;
-    for (final c in [_messages, _reads, _typing, _notifications, _connection]) {
+    for (final c in [_messages, _reads, _typing, _notifications, _changes, _connection]) {
       c.close();
     }
   }

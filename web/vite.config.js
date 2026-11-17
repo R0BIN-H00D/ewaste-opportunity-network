@@ -9,6 +9,8 @@ export default defineConfig({
     proxy: {
       '/api': { target: 'http://localhost:5000', changeOrigin: false },
       '/uploads': { target: 'http://localhost:5000', changeOrigin: false },
+      // The live channel (chat, notifications, and the change feed) shares the API's server; `ws: true` lets the socket upgrade.
+      '/socket.io': { target: 'http://localhost:5000', ws: true, changeOrigin: false },
     },
   },
   test: {

@@ -54,6 +54,7 @@ function attach(httpServer) {
   io.on('connection', (socket) => {
     const { user } = socket.data;
     socket.join(`user:${user.id}`);
+    if (user.role === 'admin') socket.join('role:admin'); // administrators hear about every change, for the live admin pages
     const allowed = makeBucket();
 
     // Wraps a handler: validates the payload, applies the rate limit, and always answers the ack (never throws).

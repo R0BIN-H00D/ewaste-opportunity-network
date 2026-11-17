@@ -1,5 +1,6 @@
 'use strict';
 const mongoose = require('mongoose');
+const { changeFeed } = require('../sockets/changeFeed');
 const { VERIFICATION_STATUS } = require('../config/constants');
 
 const { Schema } = mongoose;
@@ -62,6 +63,7 @@ function baseSchema(definition, options = {}) {
       return ret;
     },
   });
+  schema.plugin(changeFeed); // tells the people who can see a record when it changes (live web and app)
   return schema;
 }
 

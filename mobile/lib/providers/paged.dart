@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/network/api_exception.dart';
 import '../models/page_result.dart';
+import 'live_providers.dart';
 
 /// A list that arrives page by page.
 class Paged<T> {
@@ -44,6 +45,8 @@ abstract class PagedNotifier<T> extends Notifier<Paged<T>> {
 
   /// Call as the last step of `build`; returns the first state, which is already "loading".
   Paged<T> start() {
+    // Fetch the first page again when the server says something changed. What is on screen stays until the answer arrives.
+    ref.listen<int>(liveTickProvider, (_, __) => load());
     Future.microtask(load);
     // Not `const`: a constant cannot carry the type parameter, and would become Paged<Never>, which cannot hold items.
     return Paged<T>(loading: true);

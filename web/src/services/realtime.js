@@ -4,7 +4,7 @@ import { API_BASE_URL, getAccessToken, refreshSession } from './api';
 // The live channel (P8-03). It shares the API's server, so by default it is the API address without "/api". Everything it
 // delivers can also be fetched over the normal API, so when it is down the pages still work: they just update on reload.
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || API_BASE_URL.replace(/\/api\/?$/, '');
-const EVENTS = ['message:new', 'message:read', 'typing', 'notification:new'];
+const EVENTS = ['message:new', 'message:read', 'typing', 'notification:new', 'data:changed'];
 
 let socket = null;
 let connected = false;
@@ -17,10 +17,14 @@ export const _setSocketFactory = (fn) => {
   factory = fn || io;
 };
 
+let everConnected = false; // set once the first connection comes up, so a later one can be told apart as a RE-connection
+
 function setConnected(value) {
   if (connected === value) return;
   connected = value;
-  statusListeners.forEach((fn) => fn(value));
+  const again = value && everConnected;
+  if (value) everConnected = true;
+  statusListeners.forEach((fn) => fn(value, { again }));
 }
 
 function dispatch(event, payload) {
@@ -60,6 +64,7 @@ export function connectRealtime() {
 }
 
 export function disconnectRealtime() {
+  everConnected = false;
   if (!socket) return;
   socket.disconnect();
   socket = null;
@@ -73,7 +78,7 @@ export function onRealtime(event, handler) {
   return () => listeners.get(event)?.delete(handler);
 }
 
-/** Calls `handler(true|false)` when the connection comes up or goes down. Returns the function that stops listening. */
+/** Calls `handler(true|false, { again })` when the connection comes up or goes down; `again` is true for a connection after the first. Returns the function that stops listening. */
 export function onRealtimeStatus(handler) {
   statusListeners.add(handler);
   return () => statusListeners.delete(handler);

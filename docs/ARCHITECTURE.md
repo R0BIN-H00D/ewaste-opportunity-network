@@ -43,3 +43,20 @@ The rules live in one file, `backend/src/config/impact.js`, and are served as th
 
 ## Decision: use `material_ui` instead of `package:flutter/material.dart` (2026-11-14)
 Flutter 3.50 deprecates the in-SDK Material library. The mobile app imports `package:material_ui/material_ui.dart` (migrated with `dart fix --apply --code=migrate_design_widgets`). Third-party widget packages that still import the old library may need `MaterialUiCompatibilityBridge` in `MaterialApp.builder`; add it when the first such widget (e.g. flutter_map, fl_chart) is used.
+
+## Decision: web and app stay in step through one database and a change feed (2026-11-17)
+
+**One store.** The website and the app are two clients of the same API and the same MongoDB database. Nothing is kept per client, so a change made on either is stored once and is what the other reads next.
+
+**Live.** Loading a screen again used to be the only way the other client saw a change (chat and notifications aside). Now the server tells every client when something it can see has changed:
+
+- `sockets/changeFeed.js` is a Mongoose plugin applied to every schema in `baseSchema`, so no service has to announce its own changes. After a save, an update (`updateOne`, `findOneAndUpdate`) or a delete succeeds, it sends `data:changed` with `{ resource, id, action }` and nothing else. The record is never in the event; a client fetches it again through the normal API, which applies the usual permission checks.
+- Who hears it: the people the record names (every field that refers to a User, found from the schema), administrators (room `role:admin`), and everyone for records that are public in a public state (a listed device, an active product, an open donation or task, a published article, announcements, categories). A record that has just left its public state is announced too, so open lists drop it; a draft is never announced to strangers.
+- Models that are not in the plugin's resource table (tokens, logs, counters, chat, which has its own events) are not announced. When the live server is not attached (tests, scripts) the plugin does nothing.
+- Web: `useFetch` fetches again quietly (the old data stays on screen, a failed quiet fetch is ignored) after a short delay that gathers a burst into one fetch, when the tab is visible, and after a reconnection. `useFetch(..., { live: false })` turns it off for a page that holds typed input.
+- Mobile: `liveTickProvider` goes up on the same triggers (and when the app comes back to the front); `PagedNotifier` lists and the listings list fetch again on it, and `LiveRefreshObserver` invalidates every provider that holds fetched data, so detail screens refresh without each provider asking.
+- If the socket is down, nothing breaks: screens refresh when opened or pulled, as before, and catch up on reconnection.
+
+**Checked live (2026-11-17):** a draft listing created and then edited on the website appeared and changed on a phone that was only sitting on My listings; removing it on the phone made it disappear from the open web page.
+
+**Trade-offs.** An event can cause a refetch on screens it does not concern (the event names a resource but screens do not filter by it); the delay and the visible-tab rule keep this cheap. A list refreshed this way returns to its first page.

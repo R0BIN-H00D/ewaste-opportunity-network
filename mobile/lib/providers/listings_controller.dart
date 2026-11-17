@@ -4,6 +4,7 @@ import '../models/listing.dart';
 import '../services/device_repository.dart';
 import 'auth_controller.dart';
 import 'core_providers.dart';
+import 'live_providers.dart';
 
 final deviceRepositoryProvider = Provider<DeviceRepository>((ref) => DeviceRepository(ref.watch(apiClientProvider)));
 
@@ -82,6 +83,8 @@ class ListingsController extends FamilyNotifier<ListingsState, bool> {
   ListingsState build(bool arg) {
     // Watching who is signed in rebuilds this list for the next person, so one account never sees another's listings.
     ref.watch(authControllerProvider.select((s) => s.user?.id));
+    // Fetch the first page again when the server says something changed; what is on screen stays until the answer arrives.
+    ref.listen<int>(liveTickProvider, (_, __) => load());
     Future.microtask(load);
     return ListingsState(query: ListingQuery(mine: arg), loading: true);
   }

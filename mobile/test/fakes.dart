@@ -394,6 +394,7 @@ class FakeRealtime implements RealtimeService {
   final _typing = StreamController<TypingEvent>.broadcast(sync: true);
   final _notifications = StreamController<NotificationPush>.broadcast(sync: true);
   final _connection = StreamController<bool>.broadcast(sync: true);
+  final _changes = StreamController<DataChange>.broadcast(sync: true);
   final typingSent = <(String, bool)>[];
   bool connected = true;
 
@@ -401,6 +402,7 @@ class FakeRealtime implements RealtimeService {
   void pushRead(String conversationId, String by) => _reads.add(ReadEvent(conversationId: conversationId, byUserId: by));
   void pushTyping(String conversationId, String user, bool typing) => _typing.add(TypingEvent(conversationId: conversationId, userId: user, typing: typing));
   void pushNotification(NotificationItem item, int unread) => _notifications.add(NotificationPush(notification: item, unread: unread));
+  void pushChange(String resource, String id, [String action = 'updated']) => _changes.add(DataChange(resource: resource, id: id, action: action));
   void pushConnection(bool up) {
     connected = up;
     _connection.add(up);
@@ -414,6 +416,8 @@ class FakeRealtime implements RealtimeService {
   Stream<TypingEvent> get typing => _typing.stream;
   @override
   Stream<NotificationPush> get notifications => _notifications.stream;
+  @override
+  Stream<DataChange> get changes => _changes.stream;
   @override
   Stream<bool> get connection => _connection.stream;
   @override

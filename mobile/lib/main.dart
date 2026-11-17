@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'providers/live_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'core/constants/app_constants.dart';
@@ -12,7 +13,7 @@ void main() {
   // Draw behind the status and navigation bars. Screens keep clear of them with SafeArea.
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   // Firebase.initializeApp() is added in Phase 8 once google-services.json exists.
-  runApp(const ProviderScope(child: EWasteApp()));
+  runApp(ProviderScope(observers: [LiveRefreshObserver()], child: const EWasteApp()));
 }
 
 class EWasteApp extends ConsumerWidget {

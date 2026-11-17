@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { api, setAccessToken } from '../services/api';
 import { categoryApi, deviceApi } from '../services/deviceApi';
 import { marketApi } from '../services/marketplaceApi';
+import { impactApi } from '../services/impactApi';
 import Accordion from '../components/ui/Accordion';
 import Modal from '../components/ui/Modal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
@@ -15,6 +16,8 @@ vi.mock('../services/deviceApi', () => ({
   reportApi: { create: vi.fn() },
 }));
 vi.mock('../services/marketplaceApi', () => ({ marketApi: { list: vi.fn() }, orderApi: {} }));
+// The impact figures have their own tests (impact.test.jsx); here the landing and impact pages only need to render.
+vi.mock('../services/impactApi', () => ({ impactApi: { platform: vi.fn(), rules: vi.fn(), monthly: vi.fn(), mine: vi.fn(), score: vi.fn() } }));
 vi.mock('../services/api', async (importOriginal) => ({
   ...(await importOriginal()),
   getHealth: () => Promise.resolve({ success: true, data: { db: 'connected' } }),
@@ -29,6 +32,9 @@ beforeEach(() => {
   categoryApi.list.mockResolvedValue([]);
   deviceApi.list.mockResolvedValue(EMPTY_PAGE);
   marketApi.list.mockResolvedValue(EMPTY_PAGE);
+  impactApi.platform.mockRejectedValue(new Error('not needed here'));
+  impactApi.rules.mockRejectedValue(new Error('not needed here'));
+  impactApi.monthly.mockRejectedValue(new Error('not needed here'));
 });
 
 describe('public navigation', () => {
@@ -79,12 +85,6 @@ describe('static and content pages', () => {
   it('shows a not-found page for unknown articles and routes', async () => {
     renderApp('/learn/does-not-exist', anonymous());
     expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
-  });
-
-  it('shows the live device count on the impact page without inventing other numbers', async () => {
-    deviceApi.list.mockResolvedValue({ items: [], meta: { total: 7, page: 1, pages: 7, limit: 1 } });
-    renderApp('/impact', anonymous());
-    expect(await screen.findByText('7')).toBeInTheDocument();
   });
 
   it('links every learning-centre card to its article', async () => {

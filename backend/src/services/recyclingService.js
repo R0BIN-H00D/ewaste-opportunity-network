@@ -8,7 +8,7 @@ const RecyclingCenter = require('../models/RecyclingCenter');
 const DeviceListing = require('../models/DeviceListing');
 const PickupSchedule = require('../models/PickupSchedule');
 const { reschedule } = require('./pickupRules');
-const EnvironmentalImpact = require('../models/EnvironmentalImpact');
+const impact = require('./impactService');
 const Category = require('../models/Category');
 const ApiError = require('../utils/ApiError');
 const logger = require('../utils/logger');
@@ -204,10 +204,10 @@ async function completeSideEffects(done, request, centerUserId) {
       RecyclingCenter.updateOne({ _id: idOf(done.center) }, { $inc: { 'totals.actualKg': actualKg, 'totals.estimatedKg': estimatedKg } }),
       // No measured weight means nothing was verified, so no impact is recorded.
       actualKg > 0
-        ? EnvironmentalImpact.create({
+        ? impact.record({
           user: idOf(done.requester), type: 'recycling', refType: 'RecyclingRecord', refId: done._id,
           category: idOf((request.categories || [])[0]), devices: done.deviceCount, materials: { actual, estimated }, verifiedBy: centerUserId,
-        }).catch((err) => { if (err.code !== 11000) throw err; })
+        })
         : null,
     ]);
   } catch (err) {

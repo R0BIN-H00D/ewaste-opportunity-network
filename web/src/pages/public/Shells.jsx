@@ -1,10 +1,7 @@
 import { Link } from 'react-router-dom';
-import { Recycle, Sprout, Wrench } from 'lucide-react';
+import { Recycle, Wrench } from 'lucide-react';
 import PageShell from '../../components/layout/PageShell';
 import EmptyState from '../../components/ui/EmptyState';
-import GlassCard from '../../components/glass/GlassCard';
-import { useFetch } from '../../hooks/useFetch';
-import { deviceApi } from '../../services/deviceApi';
 
 export function ServicesPage() {
   return (
@@ -18,24 +15,6 @@ export function ServicesPage() {
         </section>
       </div>
       <p className="text-sm text-ink-muted dark:text-[#9FB2A7]">Meanwhile, <Link to="/list-device" className="font-semibold text-primary underline dark:text-primary-tint">list your device</Link> so providers can find you as they join.</p>
-    </PageShell>
-  );
-}
-
-/** Real numbers only. More figures appear as completed activities are recorded (FR-IMP-006). */
-export function ImpactPage() {
-  const { data, loading, error } = useFetch((signal) => deviceApi.list({ limit: 1 }, signal), []);
-  return (
-    <PageShell title="Environmental impact" intro="Our numbers come from recorded activity on the platform. Nothing here is estimated unless it is labelled as an estimate.">
-      <GlassCard className="text-center">
-        <Sprout size={32} aria-hidden className="mx-auto text-secondary-strong dark:text-primary-tint" />
-        <p className="mt-2 font-numeric text-5xl font-extrabold text-primary dark:text-primary-tint" aria-live="polite">{loading ? '…' : error ? '–' : data.meta.total}</p>
-        <p className="mt-1 text-sm text-ink-muted dark:text-[#9FB2A7]">{error ? 'The live count is unavailable right now.' : 'devices currently offered for repair, reuse, donation or recycling (measured)'}</p>
-      </GlassCard>
-      <GlassCard>
-        <h2 className="text-lg font-bold text-ink dark:text-white">What will appear here</h2>
-        <p className="mt-2 text-sm text-ink dark:text-[#E8F1EB]">When repairs, donations, refurbishments and recycling jobs are completed and verified, this page will show devices repaired, reused and recycled, materials recovered, and Green Score leaders. Each figure will say whether it is measured or estimated.</p>
-      </GlassCard>
     </PageShell>
   );
 }

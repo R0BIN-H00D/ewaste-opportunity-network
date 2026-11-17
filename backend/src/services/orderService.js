@@ -6,7 +6,7 @@ const Order = require('../models/Order');
 const MarketplaceProduct = require('../models/MarketplaceProduct');
 const RefurbisherProfile = require('../models/RefurbisherProfile');
 const Transaction = require('../models/Transaction');
-const EnvironmentalImpact = require('../models/EnvironmentalImpact');
+const impact = require('./impactService');
 const ApiError = require('../utils/ApiError');
 const logger = require('../utils/logger');
 const { parsePagination, buildMeta } = require('../utils/pagination');
@@ -153,8 +153,7 @@ async function completeOrder(order, user, role) {
     await Promise.all([
       Transaction.create({ type: 'order', refType: 'Order', refId: done._id, payer: done.buyer, payee: done.seller, amount: total, method: done.paymentMethod, status: 'recorded' }),
       // Verified impact: written only now that the buyer confirmed they received the device (BR-05).
-      EnvironmentalImpact.create({ user: done.seller, type: 'refurbishment', refType: 'Order', refId: done._id, category: product?.category, devices: done.quantity, verifiedBy: done.buyer })
-        .catch((err) => { if (err.code !== 11000) throw err; }),
+      impact.record({ user: done.seller, type: 'refurbishment', refType: 'Order', refId: done._id, category: product?.category, devices: done.quantity, verifiedBy: done.buyer }),
     ]);
   } catch (err) {
     logger.error({ err: err.message, orderId: String(done._id) }, 'order completion side effects failed');

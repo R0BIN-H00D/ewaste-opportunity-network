@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { Activity, Award, BarChart3, Bell, Flag, Megaphone, MessageSquareWarning, ScrollText, Shapes, Star, ShieldCheck, Users, CalendarClock, Boxes, Factory, GraduationCap, Heart, LayoutDashboard, LogOut, MessageCircle, PackageSearch, Recycle, ReceiptText, Settings, ShoppingBag, Store, Wrench } from 'lucide-react';
+import { Activity, Award, BarChart3, Bell, Flag, Megaphone, MessageSquareWarning, ScrollText, Shapes, Star, ShieldCheck, Users, CalendarClock, Boxes, Factory, GraduationCap, Heart, LayoutDashboard, Leaf, LogOut, MessageCircle, PackageSearch, Recycle, ReceiptText, Settings, ShoppingBag, Store, Wrench } from 'lucide-react';
 import ThemeToggle from '../components/layout/ThemeToggle';
 import AnnouncementBanner from '../components/layout/AnnouncementBanner';
 import { logoutUser } from '../store/authSlice';
@@ -105,6 +105,9 @@ export default function DashboardLayout() {
           )}
           {user?.role && user.role !== 'admin' && (
             <NavLink to="/dashboard/complaints" className={link}><MessageSquareWarning size={18} aria-hidden /> Complaints</NavLink>
+          )}
+          {user?.role && user.role !== 'admin' && (
+            <NavLink to="/dashboard/impact" className={link}><Leaf size={18} aria-hidden /> Green Score</NavLink>
           )}
           {user?.role && user.role !== 'admin' && (
             <NavLink to="/dashboard/messages" className={link}><MessageCircle size={18} aria-hidden /> Messages <Badge count={counts.messages} label="unread messages" /></NavLink>

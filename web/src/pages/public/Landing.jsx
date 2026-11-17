@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import Hero from '../../components/landing/Hero';
 import { Audiences, Categories, FaqSection, HowItWorks, LatestDevices, ProviderCta, TrustStrip, useLandingData } from '../../components/landing/Sections';
+import ImpactStrip from '../../components/impact/ImpactStrip';
 import { useCategories } from '../../hooks/useCategories';
 
 export default function Landing() {
@@ -10,6 +11,7 @@ export default function Landing() {
     <>
       <Hero />
       <TrustStrip total={error ? null : data ? data.meta.total : null} categories={categories.length} />
+      <ImpactStrip />
       <HowItWorks />
       <Categories />
       <Audiences />

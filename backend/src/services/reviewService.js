@@ -8,6 +8,8 @@ const TechnicianProfile = require('../models/TechnicianProfile');
 const RefurbisherProfile = require('../models/RefurbisherProfile');
 const Order = require('../models/Order');
 const ApiError = require('../utils/ApiError');
+const logger = require('../utils/logger');
+const impact = require('./impactService');
 const { parsePagination, buildMeta } = require('../utils/pagination');
 
 /** Which profile holds the aggregate rating for each provider role. */
@@ -83,6 +85,8 @@ async function createReview(user, input) {
     throw err;
   }
   await Promise.all([recomputeRating(target, targetRole), done()]);
+  // Two Green Score points for reviewing a verified, completed transaction, once per transaction. Never fails the review.
+  await impact.awardReview(user.id, input.contextType, input.contextId).catch((err) => logger.warn({ err: err.message }, 'review points not awarded'));
   return serialize({ ...review.toObject(), reviewer: { name: user.name } });
 }
 

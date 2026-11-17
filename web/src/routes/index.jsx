@@ -16,7 +16,9 @@ import ListDevice from '../pages/dashboard/ListDevice';
 import { AboutPage, HowItWorksPage, PrivacyPage, TermsPage } from '../pages/public/StaticPages';
 import Contact from '../pages/public/Contact';
 import { LearnArticle, LearnIndex } from '../pages/public/Learn';
-import { ImpactPage, ServicesPage } from '../pages/public/Shells';
+import { ServicesPage } from '../pages/public/Shells';
+import ImpactPage from '../pages/public/Impact';
+import ImpactDashboard from '../pages/dashboard/Impact';
 import Marketplace from '../pages/public/Marketplace';
 import ProductDetails from '../pages/public/ProductDetails';
 import { TechnicianDirectory, TechnicianProfile } from '../pages/public/Technicians';
@@ -127,6 +129,7 @@ export const routeConfig = [
           { path: 'dashboard', element: <DashboardHome /> },
           { path: 'dashboard/settings', element: <Settings /> },
           { path: 'dashboard/notifications', element: <NotificationsPage /> },
+          { path: 'dashboard/impact', element: <ImpactDashboard /> },
           { path: 'dashboard/messages', element: <Messages /> },
           { path: 'dashboard/messages/:id', element: <Messages /> },
           { path: 'dashboard/transactions', element: <Transactions /> },

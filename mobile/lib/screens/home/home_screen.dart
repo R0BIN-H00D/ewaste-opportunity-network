@@ -6,8 +6,10 @@ import '../../features/home/role_actions.dart';
 import '../../models/user.dart';
 import '../../providers/auth_controller.dart';
 import '../../providers/core_providers.dart';
+import '../../providers/impact_providers.dart';
 import '../../routes/route_paths.dart';
 import '../../widgets/glass_container.dart';
+import '../../widgets/green_ring.dart';
 import '../../widgets/message_banner.dart';
 
 /// The home screen. It greets the person, says what still needs their attention (email, provider approval) and
@@ -45,7 +47,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final actions = actionsFor(user.role);
 
     return RefreshIndicator(
-      onRefresh: () => ref.read(authControllerProvider.notifier).reload(),
+      onRefresh: () async {
+        ref.invalidate(greenScoreProvider);
+        await ref.read(authControllerProvider.notifier).reload();
+      },
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 110), // room for the floating bar
         children: [
@@ -69,7 +74,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             const SizedBox(height: 12),
           ],
-          if (!user.role.isProvider && user.role != UserRole.admin) ...[_GreenScoreCard(score: me.greenScore), const SizedBox(height: 20)],
+          if (user.role != UserRole.admin) ...[const _GreenScoreCard(), const SizedBox(height: 20)],
           Semantics(header: true, child: Text('What you can do', style: theme.textTheme.titleLarge)),
           const SizedBox(height: 12),
           for (final action in actions) ...[_ActionTile(action: action), const SizedBox(height: 12)],
@@ -79,45 +84,49 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-/// The server records impact on completion but does not award points yet (P9-03), so its score is always 0.
-/// Until it does, the card says points are coming instead of showing a number that looks earned. Flip with P9-03.
-const greenScoreLive = false;
-
-class _GreenScoreCard extends StatelessWidget {
-  const _GreenScoreCard({required this.score});
-
-  final int? score;
+/// The Green Score on Home: a ring through the current level, the level's name, and how far to the next. Opens the full page.
+/// If the score cannot be fetched it still opens the page, which says why, rather than showing a number that may be stale.
+class _GreenScoreCard extends ConsumerWidget {
+  const _GreenScoreCard();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    return GlassContainer(
-      child: Row(
-        children: [
-          Icon(Icons.eco_outlined, size: 40, color: theme.colorScheme.primary),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Green Score', style: theme.textTheme.titleLarge),
-                const SizedBox(height: 2),
-                Text(
-                  !greenScoreLive
-                      ? 'You will earn points for every completed service.'
-                      : score == null
-                          ? 'Complete a service to start building your score.'
-                          : 'Based on services you have completed.',
-                  style: theme.textTheme.bodyMedium,
-                ),
-              ],
+    final score = ref.watch(greenScoreProvider);
+
+    Widget content(Widget leading, String title, String subtitle) => Row(
+          children: [
+            leading,
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [Text(title, style: theme.textTheme.titleLarge), const SizedBox(height: 2), Text(subtitle, style: theme.textTheme.bodyMedium)],
+              ),
             ),
-          ),
-          if (greenScoreLive)
-            Text(score?.toString() ?? '–', style: theme.textTheme.headlineMedium?.copyWith(color: theme.colorScheme.primary))
-          else
-            Text('Soon', style: theme.textTheme.labelSmall),
-        ],
+            const Icon(Icons.chevron_right),
+          ],
+        );
+
+    final body = score.when(
+      loading: () => content(const SizedBox(width: 72, height: 72, child: Center(child: CircularProgressIndicator(strokeWidth: 3))), 'Green Score', 'Loading...'),
+      error: (_, __) => content(Icon(Icons.eco_outlined, size: 48, color: theme.colorScheme.primary), 'Green Score', 'Tap to see your score.'),
+      data: (s) => content(
+        GreenRing(score: s.score, level: s.level),
+        'Green Score · ${s.level.name}',
+        s.score == 0 && s.ledger.isEmpty ? 'Complete an activity to start earning points.' : (s.level.isTop ? 'You have reached the highest level.' : '${s.level.pointsToNext(s.score)} points to ${s.level.nextName}'),
+      ),
+    );
+
+    return Semantics(
+      button: true,
+      child: GlassContainer(
+        padding: EdgeInsets.zero,
+        // A transparent Material so the ripple draws on the glass instead of under it.
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(onTap: () => context.push(Routes.impact), child: Padding(padding: const EdgeInsets.all(16), child: body)),
+        ),
       ),
     );
   }

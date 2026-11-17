@@ -16,6 +16,9 @@ abstract class Routes {
   static const verification = '/account/verification';
   static const browse = '/browse';
 
+  /// The Green Score, badges, history and the person's impact.
+  static const impact = '/impact';
+
   /// The person's conversations, and one thread.
   static const messages = '/messages';
   static const messagePattern = '/messages/:id';

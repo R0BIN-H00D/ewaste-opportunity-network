@@ -136,6 +136,14 @@ Connect with `io(origin, { auth: { token: <access token> }, transports: ['websoc
 - Server to client: `message:new` `{ message, conversation }` (to both people; `conversation` is that person's own view, so `unread` and `other` differ), `message:read` `{ conversationId, by, at }` (to both), `typing` `{ conversationId, userId, typing }` (to the other person only), `notification:new` `{ notification, unread }` (to its owner, after the notification is saved).
 - Client to server, each with an acknowledgement `{ ok, data }` or `{ ok:false, message, code }`: `message:send` `{ conversationId, text }`, `message:read` `{ conversationId }`, `typing` `{ conversationId, typing }`. Payloads are validated; a connection is limited to 30 events per 10 seconds (`RATE_LIMITED`).
 
+## Impact and Green Score (`/api/analytics`)
+Figures come only from recorded, verified activity (FR-IMP-006). Device counts are *actual*, kilograms weighed on a scale at a recycling centre are *measured*, and everything else (unweighed material, CO2e avoided) is an *estimate* from placeholder factors, always labelled so (BR-06). Every impact response carries `factorsProvisional: true` and a `method` note. The rules and how they are applied are in `docs/ARCHITECTURE.md`.
+- `GET /api/analytics/platform-impact` — public, cached for a minute (`Cache-Control: public, max-age=60`). `{ devicesListed, devices{ repaired, reused, donated, refurbished, recycled, diverted }, materials{ measuredKg, estimatedKg }, co2e{ kgEstimated, isEstimate }, activeTechnicians, studentParticipants, completedDonations, verifiedActivities, updatedAt, factorsProvisional, method }`. Reversed events are excluded. Nothing about individuals.
+- `GET /api/analytics/rules` — public. The scoring rules as they run: `{ rules[{ key, points, label, who }], dailyCap, levels[{ key, name, min }], badges[{ key, name, description }], notes[], method, factorsProvisional, factors }`.
+- `GET /api/analytics/monthly?months&scope` — `months` 1 to 36 (default 12), oldest first, every month present with zeros. Each: `{ month: 'YYYY-MM', devices, byType{ repair, reuse, donation, refurbishment, recycling }, measuredKg, estimatedKg, co2eKgEstimated }`. Public for the platform; `scope=me` needs a Bearer token (`401` otherwise) and covers only that person.
+- `GET /api/analytics/user-impact` — Bearer. The caller's own `{ events, devices{ total, byType }, materials{ measuredKg, estimatedKg }, co2e{ kgEstimated, isEstimate }, factorsProvisional, method }`.
+- `GET /api/analytics/green-score?page&limit` — Bearer. `{ score, level{ key, name, min, next{ key, name, min }|null, progress 0–1 }, badges[{ key, name, description, earned, progress{ done, needed } }], ledger[{ _id, eventRef, points, rule, label, createdAt }] }`, newest first (limit ≤ 50, default 20); `meta` carries the page counts. The ledger adds up to the score. A negative line is a reversal after an upheld complaint; a `…:capped` rule means the daily limit was reached and the line is worth 0.
+
 ## Donations
 Recipients are General Users whose organisation (school, college, NGO, charity) is approved. Free transfer only: no money moves (BR-10). Statuses: `open → requested → accepted → handover_scheduled → completed`, plus `cancelled`. Every response carries `viewerRole` (`donor|recipient|requester|admin|visitor`) and `actions`; clients render controls from that list.
 - `GET /api/donations?q&category&condition&city&page&limit` — public: open or requested donations. Donor appears as "Asha R."; no exact location. `as=donor|recipient` needs a Bearer token (`401` otherwise).
@@ -250,7 +258,7 @@ Every state change is written to the audit log (`AdminLog`) with the admin, the 
 - `GET /api/announcements` — public (`optionalAuth`; `Cache-Control: no-cache`). The announcements showing now for everyone, or for the signed-in role; newest 5; fields `_id`, `title`, `body`, `startsAt`.
 
 ## Planned (currently `501 NOT_IMPLEMENTED`)
-`geo` (P8) · `analytics` (public impact figures and the Green Score; the administrator analytics already live under `/api/admin/analytics`), `ai, education` (P9).
+`geo` (P8) · `ai, education` (P9).
 
 ## CORS
 

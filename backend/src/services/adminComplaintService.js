@@ -10,6 +10,11 @@ const { notify } = require('./notificationService');
 const { ACTIVE } = require('./complaintService');
 const { parsePagination, buildMeta } = require('../utils/pagination');
 const { ROLES, ACCOUNT_STATUS } = require('../config/constants');
+const logger = require('../utils/logger');
+const impact = require('./impactService');
+
+/** Which impact events a complaint about each kind of thing can undo (the `refType` the event was written with). */
+const IMPACT_REF = { service: 'ServiceRequest', order: 'Order', donation: 'Donation', recycling: 'RecyclingRecord' };
 
 const idOf = (v) => String(v && v._id ? v._id : v);
 const person = (u) => (u ? { _id: u._id, name: u.name, role: u.role } : null);
@@ -135,6 +140,11 @@ async function act(admin, id, { action, note, assignee }, ip) {
     reason: note,
     ip,
   });
+
+  // An upheld complaint about a completed activity takes its Green Score points back, once (BR-05). It never fails the decision.
+  if (action === 'resolve' && complaint.refId && IMPACT_REF[complaint.refType]) {
+    await impact.reverse({ refType: IMPACT_REF[complaint.refType], refId: complaint.refId }).catch((err) => logger.warn({ err: err.message }, 'impact not reversed'));
+  }
 
   // Both people are told (FR-CMP-002). The other person is only told that a complaint involving them moved, never what it says.
   const msg = MESSAGES[action];

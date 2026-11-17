@@ -258,6 +258,9 @@ describe('completing an order (BR-05, BR-10)', () => {
     expect(impact).toMatchObject({ type: 'refurbishment', devices: 1 });
     expect(String(impact.user)).toBe(seller.id);
     expect(String(impact.verifiedBy)).toBe(buyer.id);
+    // The seller earns 40 points once the buyer confirms receipt; the buyer earns none for buying.
+    const ledger = await require('../src/models/GreenScoreLedger').find().lean();
+    expect(ledger.map((l) => [String(l.user), l.points, l.rule])).toEqual([[seller.id, 40, 'refurbishment_sold']]);
     expect(res.body.data.history.map((h) => h.status)).toEqual(['placed', 'confirmed', 'ready', 'delivered', 'completed']);
   });
 

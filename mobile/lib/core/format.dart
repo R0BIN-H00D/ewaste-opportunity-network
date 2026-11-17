@@ -173,6 +173,20 @@ String formatChatTime(DateTime? value, {DateTime? now}) {
   return d.year == n.year ? '${d.day} ${_months[d.month - 1]}' : formatDate(d);
 }
 
+/// "Nov" for a `YYYY-MM` month key (a chart axis), or "Nov 2026" with [withYear]. Anything unreadable comes back as it was.
+String formatMonthKey(String key, {bool withYear = false}) {
+  final parts = key.split('-');
+  final month = parts.length == 2 ? int.tryParse(parts[1]) : null;
+  if (month == null || month < 1 || month > 12) return key;
+  return withYear ? '${_months[month - 1]} ${parts[0]}' : _months[month - 1];
+}
+
+/// "1.5 kg", "0.8 kg" and "12 kg": at most one decimal, none when it is whole, so a weight never looks more exact than it is.
+String formatWeight(num kg) {
+  final rounded = (kg * 10).round() / 10;
+  return '${rounded == rounded.roundToDouble() ? rounded.toStringAsFixed(0) : rounded.toStringAsFixed(1)} kg';
+}
+
 /// "16 Nov 2026".
 String formatDate(DateTime? value) {
   if (value == null) return '';

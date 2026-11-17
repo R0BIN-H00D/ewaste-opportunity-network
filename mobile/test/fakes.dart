@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:ewaste_opportunity/core/network/api_exception.dart';
 import 'package:ewaste_opportunity/models/chat.dart';
+import 'package:ewaste_opportunity/models/impact.dart';
+import 'package:ewaste_opportunity/services/impact_repository.dart';
 import 'package:ewaste_opportunity/models/account.dart';
 import 'package:ewaste_opportunity/services/chat_repository.dart';
 import 'package:ewaste_opportunity/services/realtime_service.dart';
@@ -103,6 +105,87 @@ Conversation sampleConversation({String id = 'c1', String other = 'Ravi Kumar', 
 
 ChatMessage sampleMessage(String id, String text, {String sender = 'u2', String conversation = 'c1', bool read = false, DateTime? at}) =>
     ChatMessage(id: id, conversationId: conversation, senderId: sender, text: text, createdAt: at ?? DateTime(2026, 11, 16, 9, int.tryParse(id.replaceAll(RegExp(r'\D'), '')) ?? 0), read: read);
+
+Map<String, dynamic> greenScoreJson({int score = 92, String level = 'seed', double progress = 0.92, bool withLedger = true, List<Map<String, dynamic>>? badges}) => {
+      'score': score,
+      'level': {'key': level, 'name': level == 'seed' ? 'Seed' : 'Sprout', 'min': level == 'seed' ? 0 : 100, 'next': level == 'seed' ? {'key': 'sprout', 'name': 'Sprout', 'min': 100} : {'key': 'sapling', 'name': 'Sapling', 'min': 250}, 'progress': progress},
+      'badges': badges ??
+          [
+            {'key': 'first_repair', 'name': 'First repair', 'description': 'Take part in one completed repair.', 'earned': true, 'progress': {'done': 1, 'needed': 1}},
+            {'key': 'donor', 'name': 'Donor', 'description': 'Donate one device.', 'earned': false, 'progress': {'done': 0, 'needed': 1}},
+            {'key': 'material_saver', 'name': 'Material saver', 'description': 'Have 10 kg of materials measured on a scale at a recycling centre.', 'earned': false, 'progress': {'done': 2.5, 'needed': 10}},
+          ],
+      'ledger': withLedger
+          ? [
+              {'_id': 'l2', 'eventRef': 'donation:d1', 'points': 40, 'rule': 'donation_completed', 'label': 'You donated a device', 'createdAt': '2026-11-16T09:00:00.000Z'},
+              {'_id': 'l1', 'eventRef': 'repair:r1', 'points': 50, 'rule': 'repair_completed', 'label': 'A repair you asked for was completed', 'createdAt': '2026-11-15T09:00:00.000Z'},
+            ]
+          : [],
+    };
+
+Map<String, dynamic> impactJson({int devices = 3, double measured = 1.5, double estimated = 2, double co2e = 150}) => {
+      'events': 2,
+      'devices': {'total': devices, 'byType': {'repair': 1, 'reuse': 0, 'donation': 2, 'refurbishment': 0, 'recycling': 0}},
+      'materials': {'measuredKg': measured, 'estimatedKg': estimated},
+      'co2e': {'kgEstimated': co2e, 'isEstimate': true},
+      'factorsProvisional': true,
+      'method': 'Counts of devices are actual. Everything else is an estimate from placeholder factors.',
+    };
+
+/// An [ImpactRepository] that never touches the network. The first page of the ledger comes from [score].
+class FakeImpactRepository extends ImpactRepository {
+  FakeImpactRepository({Map<String, dynamic>? score, Map<String, dynamic>? summary, List<Map<String, dynamic>>? months, this.ledgerPages = 1})
+      : score = GreenScore.fromJson(score ?? greenScoreJson()),
+        summaryData = ImpactSummary.fromJson(summary ?? impactJson()),
+        monthList = [for (final m in months ?? defaultMonths()) MonthImpact.fromJson(m)],
+        super(ApiClient(store: MemoryKeyValueStore()));
+
+  GreenScore score;
+  ImpactSummary summaryData;
+  List<MonthImpact> monthList;
+  int ledgerPages;
+  ApiException? error;
+  int scoreCalls = 0;
+  final pagesAsked = <int>[];
+
+  static List<Map<String, dynamic>> defaultMonths() => [
+        {'month': '2026-09', 'devices': 0, 'byType': {}},
+        {'month': '2026-10', 'devices': 1, 'byType': {'repair': 1}},
+        {'month': '2026-11', 'devices': 2, 'byType': {'donation': 2}},
+      ];
+
+  @override
+  Future<({GreenScore score, PageResult<LedgerEntry> ledger})> greenScore({int page = 1}) async {
+    final e = error;
+    if (e != null) throw e;
+    scoreCalls++;
+    pagesAsked.add(page);
+    final items = page == 1 ? score.ledger : [LedgerEntry(id: 'p$page', points: 5, label: 'Older entry $page', rule: 'review_left', at: DateTime(2026, 10, 1))];
+    return (score: score, ledger: PageResult(items: items, page: page, pages: ledgerPages, total: 2));
+  }
+
+  @override
+  Future<ImpactSummary> summary() async {
+    final e = error;
+    if (e != null) throw e;
+    return summaryData;
+  }
+
+  @override
+  Future<List<MonthImpact>> monthly({int months = 12}) async {
+    final e = error;
+    if (e != null) throw e;
+    return monthList;
+  }
+
+  @override
+  Future<ScoringRules> rules() async => const ScoringRules(
+        rules: [ScoringRule(key: 'repair_completed', points: 50, label: 'A repair you asked for was completed', who: 'the person who asked')],
+        dailyCap: 10,
+        notes: ['Points come only from activities the other side has confirmed as done.'],
+        method: 'Counts of devices are actual. Everything else is an estimate.',
+      );
+}
 
 /// A [ChatRepository] that never touches the network. Threads live in [thread] (oldest first); the signed-in test user is `u1`.
 class FakeChatRepository extends ChatRepository {

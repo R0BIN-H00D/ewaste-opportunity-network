@@ -11,7 +11,7 @@ const UserProfile = require('../models/UserProfile');
 const PickupSchedule = require('../models/PickupSchedule');
 const { reschedule } = require('./pickupRules');
 const Transaction = require('../models/Transaction');
-const EnvironmentalImpact = require('../models/EnvironmentalImpact');
+const impact = require('./impactService');
 const ApiError = require('../utils/ApiError');
 const logger = require('../utils/logger');
 const { parsePagination, buildMeta } = require('../utils/pagination');
@@ -414,8 +414,7 @@ async function completeDonation(updated, donation, recipientId, byUserId) {
         { upsert: true },
       ),
       // Verified impact: written only now that the recipient has confirmed (BR-05).
-      EnvironmentalImpact.create({ user: done.donor, type: 'donation', refType: 'Donation', refId: done._id, category: donation.listing?.category?._id || donation.listing?.category, devices: 1, verifiedBy: recipientId })
-        .catch((err) => { if (err.code !== 11000) throw err; }),
+      impact.record({ user: done.donor, type: 'donation', refType: 'Donation', refId: done._id, category: donation.listing?.category?._id || donation.listing?.category, devices: 1, verifiedBy: recipientId }),
     ]);
   } catch (err) {
     logger.error({ err: err.message, donationId: String(done._id) }, 'donation completion side effects failed');

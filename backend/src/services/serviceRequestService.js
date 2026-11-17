@@ -10,7 +10,7 @@ const User = require('../models/User');
 const PickupSchedule = require('../models/PickupSchedule');
 const { reschedule } = require('./pickupRules');
 const Transaction = require('../models/Transaction');
-const EnvironmentalImpact = require('../models/EnvironmentalImpact');
+const impact = require('./impactService');
 const ApiError = require('../utils/ApiError');
 const logger = require('../utils/logger');
 const { parsePagination, buildMeta } = require('../utils/pagination');
@@ -486,8 +486,8 @@ async function confirmCompletion(id, user) {
       ),
       TechnicianProfile.updateOne({ user: done.technician }, { $inc: { completedJobs: 1, earningsTotal: quotation.amount } }),
       DeviceListing.updateOne({ _id: done.listing }, { $set: { status: 'completed' } }),
-      EnvironmentalImpact.create({ user: done.customer, type: 'repair', refType: 'ServiceRequest', refId: done._id, category: listing?.category, devices: 1, verifiedBy: user.id })
-        .catch((err) => { if (err.code !== 11000) throw err; }), // already recorded: idempotent
+      // Verified impact and Green Score points (BR-05). The technician earns points for the work too. Idempotent.
+      impact.record({ user: done.customer, provider: done.technician, type: 'repair', refType: 'ServiceRequest', refId: done._id, category: listing?.category, devices: 1, verifiedBy: user.id }),
     ]);
   } catch (err) {
     logger.error({ err: err.message, requestId: String(done._id) }, 'service completion side effects failed');

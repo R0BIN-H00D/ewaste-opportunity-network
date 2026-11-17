@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { CalendarClock } from 'lucide-react';
 import TextField from '../ui/TextField';
 import ActionBox from './ActionBox';
+import SlotChoices, { toLocalInput } from './SlotChoices';
 import { FUTURE_DATE_MESSAGE, futureDate } from '../../lib/handover';
 
 /**
@@ -13,6 +14,7 @@ export default function SchedulePickup({ title, icon = CalendarClock, dateLabel 
   const [slot, setSlot] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
+  const [picked, setPicked] = useState('');
 
   const submit = (e) => {
     e.preventDefault();
@@ -26,7 +28,8 @@ export default function SchedulePickup({ title, icon = CalendarClock, dateLabel 
     <ActionBox title={title} icon={icon}>
       {children}
       <form onSubmit={submit} noValidate className="space-y-3">
-        <TextField label={dateLabel} type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} error={error} />
+        <SlotChoices selected={picked} onPick={({ start, key }) => { setPicked(start); setDate(toLocalInput(new Date(start))); setSlot(key); setError(''); }} />
+        <TextField label={dateLabel} type="datetime-local" value={date} onChange={(e) => { setDate(e.target.value); setPicked(''); }} error={error} />
         <TextField label="Time window (optional)" value={slot} onChange={(e) => setSlot(e.target.value)} placeholder="10:00-12:00" maxLength={40} />
         <TextField as={notesAs === 'textarea' ? 'textarea' : 'input'} rows={notesAs === 'textarea' ? 2 : undefined} label={notesLabel} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} />
         <button type="submit" className="btn btn-primary" disabled={busy}>{submitLabel}</button>

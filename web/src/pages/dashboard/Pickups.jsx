@@ -36,6 +36,13 @@ function PickupCard({ pickup: p }) {
         </p>
         {p.addressArea && <p className="flex items-center gap-1 text-xs text-ink-muted dark:text-[#9FB2A7]"><MapPin size={12} aria-hidden />{p.addressArea}</p>}
         {p.notes && <p className="text-xs text-ink-muted dark:text-[#9FB2A7]">Note: {p.notes}</p>}
+        {p.reschedulesLeft !== undefined && ['requested', 'confirmed', 'rescheduled'].includes(p.status) && (
+          <p className="text-xs text-ink-muted dark:text-[#9FB2A7]">
+            {p.canChange
+              ? `Can be changed ${p.reschedulesLeft === 1 ? 'once more' : `${p.reschedulesLeft} more times`}, until ${formatDate(p.changeableUntil)}`
+              : (p.reschedulesLeft === 0 ? 'Cannot be changed again' : 'Too close to the start to change')}
+          </p>
+        )}
       </div>
       <Link to={p.link} className="btn btn-glass !px-3 !py-1.5 text-sm">Open</Link>
     </GlassCard>

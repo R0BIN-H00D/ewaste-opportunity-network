@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import '../pickups/slot_sheet.dart';
 import '../../core/format.dart';
 import '../../core/network/api_exception.dart';
 import '../../models/recycling.dart';
@@ -146,9 +147,9 @@ class _BodyState extends ConsumerState<_Body> {
   }
 
   Future<void> _schedule() async {
-    final when = await pickPickupTime(context);
+    final when = await pickPickupSlot(context);
     if (when == null) return;
-    await _act((repo) => repo.schedulePickup(r.id, date: when), done: 'Pickup saved');
+    await _act((repo) => repo.schedulePickup(r.id, date: when.date, timeSlot: when.slot), done: 'Pickup saved');
   }
 
   Future<void> _handover() async {

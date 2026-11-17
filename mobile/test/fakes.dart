@@ -3,6 +3,8 @@ import 'package:ewaste_opportunity/core/network/api_exception.dart';
 import 'package:ewaste_opportunity/models/chat.dart';
 import 'package:ewaste_opportunity/models/impact.dart';
 import 'package:ewaste_opportunity/services/impact_repository.dart';
+import 'package:ewaste_opportunity/models/pickup.dart';
+import 'package:ewaste_opportunity/services/pickup_repository.dart';
 import 'package:ewaste_opportunity/models/account.dart';
 import 'package:ewaste_opportunity/services/chat_repository.dart';
 import 'package:ewaste_opportunity/services/realtime_service.dart';
@@ -133,6 +135,75 @@ Map<String, dynamic> impactJson({int devices = 3, double measured = 1.5, double 
     };
 
 /// An [ImpactRepository] that never touches the network. The first page of the ledger comes from [score].
+/// A day of windows the way the server sends them: [open] says which of the five can be chosen.
+Map<String, dynamic> slotDayJson(String date, {Set<int> open = const {0, 1, 2, 3, 4}, Set<int> busy = const {}}) {
+  const keys = ['08:00-10:00', '10:00-12:00', '12:00-14:00', '14:00-16:00', '16:00-18:00'];
+  const labels = ['Morning', 'Late morning', 'Midday', 'Afternoon', 'Evening'];
+  return {
+    'date': date,
+    'slots': [
+      for (var i = 0; i < 5; i++)
+        {
+          'key': keys[i],
+          'label': labels[i],
+          'start': DateTime.utc(int.parse(date.substring(0, 4)), int.parse(date.substring(5, 7)), int.parse(date.substring(8, 10)), 2 + i * 2, 30).toIso8601String(),
+          'available': open.contains(i) && !busy.contains(i),
+          if (!open.contains(i)) 'reason': 'too_soon' else if (busy.contains(i)) 'reason': 'busy',
+        },
+    ],
+  };
+}
+
+Map<String, dynamic> pickupJson({String id = 'pk1', String kind = 'repair', String title = 'Dell Inspiron', String status = 'confirmed', DateTime? date, String timeSlot = '10:00-12:00', int count = 0, bool canChange = true, String viewer = 'requester'}) => {
+      '_id': id,
+      'kind': kind,
+      'contextId': 'ctx-$id',
+      'title': title,
+      'date': (date ?? DateTime.now().add(const Duration(days: 3))).toUtc().toIso8601String(),
+      'timeSlot': timeSlot,
+      'notes': '',
+      'addressArea': 'Indiranagar',
+      'status': status,
+      'rescheduleCount': count,
+      'reschedulesLeft': 3 - count,
+      'changeableUntil': (date ?? DateTime.now().add(const Duration(days: 3))).subtract(const Duration(hours: 2)).toUtc().toIso8601String(),
+      'canChange': canChange,
+      'viewerRole': viewer,
+      'counterpart': {'_id': 'u2', 'name': 'Ravi Kumar'},
+    };
+
+class FakePickupRepository extends PickupRepository {
+  FakePickupRepository({List<Map<String, dynamic>>? days, List<Map<String, dynamic>>? upcoming, List<Map<String, dynamic>>? past})
+      : catalogue = SlotCatalogue.fromJson({'days': days ?? [slotDayJson('2026-11-18'), slotDayJson('2026-11-19', busy: {1})], 'cutoffHours': 2, 'maxReschedules': 3}),
+        upcomingJson = upcoming ?? [pickupJson()],
+        pastJson = past ?? const [],
+        super(ApiClient(store: MemoryKeyValueStore()));
+
+  SlotCatalogue catalogue;
+  List<Map<String, dynamic>> upcomingJson;
+  List<Map<String, dynamic>> pastJson;
+  ApiException? slotsError;
+  ApiException? listError;
+  int slotCalls = 0;
+  final asked = <bool>[];
+
+  @override
+  Future<SlotCatalogue> slots() async {
+    slotCalls++;
+    final e = slotsError;
+    if (e != null) throw e;
+    return catalogue;
+  }
+
+  @override
+  Future<PageResult<PickupItem>> list({bool upcoming = true, int page = 1}) async {
+    asked.add(upcoming);
+    final e = listError;
+    if (e != null) throw e;
+    final rows = [for (final j in (upcoming ? upcomingJson : pastJson)) PickupItem.fromJson(j)];
+    return PageResult(items: rows, page: 1, pages: 1, total: rows.length);
+  }
+}
 class FakeImpactRepository extends ImpactRepository {
   FakeImpactRepository({Map<String, dynamic>? score, Map<String, dynamic>? summary, List<Map<String, dynamic>>? months, this.ledgerPages = 1})
       : score = GreenScore.fromJson(score ?? greenScoreJson()),

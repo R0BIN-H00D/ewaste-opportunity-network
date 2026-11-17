@@ -19,6 +19,9 @@ abstract class Routes {
   /// The Green Score, badges, history and the person's impact.
   static const impact = '/impact';
 
+  /// Every pickup, collection and handover the person is part of.
+  static const pickups = '/pickups';
+
   /// The person's conversations, and one thread.
   static const messages = '/messages';
   static const messagePattern = '/messages/:id';

@@ -16,8 +16,10 @@ class QuickAction {
 
 const _messages = QuickAction(icon: Icons.chat_bubble_outline, title: 'Messages', subtitle: 'Talk to the people you are working with', route: Routes.messages);
 
-/// The home screen's quick actions for a role. Mirrors the web dashboard's menu for that role, with Messages last for everyone who can chat.
-List<QuickAction> actionsFor(UserRole role) => [..._roleActions(role), if (role != UserRole.admin) _messages];
+const _pickups = QuickAction(icon: Icons.event_available_outlined, title: 'My pickups', subtitle: 'Collections and handovers, and when they are', route: Routes.pickups);
+
+/// The home screen's quick actions for a role. Mirrors the web dashboard's menu for that role, with Pickups and Messages last for everyone who has them.
+List<QuickAction> actionsFor(UserRole role) => [..._roleActions(role), if (role != UserRole.admin) ...[_pickups, _messages]];
 
 List<QuickAction> _roleActions(UserRole role) {
   switch (role) {

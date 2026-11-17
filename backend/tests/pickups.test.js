@@ -147,3 +147,67 @@ describe('GET /api/pickups', () => {
     expect((await list(owner, '?foo=1')).status).toBe(422);
   });
 });
+
+describe('GET /api/pickups/slots', () => {
+  it('offers five windows a day for the next two weeks and never one that starts within two hours', async () => {
+    const res = await call('get', '/api/pickups/slots', owner);
+    expect(res.status).toBe(200);
+    const { days, cutoffHours, maxReschedules, timezone } = res.body.data;
+    expect(cutoffHours).toBe(2);
+    expect(maxReschedules).toBe(3);
+    expect(timezone).toBe('Asia/Kolkata');
+    expect(days.length).toBeGreaterThanOrEqual(14);
+    days.forEach((d) => expect(d.slots.map((s) => s.key)).toEqual(['08:00-10:00', '10:00-12:00', '12:00-14:00', '14:00-16:00', '16:00-18:00']));
+    days.flatMap((d) => d.slots).forEach((s) => {
+      if (new Date(s.start).getTime() - Date.now() < 2 * 3600 * 1000) expect(s.available).toBe(false);
+      else expect(s.available).toBe(true);
+    });
+  });
+
+  it('marks a window busy when the person already has a pickup in it', async () => {
+    const free = (await call('get', '/api/pickups/slots', owner)).body.data.days.flatMap((d) => d.slots).find((s) => s.available);
+    await direct({ date: new Date(free.start) });
+    const after = (await call('get', '/api/pickups/slots', owner)).body.data.days.flatMap((d) => d.slots).find((s) => s.start === free.start);
+    expect(after.available).toBe(false);
+    expect(after.reason).toBe('busy');
+    // the other side of that pickup is busy then too, a stranger is not
+    const theirs = (await call('get', '/api/pickups/slots', centerUser)).body.data.days.flatMap((d) => d.slots).find((s) => s.start === free.start);
+    expect(theirs.available).toBe(false);
+    const strangers = (await call('get', '/api/pickups/slots', other)).body.data.days.flatMap((d) => d.slots).find((s) => s.start === free.start);
+    expect(strangers.available).toBe(true);
+  });
+
+  it('ignores cancelled and collected pickups', async () => {
+    const free = (await call('get', '/api/pickups/slots', owner)).body.data.days.flatMap((d) => d.slots).find((s) => s.available);
+    await direct({ date: new Date(free.start), status: 'cancelled' });
+    await direct({ date: new Date(free.start), status: 'collected' });
+    const again = (await call('get', '/api/pickups/slots', owner)).body.data.days.flatMap((d) => d.slots).find((s) => s.start === free.start);
+    expect(again.available).toBe(true);
+  });
+
+  it('is for signed-in people with pickups, not anonymous callers or administrators', async () => {
+    expect((await call('get', '/api/pickups/slots')).status).toBe(401);
+    expect((await call('get', '/api/pickups/slots', admin)).status).toBe(403);
+  });
+});
+
+describe('what the list says about changing a pickup', () => {
+  it('says how many changes are left and until when', async () => {
+    await scheduled(later(3));
+    const item = (await list(owner)).body.data[0];
+    expect(item.reschedulesLeft).toBe(3);
+    expect(item.canChange).toBe(true);
+    expect(new Date(item.changeableUntil).getTime()).toBe(new Date(item.date).getTime() - 2 * 3600 * 1000);
+  });
+
+  it('says no once the changes are used up or the start is under two hours away', async () => {
+    await direct({ rescheduleCount: 3 });
+    await direct({ date: new Date(Date.now() + 3600 * 1000) });
+    const items = (await list(owner)).body.data;
+    expect(items).toHaveLength(2);
+    const used = items.find((i) => i.rescheduleCount === 3);
+    expect(used.reschedulesLeft).toBe(0);
+    expect(used.canChange).toBe(false);
+    expect(items.find((i) => i.rescheduleCount === 0).canChange).toBe(false);
+  });
+});

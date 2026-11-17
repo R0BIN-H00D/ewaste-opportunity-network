@@ -9,6 +9,8 @@ const RefurbishmentJob = require('../models/RefurbishmentJob');
 const RecyclingRecord = require('../models/RecyclingRecord');
 const User = require('../models/User');
 const { parsePagination, buildMeta } = require('../utils/pagination');
+const { MAX_RESCHEDULES, RESCHEDULE_CUTOFF_MS } = require('./pickupRules');
+const { SLOTS, SLOT_DAYS, IST_OFFSET_MS, slotStart, istDay } = require('../config/pickupSlots');
 
 const ACTIVE = ['requested', 'confirmed', 'rescheduled'];
 const idOf = (v) => String(v && v._id ? v._id : v);
@@ -69,6 +71,9 @@ async function listPickups(user, query = {}) {
       addressArea: p.addressArea || '',
       status: p.status,
       rescheduleCount: p.rescheduleCount || 0,
+      reschedulesLeft: Math.max(0, MAX_RESCHEDULES - (p.rescheduleCount || 0)),
+      changeableUntil: new Date(p.date.getTime() - RESCHEDULE_CUTOFF_MS),
+      canChange: ACTIVE.includes(p.status) && (p.rescheduleCount || 0) < MAX_RESCHEDULES && p.date.getTime() - now.getTime() >= RESCHEDULE_CUTOFF_MS,
       viewerRole: asRequester ? 'requester' : 'provider',
       counterpart: { _id: otherId, name: people.get(otherId) || '' },
     };
@@ -76,4 +81,37 @@ async function listPickups(user, query = {}) {
   return { items, meta: buildMeta({ page, limit }, total) };
 }
 
-module.exports = { listPickups };
+const pad = (n) => String(n).padStart(2, '0');
+
+/**
+ * The next SLOT_DAYS days of collection windows (FR-PICK-001). A window is open unless it starts less than the change cutoff
+ * from now, or the signed-in person already has a pickup in it (`busy`) — nobody can be in two places at once.
+ */
+async function listSlots(user, now = new Date()) {
+  const today = istDay(now);
+  const mine = await PickupSchedule.find({
+    $or: [{ requester: user.id }, { provider: user.id }],
+    status: { $in: ACTIVE },
+    date: { $gte: now, $lt: new Date(now.getTime() + (SLOT_DAYS + 1) * 24 * 3600 * 1000) },
+  }).select('date');
+  const taken = new Set(mine.map((p) => {
+    const t = new Date(p.date.getTime() + IST_OFFSET_MS);
+    return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}-${t.getUTCHours()}`;
+  }));
+
+  const days = [];
+  for (let i = 0; i <= SLOT_DAYS; i += 1) {
+    const base = new Date(Date.UTC(today.y, today.m - 1, today.d + i));
+    const y = base.getUTCFullYear(); const m = base.getUTCMonth() + 1; const d = base.getUTCDate();
+    const slots = SLOTS.map((s) => {
+      const start = slotStart(y, m, d, s);
+      const tooSoon = start.getTime() - now.getTime() < RESCHEDULE_CUTOFF_MS;
+      const busy = [...Array(s.end - s.start).keys()].some((h) => taken.has(`${y}-${pad(m)}-${pad(d)}-${s.start + h}`));
+      return { key: s.key, label: s.label, start, available: !tooSoon && !busy, ...(tooSoon ? { reason: 'too_soon' } : busy ? { reason: 'busy' } : {}) };
+    });
+    if (slots.some((s) => s.available) || i > 0) days.push({ date: `${y}-${pad(m)}-${pad(d)}`, slots });
+  }
+  return { timezone: 'Asia/Kolkata', cutoffHours: RESCHEDULE_CUTOFF_MS / 3600000, maxReschedules: MAX_RESCHEDULES, days };
+}
+
+module.exports = { listPickups, listSlots };

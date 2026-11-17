@@ -12,6 +12,7 @@ import '../../widgets/app_background.dart';
 import '../../widgets/app_chip.dart';
 import '../../widgets/glass_app_bar.dart';
 import '../../widgets/glass_container.dart';
+import '../../widgets/message_button.dart';
 import '../../widgets/listing_photo.dart';
 import '../../widgets/message_banner.dart';
 import '../../widgets/skeleton.dart';
@@ -317,6 +318,7 @@ class _BodyState extends ConsumerState<_Body> {
                 _fact(theme, 'Status', labelOf(donationRequestStatusPairs, asked.status)),
                 if ((asked.justification ?? '').trim().isNotEmpty) _fact(theme, 'Why', asked.justification!.trim()),
                 if ((asked.intendedUse ?? '').trim().isNotEmpty) _fact(theme, 'Use', asked.intendedUse!.trim()),
+                if (asked.id.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: MessageButton(contextType: 'donation', contextId: asked.id, label: 'Message ${d.donorName ?? 'the donor'}')),
               ],
             ),
           ),
@@ -328,7 +330,10 @@ class _BodyState extends ConsumerState<_Body> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Semantics(header: true, child: Text('Requests', style: theme.textTheme.titleLarge)),
-                for (final row in d.requests) _RequestRow(row: row, canDecide: d.can('decide') && row.isPending, busy: _busy, onChoose: () => _decide(row, accept: true), onDecline: () => _decide(row, accept: false)),
+                for (final row in d.requests) ...[
+                  _RequestRow(row: row, canDecide: d.can('decide') && row.isPending, busy: _busy, onChoose: () => _decide(row, accept: true), onDecline: () => _decide(row, accept: false)),
+                  if (row.id.isNotEmpty) Padding(padding: const EdgeInsets.only(bottom: 8), child: MessageButton(contextType: 'donation', contextId: row.id, label: 'Message ${row.title}')),
+                ],
               ],
             ),
           ),

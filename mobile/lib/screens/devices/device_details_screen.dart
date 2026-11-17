@@ -10,6 +10,7 @@ import '../../widgets/app_background.dart';
 import '../../widgets/glass_app_bar.dart';
 import '../../widgets/app_chip.dart';
 import '../../widgets/glass_container.dart';
+import '../../widgets/message_button.dart';
 import '../../widgets/listing_photo.dart';
 import '../../widgets/message_banner.dart';
 import '../../widgets/skeleton.dart';
@@ -179,6 +180,10 @@ class _BodyState extends ConsumerState<_Body> {
           tone: BannerTone.info,
           message: 'Only the area is shown. The exact address is shared privately when both sides agree to a handover.',
         ),
+        if (!l.isOwner && l.isLive) ...[
+          const SizedBox(height: 16),
+          MessageButton(contextType: 'enquiry', contextId: l.id, label: 'Ask ${l.ownerName ?? 'the owner'} a question'),
+        ],
         if (l.isOwner) ...[
           const SizedBox(height: 16),
           GlassContainer(

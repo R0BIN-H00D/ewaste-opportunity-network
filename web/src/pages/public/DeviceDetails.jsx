@@ -7,6 +7,7 @@ import ErrorState from '../../components/ui/ErrorState';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Skeleton from '../../components/ui/Skeleton';
 import ReportDialog from '../../components/devices/ReportDialog';
+import MessageButton from '../../components/chat/MessageButton';
 import { useFetch } from '../../hooks/useFetch';
 import { useAuth } from '../../hooks/useAuth';
 import { deviceApi } from '../../services/deviceApi';
@@ -155,6 +156,11 @@ export default function DeviceDetails() {
                 Requests for repair, reuse, donation and recycling open with the service modules. Meanwhile you can{' '}
                 <Link to="/services" className="font-semibold text-primary underline dark:text-primary-tint">find a service provider</Link>.
               </p>
+              {isAuthenticated && isLive && (
+                <div className="mt-3">
+                  <MessageButton contextType="enquiry" contextId={listing._id} label={`Ask ${listing.owner?.name || 'the owner'} a question`} />
+                </div>
+              )}
               <button
                 type="button"
                 className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-ink-muted underline hover:text-danger"

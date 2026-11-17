@@ -1,16 +1,27 @@
 import { useEffect, useRef } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { Activity, Award, BarChart3, Bell, Flag, Megaphone, MessageSquareWarning, ScrollText, Shapes, Star, ShieldCheck, Users, CalendarClock, Boxes, Factory, GraduationCap, Heart, LayoutDashboard, LogOut, PackageSearch, Recycle, ReceiptText, Settings, ShoppingBag, Store, Wrench } from 'lucide-react';
+import { Activity, Award, BarChart3, Bell, Flag, Megaphone, MessageSquareWarning, ScrollText, Shapes, Star, ShieldCheck, Users, CalendarClock, Boxes, Factory, GraduationCap, Heart, LayoutDashboard, LogOut, MessageCircle, PackageSearch, Recycle, ReceiptText, Settings, ShoppingBag, Store, Wrench } from 'lucide-react';
 import ThemeToggle from '../components/layout/ThemeToggle';
 import AnnouncementBanner from '../components/layout/AnnouncementBanner';
 import { logoutUser } from '../store/authSlice';
 import { useAuth } from '../hooks/useAuth';
+import { useLiveSession, useUnreadCounts } from '../hooks/useRealtime';
 
 const link = ({ isActive }) =>
   `flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm font-medium transition ${
     isActive ? 'bg-primary/10 text-primary dark:text-primary-tint' : 'text-ink-muted hover:text-ink dark:text-[#9FB2A7] dark:hover:text-white'
   }`;
+
+/** A small count beside a menu item; nothing when there is nothing waiting. */
+function Badge({ count, label }) {
+  if (!count) return null;
+  return (
+    <span className="ml-auto rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-white dark:bg-primary-tint dark:text-canvas-dark" aria-label={`${count} ${label}`}>
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
 
 // Glass sidebar + topbar shell. Role-specific navigation is added with each role's dashboard (Phase 4-5).
 export default function DashboardLayout() {
@@ -19,6 +30,9 @@ export default function DashboardLayout() {
   const { pathname } = useLocation();
   const { user } = useAuth();
   const navRef = useRef(null);
+  // The live connection and the unread badges live as long as the dashboard is open.
+  useLiveSession(user?._id);
+  const counts = useUnreadCounts();
 
   // On a phone the menu is one scrolling row; keep the current page's link in view after every navigation.
   useEffect(() => {
@@ -92,7 +106,10 @@ export default function DashboardLayout() {
           {user?.role && user.role !== 'admin' && (
             <NavLink to="/dashboard/complaints" className={link}><MessageSquareWarning size={18} aria-hidden /> Complaints</NavLink>
           )}
-          <NavLink to="/dashboard/notifications" className={link}><Bell size={18} aria-hidden /> Notifications</NavLink>
+          {user?.role && user.role !== 'admin' && (
+            <NavLink to="/dashboard/messages" className={link}><MessageCircle size={18} aria-hidden /> Messages <Badge count={counts.messages} label="unread messages" /></NavLink>
+          )}
+          <NavLink to="/dashboard/notifications" className={link}><Bell size={18} aria-hidden /> Notifications <Badge count={counts.notifications} label="unread notifications" /></NavLink>
           <NavLink to="/dashboard/transactions" className={link}><ReceiptText size={18} aria-hidden /> Transactions</NavLink>
           <NavLink to="/dashboard/settings" className={link}><Settings size={18} aria-hidden /> Settings</NavLink>
         </nav>

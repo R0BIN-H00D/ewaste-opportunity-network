@@ -3,6 +3,7 @@
 // Creating a notification must never fail the request that caused it.
 const Notification = require('../models/Notification');
 const logger = require('../utils/logger');
+const { emitToUser } = require('../sockets/emitter');
 
 async function notify(userIds, { type, title, body, data = {} }) {
   // Callers may pass plain ids or populated documents; a populated document must never be stringified (it would not be an id).
@@ -10,9 +11,22 @@ async function notify(userIds, { type, title, body, data = {} }) {
   const ids = [...new Set((Array.isArray(userIds) ? userIds : [userIds]).filter(Boolean).map(idOf))];
   if (ids.length === 0) return;
   try {
-    await Notification.insertMany(ids.map((user) => ({ user, type, title, body, data })));
+    const saved = await Notification.insertMany(ids.map((user) => ({ user, type, title, body, data })));
+    await pushLive(saved); // a hiccup in live delivery must not look like a failed save
   } catch (err) {
     logger.warn({ err: err.message, type }, 'notification not saved');
+  }
+}
+
+/** Tells each person's open apps about their new notification, with the unread total for the badge. No-op if nobody is connected. */
+async function pushLive(docs) {
+  for (const doc of docs) {
+    try {
+      const unread = await Notification.countDocuments({ user: doc.user, readAt: null });
+      emitToUser(doc.user, 'notification:new', { notification: view(doc.toObject()), unread });
+    } catch (err) {
+      logger.warn({ err: err.message }, 'notification not pushed live');
+    }
   }
 }
 

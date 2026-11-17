@@ -76,6 +76,12 @@ class NotificationsController extends PagedNotifier<NotificationItem> {
     }
   }
 
+  /// A notification the server just pushed: shown at the top at once. Ignored if the list has not been opened yet, or already has it.
+  void addLive(NotificationItem item) {
+    if (!state.loaded || state.items.any((n) => n.id == item.id)) return;
+    state = state.copyWith(items: [item, ...state.items], total: state.total + 1);
+  }
+
   Future<void> markAllRead() async {
     await ref.read(accountRepositoryProvider).markAllRead();
     state = state.copyWith(items: [for (final n in state.items) n.markedRead()]);

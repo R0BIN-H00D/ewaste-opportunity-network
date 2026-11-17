@@ -115,11 +115,26 @@ The platform records payments made offline between people; it never processes mo
 - `PUT /api/transactions/:id/confirm` `{ reference? }` — payee only: `recorded` → `confirmed`. Non-participants get `404`, the payer `403`, an already confirmed payment `409`.
 
 ## Notifications (Bearer, your own only)
-The in-app notification centre (P8-05, in-app part). Every service request, quotation, handover and similar event writes one through `notificationService.notify()`. Push (FCM) and email channels will be added later without changing these routes.
+The in-app notification centre (P8-05, in-app part). Every service request, quotation, handover and similar event writes one through `notificationService.notify()`. Each new notification is also pushed live over the socket (`notification:new`, see Chat below). Push (FCM) and email channels will be added later without changing these routes.
 - `GET /api/notifications?unread=true&page&limit` — newest first (limit ≤ 50, default 20). Each item: `{ _id, type, title, body?, data{ id, deepLink }, readAt|null, createdAt }`. `meta` carries `page, limit, total, pages` and `unread` (the total unread count, for a badge).
 - `GET /api/notifications/unread-count` → `{ unread }`.
 - `PUT /api/notifications/read-all` → `{ updated, unread: 0 }`.
 - `PUT /api/notifications/:id/read` — marks one read (reading twice keeps the first time). Someone else's id, an unknown id and a malformed id all return `404`.
+
+## Chat (Bearer)
+One-to-one conversations between the two people on a shared record (P8-03). The server works out the two people from the record, so a client never names the other participant and nobody can message a stranger. Text only for now (photos wait for the Cloudinary work, P8-02). A stranger, an unknown id and a malformed id all get the same `404`.
+- `POST /api/chat/conversations` `{ contextType, contextId }` — finds or starts the thread. `contextType` is one of `service` (the repair's customer and its assigned technician; `404` until one is chosen), `order` (buyer and seller), `recycling` (the requester and the centre), `donation` (the id is one recipient's *donation request*: the donor and that recipient), `offer` (a refurbishment job's owner and refurbisher), `enquiry` (a listed device: the asker and its owner; not your own, and only while it is on sale). Either person may open it and gets the same thread back.
+- `GET /api/chat/conversations?page&limit` — mine, most recent first (limit ≤ 50, default 20). Each: `{ _id, contextType, contextId, other{ _id, name, role }, lastMessage{ text, at, mine }|null, unread, updatedAt }`. `meta` carries the page counts and `unread`, the total waiting across all threads.
+- `GET /api/chat/conversations/:id` — one conversation (same shape).
+- `GET /api/chat/unread-count` → `{ unread }`.
+- `GET /api/chat/conversations/:id/messages?limit&before` — oldest first within the page (limit ≤ 100, default 30). Pass the previous `meta.nextBefore` as `before` to go further back; `meta` is `{ hasMore, nextBefore }`. Each: `{ _id, conversation, sender, text, createdAt, read }`, where `read` means the *other* person has read it.
+- `POST /api/chat/conversations/:id/messages` `{ text }` → `201`. 1 to 2000 characters, trimmed. `409 RECIPIENT_UNAVAILABLE` if the other account is suspended or deleted. At most 40 a minute per person (`429`).
+- `PUT /api/chat/conversations/:id/read` → `{ unread: 0 }` — marks the other person's messages read and clears my count.
+
+### Real time (Socket.IO, same server and port)
+Connect with `io(origin, { auth: { token: <access token> }, transports: ['websocket'] })`. A missing, expired, revoked or suspended-account token is refused with the error `UNAUTHORIZED`: refresh the session and connect again. Each person's devices join the private room `user:<id>`; nothing is ever sent to anyone else. Everything here can also be done over REST, so chat keeps working with no socket.
+- Server to client: `message:new` `{ message, conversation }` (to both people; `conversation` is that person's own view, so `unread` and `other` differ), `message:read` `{ conversationId, by, at }` (to both), `typing` `{ conversationId, userId, typing }` (to the other person only), `notification:new` `{ notification, unread }` (to its owner, after the notification is saved).
+- Client to server, each with an acknowledgement `{ ok, data }` or `{ ok:false, message, code }`: `message:send` `{ conversationId, text }`, `message:read` `{ conversationId }`, `typing` `{ conversationId, typing }`. Payloads are validated; a connection is limited to 30 events per 10 seconds (`RATE_LIMITED`).
 
 ## Donations
 Recipients are General Users whose organisation (school, college, NGO, charity) is approved. Free transfer only: no money moves (BR-10). Statuses: `open → requested → accepted → handover_scheduled → completed`, plus `cancelled`. Every response carries `viewerRole` (`donor|recipient|requester|admin|visitor`) and `actions`; clients render controls from that list.
@@ -235,7 +250,7 @@ Every state change is written to the audit log (`AdminLog`) with the admin, the 
 - `GET /api/announcements` — public (`optionalAuth`; `Cache-Control: no-cache`). The announcements showing now for everyone, or for the signed-in role; newest 5; fields `_id`, `title`, `body`, `startsAt`.
 
 ## Planned (currently `501 NOT_IMPLEMENTED`)
-`chat, geo` (P8) · `analytics` (public impact figures and the Green Score; the administrator analytics already live under `/api/admin/analytics`), `ai, education` (P9).
+`geo` (P8) · `analytics` (public impact figures and the Green Score; the administrator analytics already live under `/api/admin/analytics`), `ai, education` (P9).
 
 ## CORS
 

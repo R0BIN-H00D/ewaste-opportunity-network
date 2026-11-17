@@ -15,6 +15,11 @@ abstract class Routes {
   static const help = '/account/help';
   static const verification = '/account/verification';
   static const browse = '/browse';
+
+  /// The person's conversations, and one thread.
+  static const messages = '/messages';
+  static const messagePattern = '/messages/:id';
+  static String message(String conversationId) => '/messages/$conversationId';
   static const myListings = '/my-listings';
   static const newListing = '/listings/new';
 

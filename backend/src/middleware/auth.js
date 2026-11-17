@@ -5,10 +5,8 @@ const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 const { ROLES, ACCOUNT_STATUS } = require('../config/constants');
 
-async function resolveUser(req) {
-  const [scheme, token] = (req.headers.authorization || '').split(' ');
-  if (scheme !== 'Bearer' || !token) return null;
-
+/** The signed-in person behind an access token, or an error. Shared by the HTTP middleware and the Socket.IO handshake. */
+async function userFromToken(token) {
   const payload = verifyAccessToken(token); // throws JsonWebTokenError/TokenExpiredError -> 401 via error handler
   const user = await User.findById(payload.sub).select('name role status tokenVersion');
   if (!user || user.status === ACCOUNT_STATUS.DELETED) throw ApiError.unauthorized('Account not found');
@@ -16,6 +14,12 @@ async function resolveUser(req) {
   if (user.status === ACCOUNT_STATUS.SUSPENDED) throw ApiError.forbidden('Your account is suspended', 'ACCOUNT_SUSPENDED');
   // 'pending_verification' accounts may authenticate (they need to submit documents); feature gates use requireVerified.
   return { id: String(user._id), role: user.role, status: user.status, name: user.name };
+}
+
+async function resolveUser(req) {
+  const [scheme, token] = (req.headers.authorization || '').split(' ');
+  if (scheme !== 'Bearer' || !token) return null;
+  return userFromToken(token);
 }
 
 /** Requires a valid access token. Sets req.user = { id, role, status, name }. */
@@ -58,4 +62,4 @@ const requireVerified = asyncHandler(async (req, _res, next) => {
   return next();
 });
 
-module.exports = { authenticate, optionalAuth, authorize, requireVerified };
+module.exports = { authenticate, optionalAuth, authorize, requireVerified, userFromToken };

@@ -226,6 +226,17 @@ void main() {
       expect(find.textContaining('Expect it back on'), findsOneWidget);
     });
 
+    testWidgets('a long technician name in the handover card wraps instead of overflowing on a small phone', (tester) async {
+      final json = requestJson(status: 'device_delivery_pending', actions: ['confirm_handover'])
+        ..['technician'] = {'_id': 't1', 'name': 'A technician with a very long business name indeed'};
+      await _pump(tester, const RequestDetailsScreen(id: 'r1'), FakeRequestRepository(current: ServiceRequest.fromJson(json)));
+      tester.view.physicalSize = const Size(320, 2400);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.textContaining('has not confirmed yet'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('no return time yet, no Return row', (tester) async {
       await _pump(tester, const RequestDetailsScreen(id: 'r1'), FakeRequestRepository(current: sampleRequest(status: 'device_delivery_pending', actions: ['confirm_handover'])));
       expect(find.text('Return'), findsNothing);

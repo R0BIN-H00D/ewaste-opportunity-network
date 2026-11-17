@@ -23,7 +23,8 @@ import { TechnicianDirectory, TechnicianProfile } from '../pages/public/Technici
 import Requests from '../pages/dashboard/Requests';
 import NewRequest from '../pages/dashboard/NewRequest';
 import RequestDetail from '../pages/dashboard/RequestDetail';
-import { NotificationsPage } from '../pages/dashboard/Shells';
+import NotificationsPage from '../pages/dashboard/Notifications';
+import Messages from '../pages/dashboard/Messages';
 import Transactions from '../pages/dashboard/Transactions';
 import Donations from '../pages/public/Donations';
 import DonationDetail from '../pages/public/DonationDetail';
@@ -126,6 +127,8 @@ export const routeConfig = [
           { path: 'dashboard', element: <DashboardHome /> },
           { path: 'dashboard/settings', element: <Settings /> },
           { path: 'dashboard/notifications', element: <NotificationsPage /> },
+          { path: 'dashboard/messages', element: <Messages /> },
+          { path: 'dashboard/messages/:id', element: <Messages /> },
           { path: 'dashboard/transactions', element: <Transactions /> },
           { path: 'dashboard/requests', element: <Requests /> },
           { path: 'dashboard/requests/:id', element: <RequestDetail /> },

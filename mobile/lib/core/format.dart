@@ -157,6 +157,22 @@ String formatSavedAt(DateTime saved, {DateTime? now}) {
   return formatDateTime(s);
 }
 
+/// A short time for a conversation: "3:05 PM" today, "Yesterday", "16 Nov" this year, otherwise "16 Nov 2025". [now] is for tests.
+String formatChatTime(DateTime? value, {DateTime? now}) {
+  if (value == null) return '';
+  final d = value.toLocal();
+  final n = (now ?? DateTime.now()).toLocal();
+  final today = DateTime(n.year, n.month, n.day);
+  final day = DateTime(d.year, d.month, d.day);
+  final daysAgo = today.difference(day).inDays;
+  if (daysAgo <= 0) {
+    final hour12 = d.hour % 12 == 0 ? 12 : d.hour % 12;
+    return '$hour12:${d.minute.toString().padLeft(2, '0')} ${d.hour < 12 ? 'AM' : 'PM'}';
+  }
+  if (daysAgo == 1) return 'Yesterday';
+  return d.year == n.year ? '${d.day} ${_months[d.month - 1]}' : formatDate(d);
+}
+
 /// "16 Nov 2026".
 String formatDate(DateTime? value) {
   if (value == null) return '';

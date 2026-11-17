@@ -3,7 +3,10 @@ import 'package:ewaste_opportunity/core/theme/app_theme.dart';
 import 'package:ewaste_opportunity/models/listing.dart';
 import 'package:ewaste_opportunity/models/recycling_report.dart';
 import 'package:ewaste_opportunity/providers/core_providers.dart';
+import 'package:ewaste_opportunity/providers/chat_providers.dart';
 import 'package:ewaste_opportunity/providers/learning_providers.dart';
+import 'package:ewaste_opportunity/screens/chat/chat_screen.dart';
+import 'package:ewaste_opportunity/screens/chat/conversations_screen.dart';
 import 'package:ewaste_opportunity/providers/listings_controller.dart';
 import 'package:ewaste_opportunity/providers/marketplace_providers.dart';
 import 'package:ewaste_opportunity/providers/photo_providers.dart';
@@ -58,6 +61,10 @@ Future<void> _show(WidgetTester tester, Widget screen, double scale) async {
           ..minePages = {1: [sampleTask(), sampleTask(id: 'o2', status: 'closed', counts: const {})]}
           ..applicantList = [sampleApplicant()]),
         recyclingRepositoryProvider.overrideWithValue(FakeRecyclingRepository()..reportData = RecyclingReport.fromJson(reportJson())),
+        chatRepositoryProvider.overrideWithValue(FakeChatRepository()
+          ..conversationList = [sampleConversation(other: 'Someone with a long name', lastText: 'A fairly long message that has to wrap onto more than one line', unread: 12)]
+          ..thread['c1'] = [sampleMessage('m1', 'A fairly long message that has to wrap onto more than one line ' * 3, sender: 'u1', read: true), sampleMessage('m2', 'Reply ' * 30, read: true)]),
+        realtimeServiceProvider.overrideWithValue(FakeRealtime()),
         deviceRepositoryProvider.overrideWithValue(FakeDeviceRepository()),
         photoPickerProvider.overrideWithValue(FakePhotoPicker()),
         categoriesProvider.overrideWith((ref) async => const [Category(id: 'c1', name: 'Phones', slug: 'phones'), Category(id: 'c2', name: 'Laptops', slug: 'laptops')]),
@@ -89,6 +96,8 @@ void main() {
     'the applicants': () => const ApplicantsScreen(opportunityId: 'o1'),
     'one application, for its supervisor': () => const ApplicationDetailsScreen(id: 'a1'),
     'the recycler report': () => const RecyclingReportScreen(),
+    'the conversations': () => const ConversationsScreen(),
+    'a conversation': () => const ChatScreen(conversationId: 'c1', title: 'A person with a rather long name', subtitle: 'Question about a device'),
     'the location field': () => SingleChildScrollView(child: LocationField(value: const GeoPoint(12.9716, 77.5946), onChanged: (_) {})),
   };
 

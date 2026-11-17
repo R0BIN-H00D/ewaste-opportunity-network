@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../models/user.dart';
 import '../../providers/account_providers.dart';
 import '../../providers/auth_controller.dart';
+import '../../providers/chat_providers.dart';
 import '../../routes/route_paths.dart';
 import '../../widgets/glass_container.dart';
 
@@ -32,6 +33,7 @@ class AccountScreen extends ConsumerWidget {
     final user = ref.watch(authControllerProvider).user;
     if (user == null) return const SizedBox.shrink();
     final unread = ref.watch(unreadNotificationsProvider).valueOrNull ?? 0;
+    final unreadMessages = ref.watch(chatUnreadProvider).valueOrNull ?? 0;
     final initial = user.name.trim().isEmpty ? '?' : user.name.trim().substring(0, 1).toUpperCase();
 
     Widget tile(IconData icon, String title, String subtitle, String route, {int badge = 0}) => ListTile(
@@ -54,11 +56,15 @@ class AccountScreen extends ConsumerWidget {
           onTap: () async {
             await context.push(route);
             ref.invalidate(unreadNotificationsProvider);
+            ref.invalidate(chatUnreadProvider);
           },
         );
 
     return RefreshIndicator(
-      onRefresh: () async => ref.invalidate(unreadNotificationsProvider),
+      onRefresh: () async {
+        ref.invalidate(unreadNotificationsProvider);
+        ref.invalidate(chatUnreadProvider);
+      },
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
         children: [
@@ -96,6 +102,7 @@ class AccountScreen extends ConsumerWidget {
               child: Column(
                 children: [
                   tile(Icons.notifications_none_rounded, 'Notifications', 'Updates about your devices and requests', Routes.notifications, badge: unread),
+                  tile(Icons.chat_bubble_outline, 'Messages', 'Conversations with the people you work with', Routes.messages, badge: unreadMessages),
                   tile(Icons.person_outline_rounded, 'Profile', 'Name, phone and your area', Routes.profile),
                   if (user.role.isProvider) tile(Icons.verified_user_outlined, 'Verification', 'Your documents and approval', Routes.verification),
                   tile(Icons.receipt_long_outlined, 'Transaction history', 'What you paid and were paid', Routes.payments),

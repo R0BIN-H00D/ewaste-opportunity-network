@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, MapPin, Star, User, XCircle } from 'lucide-react';
 import GlassCard from '../../components/glass/GlassCard';
+import MessageButton from '../../components/chat/MessageButton';
 import Alert from '../../components/ui/Alert';
 import Badge from '../../components/ui/Badge';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -126,6 +127,7 @@ export default function OrderDetail() {
       <Alert variant="success">{flash}</Alert>
       <GlassCard><Tracker order={o} /></GlassCard>
       <OrderActions order={o} onChanged={(updated, message) => { setFresh(updated); setFlash(message || ''); }} />
+      <div><MessageButton contextType="order" contextId={o._id} label={`Message ${(seller ? o.buyer?.name : o.seller?.name) || (seller ? 'the buyer' : 'the seller')}`} /></div>
       {seller && o.status === 'delivered' && <Alert variant="info">Waiting for the buyer to confirm they received it. That completes the order and records the payment.</Alert>}
 
       <div className="grid gap-5 lg:grid-cols-2">

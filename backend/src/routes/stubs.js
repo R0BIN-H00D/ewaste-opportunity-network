@@ -4,7 +4,7 @@
 const router = require('express').Router();
 
 const PLANNED = {
-  P8: ['chat', 'geo'],
+  P8: ['geo'],
   P9: ['analytics', 'ai', 'education'],
 };
 

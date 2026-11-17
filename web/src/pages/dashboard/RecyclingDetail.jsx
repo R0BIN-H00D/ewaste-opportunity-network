@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, MapPin, User } from 'lucide-react';
 import GlassCard from '../../components/glass/GlassCard';
+import MessageButton from '../../components/chat/MessageButton';
 import Alert from '../../components/ui/Alert';
 import Badge from '../../components/ui/Badge';
 import ErrorState from '../../components/ui/ErrorState';
@@ -95,6 +96,7 @@ export default function RecyclingDetail() {
       {r.status === 'cancelled' && <Alert variant="info">This request was cancelled{r.cancelReason ? `: ${r.cancelReason}` : '.'}</Alert>}
       <GlassCard><Tracker request={r} /></GlassCard>
       <RecyclingActions request={r} onChanged={(updated, message) => { setFresh(updated); setFlash(message || ''); }} />
+      <div><MessageButton contextType="recycling" contextId={r._id} label={asCenter ? 'Message the sender' : 'Message the centre'} /></div>
 
       <div className="grid gap-5 lg:grid-cols-2">
         <GlassCard as="section" aria-label="Request details" className="space-y-3">

@@ -13,6 +13,7 @@ import '../../widgets/app_background.dart';
 import '../../widgets/app_chip.dart';
 import '../../widgets/glass_app_bar.dart';
 import '../../widgets/glass_container.dart';
+import '../../widgets/message_button.dart';
 import '../../widgets/listing_photo.dart';
 import '../../widgets/message_banner.dart';
 import '../../widgets/skeleton.dart';
@@ -309,6 +310,9 @@ class _BodyState extends ConsumerState<_Body> {
       if (r.can('confirm_completion')) FilledButton.icon(onPressed: _busy ? null : _complete, icon: const Icon(Icons.task_alt), label: const Text('Confirm repair is done')),
       if (r.can('review')) FilledButton.icon(onPressed: _busy ? null : _review, icon: const Icon(Icons.star_outline_rounded), label: Text('Review ${r.technicianName ?? 'the technician'}')),
       if (r.can('cancel')) OutlinedButton.icon(onPressed: _busy ? null : _cancel, icon: const Icon(Icons.cancel_outlined), label: const Text('Cancel request')),
+      // Only once a technician has the job (before that there is nobody to talk to).
+      if (asTechnician ? (!r.can('accept') && !r.can('reject')) : r.technicianName != null)
+        MessageButton(contextType: 'service', contextId: r.id, label: 'Message ${asTechnician ? (r.customerName ?? 'the customer') : r.technicianName}'),
     ];
 
     return ListView(
@@ -460,7 +464,8 @@ class _HandoverCard extends StatelessWidget {
           children: [
             Icon(done ? Icons.check_circle : Icons.radio_button_unchecked, size: 20, color: done ? theme.colorScheme.primary : theme.disabledColor),
             const SizedBox(width: 8),
-            Text('$who ${done ? 'confirmed' : '${who == 'You' ? 'have' : 'has'} not confirmed yet'}'),
+            // Expanded so a long name wraps instead of running off the card (it overflowed by a couple of pixels).
+            Expanded(child: Text('$who ${done ? 'confirmed' : '${who == 'You' ? 'have' : 'has'} not confirmed yet'}')),
           ],
         );
     return GlassContainer(

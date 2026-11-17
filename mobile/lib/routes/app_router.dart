@@ -10,6 +10,9 @@ import '../screens/account/profile_screen.dart';
 import '../screens/account/settings_screen.dart';
 import '../screens/account/verification_screen.dart';
 import '../screens/donations/donation_details_screen.dart';
+import '../models/chat.dart';
+import '../screens/chat/chat_screen.dart';
+import '../screens/chat/conversations_screen.dart';
 import '../screens/location/pin_picker_screen.dart';
 import '../services/location_service.dart';
 import '../screens/donations/donations_screen.dart';
@@ -107,6 +110,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Full-screen pages opened on top of the bottom bar. They need a signed-in person like everything not listed as public.
       GoRoute(path: Routes.browse, builder: (_, __) => const BrowsePage()),
       GoRoute(path: Routes.myListings, builder: (_, __) => const MyListingsPage()),
+      GoRoute(path: Routes.messages, builder: (_, __) => const ConversationsPage()),
+      GoRoute(
+        path: Routes.messagePattern,
+        builder: (_, state) => ChatPage(conversationId: state.pathParameters['id']!, conversation: state.extra is Conversation ? state.extra as Conversation : null),
+      ),
       GoRoute(path: Routes.newListing, builder: (_, __) => const NewListingScreen()),
       GoRoute(path: Routes.pickLocation, builder: (_, state) => PinPickerScreen(initial: state.extra is GeoPoint ? state.extra as GeoPoint : null)),
       GoRoute(path: Routes.listingPattern, builder: (_, state) => DeviceDetailsScreen(id: state.pathParameters['id']!)),

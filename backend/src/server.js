@@ -8,7 +8,8 @@ const createApp = require('./app');
 async function main() {
   const app = createApp();
   const server = http.createServer(app);
-  // Socket.IO attaches to this same server in Phase 8 (src/sockets).
+  // Real-time chat and notification push share this server (and port) with the REST API.
+  require('./sockets').attach(server);
 
   try {
     await connectDB();

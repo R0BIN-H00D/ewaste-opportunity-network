@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, MapPin, User } from 'lucide-react';
 import GlassCard from '../../components/glass/GlassCard';
+import MessageButton from '../../components/chat/MessageButton';
 import Alert from '../../components/ui/Alert';
 import Badge from '../../components/ui/Badge';
 import ErrorState from '../../components/ui/ErrorState';
@@ -77,6 +78,7 @@ export default function RefurbJobDetail() {
       <GlassCard><Tracker job={j} /></GlassCard>
 
       <JobActions job={j} onChanged={(updated, message) => { setFresh(updated); setFlash(message || ''); }} />
+      <div><MessageButton contextType="offer" contextId={j._id} label={asOwner ? 'Message the refurbisher' : 'Message the owner'} /></div>
 
       <div className="grid gap-5 lg:grid-cols-2">
         <GlassCard as="section" aria-label="Device and offer" className="space-y-4">

@@ -1,4 +1,9 @@
+import 'dart:async';
 import 'package:ewaste_opportunity/core/network/api_exception.dart';
+import 'package:ewaste_opportunity/models/chat.dart';
+import 'package:ewaste_opportunity/models/account.dart';
+import 'package:ewaste_opportunity/services/chat_repository.dart';
+import 'package:ewaste_opportunity/services/realtime_service.dart';
 import 'package:ewaste_opportunity/core/storage/key_value_store.dart';
 import 'package:ewaste_opportunity/models/donation.dart';
 import 'package:ewaste_opportunity/models/listing.dart';
@@ -80,6 +85,127 @@ class FakeDeviceRepository extends DeviceRepository {
   Future<void> remove(String id) async {
     removed = id;
   }
+}
+
+Conversation sampleConversation({String id = 'c1', String other = 'Ravi Kumar', String contextType = 'service', int unread = 0, String? lastText, bool lastMine = false}) => Conversation(
+      id: id,
+      contextType: contextType,
+      contextId: 'ctx-$id',
+      otherId: 'u2',
+      otherName: other,
+      otherRole: 'technician',
+      lastText: lastText,
+      lastAt: lastText == null ? null : DateTime.now(),
+      lastMine: lastMine,
+      unread: unread,
+      updatedAt: DateTime.now(),
+    );
+
+ChatMessage sampleMessage(String id, String text, {String sender = 'u2', String conversation = 'c1', bool read = false, DateTime? at}) =>
+    ChatMessage(id: id, conversationId: conversation, senderId: sender, text: text, createdAt: at ?? DateTime(2026, 11, 16, 9, int.tryParse(id.replaceAll(RegExp(r'\D'), '')) ?? 0), read: read);
+
+/// A [ChatRepository] that never touches the network. Threads live in [thread] (oldest first); the signed-in test user is `u1`.
+class FakeChatRepository extends ChatRepository {
+  FakeChatRepository() : super(ApiClient(store: MemoryKeyValueStore()));
+
+  List<Conversation> conversationList = [];
+  final Map<String, List<ChatMessage>> thread = {};
+  int unreadCount = 0;
+  int pageSize = 30;
+  ApiException? sendError;
+  ApiException? openError;
+  ApiException? messagesError;
+  Conversation? openResult;
+
+  /// While set, [send] waits for it, so a test can act while a message is still "sending".
+  Completer<void>? sendGate;
+
+  final sent = <(String, String)>[];
+  final opened = <(String, String)>[];
+  final marked = <String>[];
+  int _n = 100;
+
+  @override
+  Future<Conversation> open(String contextType, String contextId) async {
+    final e = openError;
+    if (e != null) throw e;
+    opened.add((contextType, contextId));
+    return openResult ?? sampleConversation(id: 'opened', contextType: contextType);
+  }
+
+  @override
+  Future<({PageResult<Conversation> page, int unread})> conversations({int page = 1}) async =>
+      (page: PageResult(items: conversationList, page: 1, pages: 1, total: conversationList.length), unread: unreadCount);
+
+  @override
+  Future<int> unread() async => unreadCount;
+
+  @override
+  Future<MessagePage> messages(String conversationId, {String? before, int limit = 30}) async {
+    final e = messagesError;
+    if (e != null) throw e;
+    final all = thread[conversationId] ?? const <ChatMessage>[];
+    final end = before == null ? all.length : all.indexWhere((m) => m.id == before);
+    final window = all.sublist(0, end < 0 ? 0 : end);
+    final start = window.length > pageSize ? window.length - pageSize : 0;
+    final page = window.sublist(start);
+    return MessagePage(items: page, hasMore: start > 0, nextBefore: start > 0 ? page.first.id : null);
+  }
+
+  @override
+  Future<ChatMessage> send(String conversationId, String text) async {
+    await sendGate?.future;
+    final e = sendError;
+    if (e != null) throw e;
+    sent.add((conversationId, text.trim()));
+    final m = ChatMessage(id: 'm${_n++}', conversationId: conversationId, senderId: 'u1', text: text.trim(), createdAt: DateTime.now());
+    thread.putIfAbsent(conversationId, () => []).add(m);
+    return m;
+  }
+
+  @override
+  Future<void> markRead(String conversationId) async {
+    marked.add(conversationId);
+  }
+}
+
+/// A live connection the test controls: push events with [pushMessage] and friends, and see what the app sent in [typingSent].
+class FakeRealtime implements RealtimeService {
+  final _messages = StreamController<MessageEvent>.broadcast(sync: true);
+  final _reads = StreamController<ReadEvent>.broadcast(sync: true);
+  final _typing = StreamController<TypingEvent>.broadcast(sync: true);
+  final _notifications = StreamController<NotificationPush>.broadcast(sync: true);
+  final _connection = StreamController<bool>.broadcast(sync: true);
+  final typingSent = <(String, bool)>[];
+  bool connected = true;
+
+  void pushMessage(ChatMessage message, Conversation conversation) => _messages.add(MessageEvent(message: message, conversation: conversation));
+  void pushRead(String conversationId, String by) => _reads.add(ReadEvent(conversationId: conversationId, byUserId: by));
+  void pushTyping(String conversationId, String user, bool typing) => _typing.add(TypingEvent(conversationId: conversationId, userId: user, typing: typing));
+  void pushNotification(NotificationItem item, int unread) => _notifications.add(NotificationPush(notification: item, unread: unread));
+  void pushConnection(bool up) {
+    connected = up;
+    _connection.add(up);
+  }
+
+  @override
+  Stream<MessageEvent> get messages => _messages.stream;
+  @override
+  Stream<ReadEvent> get reads => _reads.stream;
+  @override
+  Stream<TypingEvent> get typing => _typing.stream;
+  @override
+  Stream<NotificationPush> get notifications => _notifications.stream;
+  @override
+  Stream<bool> get connection => _connection.stream;
+  @override
+  bool get isConnected => connected;
+  @override
+  void connect() {}
+  @override
+  void sendTyping(String conversationId, bool typing) => typingSent.add((conversationId, typing));
+  @override
+  void dispose() {}
 }
 
 /// A phone whose position, or reason for refusing, the test chooses. Counts how often it was asked and opened.

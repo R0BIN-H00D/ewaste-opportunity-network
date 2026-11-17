@@ -7,6 +7,7 @@ import Badge from '../../components/ui/Badge';
 import ErrorState from '../../components/ui/ErrorState';
 import Skeleton from '../../components/ui/Skeleton';
 import ActionPanel from '../../components/requests/ActionPanel';
+import MessageButton from '../../components/chat/MessageButton';
 import { History, PhotoGrid, Tracker } from '../../components/requests/RequestTimeline';
 import { Thumb } from '../../components/devices/DeviceCard';
 import { useFetch } from '../../hooks/useFetch';
@@ -86,6 +87,9 @@ export default function RequestDetail() {
           setFlash(message || '');
         }}
       />
+
+      {/* Once a technician has the job there is someone to talk to. */}
+      {r.technician && <div><MessageButton contextType="service" contextId={r._id} label={`Message ${other?.name || (technicianView ? 'the customer' : 'the technician')}`} /></div>}
 
       <div className="grid gap-5 lg:grid-cols-2">
         <GlassCard as="section" aria-label="Request details" className="space-y-4">

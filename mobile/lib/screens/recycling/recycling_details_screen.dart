@@ -10,6 +10,7 @@ import '../../widgets/app_background.dart';
 import '../../widgets/app_chip.dart';
 import '../../widgets/glass_app_bar.dart';
 import '../../widgets/glass_container.dart';
+import '../../widgets/message_button.dart';
 import '../../widgets/listing_photo.dart';
 import '../../widgets/message_banner.dart';
 import '../../widgets/skeleton.dart';
@@ -263,6 +264,7 @@ class _BodyState extends ConsumerState<_Body> {
                 MessageBanner(message: 'Reason: ${r.cancelReason!.trim()}', tone: BannerTone.warning),
               ],
               ...buttons,
+              Padding(padding: const EdgeInsets.only(top: 8), child: MessageButton(contextType: 'recycling', contextId: r.id, label: 'Message $who')),
             ],
           ),
         ),

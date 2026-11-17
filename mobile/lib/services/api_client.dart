@@ -65,6 +65,9 @@ class ApiClient {
 
   bool get hasAccessToken => _accessToken != null;
 
+  /// The current access token, for the live connection's sign-in. Kept in memory only, like the rest of the session.
+  String? get accessToken => _accessToken;
+
   /// Who the saved answers belong to. Set when someone signs in.
   void useCacheFor(String ownerId) => _cacheOwner = ownerId;
 

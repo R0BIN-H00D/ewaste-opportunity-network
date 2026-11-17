@@ -14,8 +14,12 @@ class QuickAction {
   final String? route;
 }
 
-/// The home screen's quick actions for a role. Mirrors the web dashboard's menu for that role.
-List<QuickAction> actionsFor(UserRole role) {
+const _messages = QuickAction(icon: Icons.chat_bubble_outline, title: 'Messages', subtitle: 'Talk to the people you are working with', route: Routes.messages);
+
+/// The home screen's quick actions for a role. Mirrors the web dashboard's menu for that role, with Messages last for everyone who can chat.
+List<QuickAction> actionsFor(UserRole role) => [..._roleActions(role), if (role != UserRole.admin) _messages];
+
+List<QuickAction> _roleActions(UserRole role) {
   switch (role) {
     case UserRole.user:
       return const [

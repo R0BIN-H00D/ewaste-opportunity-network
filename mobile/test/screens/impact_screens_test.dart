@@ -52,8 +52,8 @@ void main() {
   group('the Green Score card on Home', () {
     testWidgets('shows the ring, the level and how far to the next one', (tester) async {
       await _pump(tester, const HomeScreen(), FakeImpactRepository());
-      expect(find.text('Green Score · Seed'), findsOneWidget);
-      expect(find.text('8 points to Sprout'), findsOneWidget);
+      expect(find.text('Green Score'), findsOneWidget);
+      expect(find.text('Seed · 8 points to Sprout'), findsOneWidget);
       expect(find.byType(GreenRing), findsOneWidget);
       expect(find.text('92'), findsOneWidget);
       expect(find.text('Soon'), findsNothing);
@@ -68,7 +68,7 @@ void main() {
 
     testWidgets('opens the full page when tapped', (tester) async {
       await _pump(tester, const HomeScreen(), FakeImpactRepository());
-      await tester.tap(find.text('Green Score · Seed'));
+      await tester.tap(find.text('Seed · 8 points to Sprout'));
       for (var i = 0; i < 4; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
@@ -84,13 +84,13 @@ void main() {
 
     testWidgets('is there for technicians too, who earn points for repairs, but not for administrators', (tester) async {
       await _pump(tester, const HomeScreen(), FakeImpactRepository(), role: UserRole.technician);
-      expect(find.text('Green Score · Seed'), findsOneWidget);
+      expect(find.text('Seed · 8 points to Sprout'), findsOneWidget);
     });
 
     testWidgets('fits at the largest text size', (tester) async {
       await _pump(tester, const HomeScreen(), FakeImpactRepository(), scale: 2);
       expect(tester.takeException(), isNull);
-      expect(find.text('Green Score · Seed'), findsOneWidget);
+      expect(find.text('Seed · 8 points to Sprout'), findsOneWidget);
     });
 
     testWidgets('administrators do not get one', (tester) async {

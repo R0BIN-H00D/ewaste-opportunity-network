@@ -113,8 +113,10 @@ class _GreenScoreCard extends ConsumerWidget {
       error: (_, __) => content(Icon(Icons.eco_outlined, size: 48, color: theme.colorScheme.primary), 'Green Score', 'Tap to see your score.'),
       data: (s) => content(
         GreenRing(score: s.score, level: s.level),
-        'Green Score · ${s.level.name}',
-        s.score == 0 && s.ledger.isEmpty ? 'Complete an activity to start earning points.' : (s.level.isTop ? 'You have reached the highest level.' : '${s.level.pointsToNext(s.score)} points to ${s.level.nextName}'),
+        'Green Score',
+        s.score == 0 && s.ledger.isEmpty
+            ? 'Complete an activity to start earning points.'
+            : (s.level.isTop ? '${s.level.name} · the highest level' : '${s.level.name} · ${s.level.pointsToNext(s.score)} points to ${s.level.nextName}'),
       ),
     );
 

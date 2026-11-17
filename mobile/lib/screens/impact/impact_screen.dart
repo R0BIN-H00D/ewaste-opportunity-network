@@ -291,8 +291,9 @@ class _MonthlyCard extends StatelessWidget {
                           reservedSize: 28,
                           getTitlesWidget: (v, meta) {
                             final i = v.round();
-                            // Every other month, or the labels crowd each other on a narrow phone.
-                            if (i < 0 || i >= months.length || (months.length > 6 && i.isOdd)) return const SizedBox.shrink();
+                            // Every other month, counted back from the newest so the latest bar is always named (and the labels
+                            // do not crowd each other on a narrow phone).
+                            if (i < 0 || i >= months.length || (months.length > 6 && (months.length - 1 - i).isOdd)) return const SizedBox.shrink();
                             return Padding(padding: const EdgeInsets.only(top: 6), child: Text(formatMonthKey(months[i].month), style: theme.textTheme.labelSmall));
                           },
                         ),

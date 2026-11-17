@@ -25,6 +25,23 @@ export const applicationApi = {
   withdraw: (id, reason) => data(api.post(`/students/applications/${id}/withdraw`, reason ? { reason } : {})),
 };
 
+// A file download asks for a Blob, so an error body arrives as a Blob too; read it back into JSON so the page can show the server's message.
+async function readBlobError(err) {
+  const body = err?.response?.data;
+  if (typeof Blob !== 'undefined' && body instanceof Blob) {
+    try { err.response.data = JSON.parse(await body.text()); } catch { /* keep the generic message */ }
+  }
+  throw err;
+}
+
+export const certificateApi = {
+  /** The certificate as a PDF: resolves with { blob, filename }. */
+  download: (id) => api.get(`/students/certificates/${id}/pdf`, { responseType: 'blob' }).then(
+    (r) => ({ blob: r.data, filename: /filename="?([^";]+)"?/i.exec(r.headers['content-disposition'] || '')?.[1] || 'certificate.pdf' }),
+    readBlobError,
+  ),
+};
+
 export const experienceApi = {
   get: (signal) => data(api.get('/students/experience', { signal })),
 };

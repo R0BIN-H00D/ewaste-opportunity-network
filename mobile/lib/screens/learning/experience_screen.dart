@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import '../../core/format.dart';
 import '../../core/network/api_exception.dart';
+import '../../models/learning.dart';
 import '../../providers/learning_providers.dart';
 import '../../routes/route_paths.dart';
 import '../../widgets/app_background.dart';
@@ -69,18 +70,7 @@ class ExperienceScreen extends ConsumerWidget {
                               : Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    for (final c in list)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 10),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(c.certNo, style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700)),
-                                            if ((c.taskTitle ?? '').isNotEmpty) Text(c.taskTitle!, style: theme.textTheme.bodyLarge),
-                                            Text([if (c.hours > 0) formatHours(c.hours), if (c.issuedAt != null) 'Issued ${formatDate(c.issuedAt)}'].join(' · '), style: theme.textTheme.bodyMedium),
-                                          ],
-                                        ),
-                                      ),
+                                    for (final c in list) _CertificateRow(certificate: c),
                                   ],
                                 ),
                         ),
@@ -125,6 +115,58 @@ class ExperienceScreen extends ConsumerWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// One certificate, with a button that fetches the PDF and opens the phone's share sheet to save or send it.
+class _CertificateRow extends ConsumerStatefulWidget {
+  const _CertificateRow({required this.certificate});
+
+  final Certificate certificate;
+
+  @override
+  ConsumerState<_CertificateRow> createState() => _CertificateRowState();
+}
+
+class _CertificateRowState extends ConsumerState<_CertificateRow> {
+  bool _busy = false;
+
+  Future<void> _download() async {
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final file = await ref.read(learningRepositoryProvider).certificatePdf(widget.certificate.id);
+      await ref.read(certificateSaverProvider).share(file.filename, file.bytes);
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('Could not open the certificate on this phone.')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final c = widget.certificate;
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(c.certNo, style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700)),
+          if ((c.taskTitle ?? '').isNotEmpty) Text(c.taskTitle!, style: theme.textTheme.bodyLarge),
+          Text([if (c.hours > 0) formatHours(c.hours), if (c.issuedAt != null) 'Issued ${formatDate(c.issuedAt)}'].join(' · '), style: theme.textTheme.bodyMedium),
+          const SizedBox(height: 4),
+          OutlinedButton.icon(
+            onPressed: _busy ? null : _download,
+            icon: _busy ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.download_outlined),
+            label: Text(_busy ? 'Preparing...' : 'Download PDF'),
+          ),
+        ],
       ),
     );
   }

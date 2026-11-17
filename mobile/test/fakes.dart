@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:typed_data';
+import 'package:ewaste_opportunity/services/certificate_saver.dart';
 import 'package:ewaste_opportunity/core/network/api_exception.dart';
 import 'package:ewaste_opportunity/models/chat.dart';
 import 'package:ewaste_opportunity/models/impact.dart';
@@ -961,6 +963,23 @@ Application sampleApplicant({String id = 'a1', String status = 'applied', List<S
     });
 
 /// A [LearningRepository] that never touches the network. Every action records itself in [calls] and answers with [result].
+/// Records what would have been handed to the share sheet.
+class FakeCertificateSaver extends CertificateSaver {
+  FakeCertificateSaver();
+
+  final shared = <(String, int)>[];
+  Object? failWith;
+  Completer<void>? hold;
+
+  @override
+  Future<void> share(String filename, Uint8List bytes) async {
+    await hold?.future;
+    final f = failWith;
+    if (f != null) throw f;
+    shared.add((filename, bytes.length));
+  }
+}
+
 class FakeLearningRepository extends LearningRepository {
   FakeLearningRepository({
     Opportunity? opportunity,
@@ -1031,6 +1050,17 @@ class FakeLearningRepository extends LearningRepository {
 
   @override
   Future<List<Certificate>> certificates() async => certificateList;
+
+  ApiException? pdfError;
+  final pdfAsked = <String>[];
+
+  @override
+  Future<({Uint8List bytes, String filename})> certificatePdf(String id) async {
+    pdfAsked.add(id);
+    final e = pdfError;
+    if (e != null) throw e;
+    return (bytes: Uint8List.fromList([37, 80, 68, 70]), filename: 'certificate-$id.pdf');
+  }
 
   /// The supervisor's own tasks, by page, and the applicants on a task.
   Map<int, List<Opportunity>> minePages = const {};

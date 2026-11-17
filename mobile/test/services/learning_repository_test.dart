@@ -202,4 +202,28 @@ void main() {
       expect([r[4].method, r[4].path, r[4].data], ['PUT', '/students/applications/a1/complete', {'hours': 3.5, 'feedback': 'Careful'}]);
     });
   });
-}
+
+  group('certificate PDF', () {
+    test('returns the file bytes and the name the server gave', () async {
+      final rig = _rig((o) async => ResponseBody.fromBytes(
+            [37, 80, 68, 70, 45],
+            200,
+            headers: {
+              Headers.contentTypeHeader: ['application/pdf'],
+              'content-disposition': ['attachment; filename="certificate-CERT-2026-AB12CD.pdf"'],
+            },
+          ));
+      final file = await LearningRepository(rig.client).certificatePdf('c1');
+      expect(file.bytes, [37, 80, 68, 70, 45]);
+      expect(file.filename, 'certificate-CERT-2026-AB12CD.pdf');
+      expect(rig.api.requests.single.path, '/students/certificates/c1/pdf');
+      expect(rig.api.requests.single.responseType, ResponseType.bytes);
+    });
+
+    test('falls back to a plain name, and turns a server error into an ApiException', () async {
+      final ok = _rig((o) async => ResponseBody.fromBytes([1], 200, headers: {Headers.contentTypeHeader: ['application/pdf']}));
+      expect((await LearningRepository(ok.client).certificatePdf('c1')).filename, 'certificate.pdf');
+      final gone = _rig((o) async => ResponseBody.fromBytes(utf8.encode(jsonEncode({'success': false, 'message': 'Certificate not found', 'code': 'NOT_FOUND'})), 404, headers: {Headers.contentTypeHeader: [Headers.jsonContentType]}));
+      await expectLater(LearningRepository(gone.client).certificatePdf('c1'), throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 404)));
+    });
+  });}

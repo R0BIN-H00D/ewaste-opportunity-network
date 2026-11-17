@@ -23,3 +23,10 @@ exports.withdraw = asyncHandler(async (req, res) => ok(res, await svc.withdraw(r
 
 exports.experience = asyncHandler(async (req, res) => ok(res, await svc.experience(req.user)));
 exports.certificates = asyncHandler(async (req, res) => ok(res, await svc.listCertificates(req.user)));
+
+exports.verifyCertificate = asyncHandler(async (req, res) => ok(res, await svc.verifyCertificate(req.params.certNo)));
+exports.certificatePdf = asyncHandler(async (req, res) => {
+  const { filename, buffer } = await svc.certificateFile(req.user, req.params.id);
+  res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${filename}"`, 'Content-Length': buffer.length, 'Cache-Control': 'private, no-store' });
+  res.send(buffer);
+});

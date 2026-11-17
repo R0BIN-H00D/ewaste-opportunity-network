@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/learning.dart';
 import '../models/page_result.dart';
+import '../services/certificate_saver.dart';
 import '../services/learning_repository.dart';
 import 'auth_controller.dart';
 import 'core_providers.dart';
@@ -108,6 +109,8 @@ final experienceProvider = FutureProvider.autoDispose<Experience>((ref) {
   ref.watch(authControllerProvider.select((s) => s.user?.id));
   return ref.watch(learningRepositoryProvider).experience();
 });
+
+final certificateSaverProvider = Provider<CertificateSaver>((ref) => const CertificateSaver());
 
 final certificatesProvider = FutureProvider.autoDispose<List<Certificate>>((ref) {
   ref.watch(authControllerProvider.select((s) => s.user?.id));

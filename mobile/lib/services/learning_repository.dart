@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import '../core/network/api_exception.dart';
 import '../models/learning.dart';
@@ -128,6 +129,13 @@ class LearningRepository {
   Future<List<Certificate>> certificates() => guard(() async {
         final res = await _dio.get<dynamic>('/students/certificates');
         return [for (final raw in (res.data as Map)['data'] as List) Certificate.fromJson((raw as Map).cast<String, dynamic>())];
+      });
+
+  /// A certificate as a PDF: the file's bytes and the name the server gave it.
+  Future<({Uint8List bytes, String filename})> certificatePdf(String id) => guard(() async {
+        final res = await _dio.get<List<int>>('/students/certificates/$id/pdf', options: Options(responseType: ResponseType.bytes));
+        final name = RegExp(r'filename="?([^";]+)"?', caseSensitive: false).firstMatch(res.headers.value('content-disposition') ?? '')?.group(1);
+        return (bytes: Uint8List.fromList(res.data ?? const <int>[]), filename: name ?? 'certificate.pdf');
       });
 
   /* ---------- the supervising technician ---------- */

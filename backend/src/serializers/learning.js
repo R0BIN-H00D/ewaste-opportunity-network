@@ -65,7 +65,7 @@ const serializeStudent = (u, profile) => ({
  * @param a application with `opportunity` populated (deviceType, postedBy) and `student` populated (name)
  * @param ctx { role: 'student'|'supervisor'|'admin', studentProfile, certNo }
  */
-function serializeApplication(a, { role, studentProfile, certNo = null } = {}) {
+function serializeApplication(a, { role, studentProfile, certNo = null, certificateId = null } = {}) {
   const opp = a.opportunity || {};
   return {
     _id: a._id,
@@ -92,6 +92,7 @@ function serializeApplication(a, { role, studentProfile, certNo = null } = {}) {
     },
     student: serializeStudent(a.student, studentProfile),
     certificate: certNo,
+    certificateId,
     history: (a.history || []).map((h) => ({ status: h.status, at: h.at, note: h.note })),
   };
 }

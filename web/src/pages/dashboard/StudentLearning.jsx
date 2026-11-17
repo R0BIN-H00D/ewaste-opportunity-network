@@ -7,6 +7,7 @@ import ErrorState from '../../components/ui/ErrorState';
 import Pagination from '../../components/ui/Pagination';
 import Skeleton from '../../components/ui/Skeleton';
 import TextField from '../../components/ui/TextField';
+import CertificateDownload from '../../components/learning/CertificateDownload';
 import { SkillChips, day } from '../../components/learning/OpportunityCard';
 import { useFetch } from '../../hooks/useFetch';
 import { applicationApi, experienceApi } from '../../services/learningApi';
@@ -51,7 +52,12 @@ function Experience() {
                   <Link to={`/dashboard/applications/${i._id}`} className="font-semibold text-ink hover:underline dark:text-white">{i.opportunity.title}</Link>
                   <p className="text-xs text-ink-muted dark:text-[#9FB2A7]">{formatHours(i.hours)} · supervised by {i.opportunity.supervisor?.name}</p>
                 </div>
-                {i.certificate ? <Badge tone="green">Certificate {i.certificate}</Badge> : <Badge tone="neutral">Certificate pending approval</Badge>}
+                {i.certificate ? (
+                  <span className="flex flex-wrap items-center gap-2">
+                    <Badge tone="green">Certificate {i.certificate}</Badge>
+                    {i.certificateId && <CertificateDownload id={i.certificateId} certNo={i.certificate} />}
+                  </span>
+                ) : <Badge tone="neutral">Certificate pending approval</Badge>}
               </li>
             ))}
           </ul>

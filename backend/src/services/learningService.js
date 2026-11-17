@@ -10,6 +10,7 @@ const StudentApplication = require('../models/StudentApplication');
 const StudentProfile = require('../models/StudentProfile');
 const TechnicianProfile = require('../models/TechnicianProfile');
 const Certificate = require('../models/Certificate');
+const { buildCertificatePdf } = require('./certificatePdf');
 const Category = require('../models/Category');
 const ApiError = require('../utils/ApiError');
 const logger = require('../utils/logger');
@@ -257,8 +258,8 @@ async function presentApplications(list, role) {
     profileMap(StudentProfile, list.map((a) => idOf(a.student))),
     Certificate.find({ application: { $in: list.map((a) => a._id) } }).select('application certNo').lean(),
   ]);
-  const certByApp = Object.fromEntries(certs.map((c) => [String(c.application), c.certNo]));
-  return list.map((a) => serializeApplication(a, { role: typeof role === 'function' ? role(a) : role, studentProfile: profiles[idOf(a.student)], certNo: certByApp[String(a._id)] || null }));
+  const certByApp = Object.fromEntries(certs.map((c) => [String(c.application), c]));
+  return list.map((a) => serializeApplication(a, { role: typeof role === 'function' ? role(a) : role, studentProfile: profiles[idOf(a.student)], certNo: certByApp[String(a._id)]?.certNo || null, certificateId: certByApp[String(a._id)]?._id || null }));
 }
 
 async function viewApplication(id, user) {
@@ -438,6 +439,36 @@ async function listCertificates(user) {
   return rows.map((c) => serializeCertificate(c, c.application));
 }
 
+const CERT_POPULATE = [{ path: 'student', select: 'name' }, { path: 'application', populate: { path: 'opportunity', select: 'title postedBy', populate: { path: 'postedBy', select: 'name' } } }];
+const CERT_NO = /^CERT-\d{4}-[A-Z0-9]{6}$/;
+const shortName = (name = '') => {
+  const [first, ...rest] = String(name).trim().split(/\s+/);
+  return rest.length ? `${first} ${rest[rest.length - 1][0].toUpperCase()}.` : first || 'Student';
+};
+const certificateFacts = (c) => ({
+  certNo: c.certNo,
+  title: c.application?.opportunity?.title || 'Learning task',
+  hours: c.application?.hours || 0,
+  completedAt: c.application?.completedAt,
+  issuedAt: c.issuedAt,
+  supervisorName: c.application?.opportunity?.postedBy?.name,
+});
+
+/** The certificate as a PDF for the student it belongs to (or an administrator). Anyone else gets "not found". */
+async function certificateFile(user, id) {
+  const c = await Certificate.findById(id).populate(CERT_POPULATE);
+  if (!c || (user.role !== 'admin' && idOf(c.student) !== user.id)) throw ApiError.notFound('Certificate not found');
+  return { filename: `certificate-${c.certNo}.pdf`, buffer: buildCertificatePdf({ ...certificateFacts(c), studentName: c.student?.name }) };
+}
+
+/** Public check of a certificate ID: says whether it exists and for what, naming the student only by first name and last initial. */
+async function verifyCertificate(certNo) {
+  const id = String(certNo || '').trim().toUpperCase();
+  const c = CERT_NO.test(id) ? await Certificate.findOne({ certNo: id }).populate(CERT_POPULATE) : null;
+  if (!c) throw ApiError.notFound('No certificate has this ID');
+  return { valid: true, ...certificateFacts(c), studentName: shortName(c.student?.name) };
+}
+
 const newCertNo = () => `CERT-${new Date().getUTCFullYear()}-${crypto.randomBytes(4).toString('hex').slice(0, 6).toUpperCase()}`;
 
 /** Admin approval of a participation certificate (FR-STU-006). The admin route arrives with Phase 6; the rule lives here. */
@@ -458,5 +489,5 @@ async function issueCertificate(admin, applicationId) {
 module.exports = {
   createOpportunity, listOpportunities, myOpportunities, getOpportunity, updateOpportunity, setOpportunityStatus,
   apply, listMine, getApplication, withdraw, listApplicants, decide, start, complete,
-  experience, listCertificates, issueCertificate,
+  experience, listCertificates, issueCertificate, certificateFile, verifyCertificate,
 };

@@ -29,5 +29,7 @@ router.post('/applications/:id/withdraw', validObjectIdParam(), ...student, vali
 
 router.get('/experience', ...student, ctrl.experience);
 router.get('/certificates', ...student, ctrl.certificates);
+router.get('/certificates/verify/:certNo', ctrl.verifyCertificate); // public: anyone holding a certificate can check it
+router.get('/certificates/:id/pdf', validObjectIdParam(), authenticate, authorize(ROLES.STUDENT, ROLES.ADMIN), ctrl.certificatePdf);
 
 module.exports = router;

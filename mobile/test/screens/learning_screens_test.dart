@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:ewaste_opportunity/core/network/api_exception.dart';
 import 'package:ewaste_opportunity/core/storage/key_value_store.dart';
 import 'package:ewaste_opportunity/core/theme/app_theme.dart';
@@ -19,7 +20,7 @@ import 'package:material_ui/material_ui.dart';
 import '../fakes.dart';
 import '../helpers.dart';
 
-Future<void> _pump(WidgetTester tester, Widget screen, FakeLearningRepository repo) async {
+Future<void> _pump(WidgetTester tester, Widget screen, FakeLearningRepository repo, {FakeCertificateSaver? saver}) async {
   tester.view.physicalSize = const Size(900, 3000);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -40,6 +41,7 @@ Future<void> _pump(WidgetTester tester, Widget screen, FakeLearningRepository re
         keyValueStoreProvider.overrideWithValue(MemoryKeyValueStore()),
         authRepositoryProvider.overrideWithValue(FakeAuthRepository()),
         learningRepositoryProvider.overrideWithValue(repo),
+        certificateSaverProvider.overrideWithValue(saver ?? FakeCertificateSaver()),
         deviceRepositoryProvider.overrideWithValue(FakeDeviceRepository()),
         categoriesProvider.overrideWith((ref) async => const [Category(id: 'c1', name: 'Phones', slug: 'phones')]),
       ],
@@ -270,5 +272,68 @@ void main() {
       expect(find.textContaining('No certificates yet'), findsOneWidget);
       expect(find.textContaining('Nothing completed yet'), findsOneWidget);
     });
-  });
+
+    group('downloading a certificate', () {
+      final cert = [const Certificate(id: 'c1', certNo: 'CERT-2026-AB12CD', taskTitle: 'Replace a phone battery', hours: 3.5)];
+
+      testWidgets('fetches the PDF and hands it to the share sheet under the server\'s file name', (tester) async {
+        final repo = FakeLearningRepository(certificateList: cert);
+        final saver = FakeCertificateSaver();
+        await _pump(tester, const ExperienceScreen(), repo, saver: saver);
+        await tester.tap(find.text('Download PDF'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(repo.pdfAsked, ['c1']);
+        expect(saver.shared, [('certificate-c1.pdf', 4)]);
+        expect(find.text('Download PDF'), findsOneWidget);
+      });
+
+      testWidgets('shows it is working, and cannot be tapped twice', (tester) async {
+        final repo = FakeLearningRepository(certificateList: cert);
+        final saver = FakeCertificateSaver()..hold = Completer<void>();
+        await _pump(tester, const ExperienceScreen(), repo, saver: saver);
+        await tester.tap(find.text('Download PDF'));
+        await tester.pump();
+        expect(find.text('Preparing...'), findsOneWidget);
+        await tester.tap(find.text('Preparing...'), warnIfMissed: false);
+        await tester.pump();
+        expect(repo.pdfAsked, hasLength(1));
+        saver.hold!.complete();
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(find.text('Download PDF'), findsOneWidget);
+      });
+
+      testWidgets('says what the server said when it cannot be fetched', (tester) async {
+        final repo = FakeLearningRepository(certificateList: cert)..pdfError = const ApiException('Certificate not found', failure: ApiFailure.notFound, statusCode: 404);
+        final saver = FakeCertificateSaver();
+        await _pump(tester, const ExperienceScreen(), repo, saver: saver);
+        await tester.tap(find.text('Download PDF'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(find.text('Certificate not found'), findsOneWidget);
+        expect(saver.shared, isEmpty);
+        expect(find.text('Download PDF'), findsOneWidget);
+      });
+
+      testWidgets('says so when the phone cannot open it', (tester) async {
+        final repo = FakeLearningRepository(certificateList: cert);
+        final saver = FakeCertificateSaver()..failWith = StateError('no share sheet');
+        await _pump(tester, const ExperienceScreen(), repo, saver: saver);
+        await tester.tap(find.text('Download PDF'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(find.text('Could not open the certificate on this phone.'), findsOneWidget);
+      });
+
+      testWidgets('each certificate has its own button', (tester) async {
+        final repo = FakeLearningRepository(certificateList: [...cert, const Certificate(id: 'c2', certNo: 'CERT-2026-FF00AA')]);
+        final saver = FakeCertificateSaver();
+        await _pump(tester, const ExperienceScreen(), repo, saver: saver);
+        expect(find.text('Download PDF'), findsNWidgets(2));
+        await tester.tap(find.text('Download PDF').last);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(repo.pdfAsked, ['c2']);
+      });
+    });  });
 }

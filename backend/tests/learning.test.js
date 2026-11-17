@@ -1,6 +1,7 @@
 'use strict';
 require('./helpers/env');
 const request = require('supertest');
+const mongoose = require('mongoose');
 const createApp = require('../src/app');
 const db = require('./helpers/db');
 const { makeUser, makeTechnician, authHeader, seedCategories } = require('./helpers/factories');
@@ -502,6 +503,92 @@ describe('experience and certificates', () => {
     expect((await call('get', `${S}/certificates`, student2)).body.data).toEqual([]);
     const exp = await call('get', `${S}/experience`, student);
     expect(exp.body.data.items[0].certificate).toBe(cert.certNo);
+    expect(exp.body.data.items[0].certificateId).toBe(String(cert._id));
     expect(await Notification.countDocuments({ user: student.id, type: 'learning.certificate' })).toBe(1);
+  });
+});
+
+describe('certificate PDF and verification', () => {
+  const binary = (res, cb) => { res.setEncoding('binary'); let d = ''; res.on('data', (x) => { d += x; }); res.on('end', () => cb(null, Buffer.from(d, 'binary'))); };
+  const issue = async (over = {}) => {
+    const { appId } = await toInProgress(over);
+    await complete(appId, { hours: 6 });
+    return learningService.issueCertificate(admin, appId);
+  };
+  const pdf = (id, user) => { const r = request(app).get(`${S}/certificates/${id}/pdf`).buffer(true).parse(binary); if (user) r.set(authHeader(user)); return r; };
+
+  it('gives the student a PDF with the certificate ID, the task, the hours and both signatories', async () => {
+    const cert = await issue();
+    const res = await pdf(cert._id, student);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toBe('application/pdf');
+    expect(res.headers['content-disposition']).toBe(`attachment; filename="certificate-${cert.certNo}.pdf"`);
+    expect(res.headers['cache-control']).toContain('no-store');
+    const text = res.body.toString('latin1');
+    expect(text.startsWith('%PDF-1.4')).toBe(true);
+    expect(text.trimEnd().endsWith('%%EOF')).toBe(true);
+    expect(text).toContain(`Certificate ID: ${cert.certNo}`);
+    expect(text).toContain('Diagnose a laptop that will not power on');
+    expect(text).toContain('6 hours');
+    expect(text).toContain('Ravi Kumar');
+    expect(text).toContain('Meera Nair');
+  });
+
+  it('has a table of contents that points at every object', async () => {
+    const cert = await issue();
+    const text = (await pdf(cert._id, student)).body.toString('latin1');
+    const start = Number(/startxref\n(\d+)\n%%EOF/.exec(text)[1]);
+    expect(text.slice(start, start + 4)).toBe('xref');
+    const rows = text.slice(start).split('\n').filter((l) => /^\d{10} 00000 n $/.test(l));
+    expect(rows).toHaveLength(6);
+    rows.forEach((row, i) => expect(text.slice(Number(row.slice(0, 10))).startsWith(`${i + 1} 0 obj`)).toBe(true));
+    const length = Number(/\/Length (\d+)/.exec(text)[1]);
+    const body = text.slice(text.indexOf('stream\n') + 7);
+    expect(body.slice(length).startsWith('\nendstream')).toBe(true);
+  });
+
+  it('lets an administrator download it but nobody else, and says "not found" rather than "forbidden"', async () => {
+    const cert = await issue();
+    expect((await pdf(cert._id, admin)).status).toBe(200);
+    expect((await pdf(cert._id, student2)).status).toBe(404);
+    expect((await pdf(cert._id, tech)).status).toBe(403);
+    expect((await pdf(cert._id)).status).toBe(401);
+    expect((await pdf(new mongoose.Types.ObjectId(), student)).status).toBe(404);
+    expect((await pdf('not-an-id', student)).status).toBe(404);
+  });
+
+  it('keeps brackets, backslashes and unusual characters from breaking the file', async () => {
+    const { buildCertificatePdf } = require('../src/services/certificatePdf');
+    const buf = buildCertificatePdf({ certNo: 'CERT-2026-ABC123', studentName: 'A (B) \\ Cé रा', title: 'Fix ) a ( thing', hours: 1, issuedAt: new Date() });
+    const text = buf.toString('latin1');
+    expect(text).toContain('A \\(B\\) \\\\ C\xe9 ??');
+    expect(text).toContain('Fix \\) a \\( thing');
+    expect(text).toContain('1 hour)');
+  });
+
+  it('cuts a very long task title to fit the page', async () => {
+    const { buildCertificatePdf, textWidth } = require('../src/services/certificatePdf');
+    const title = 'Repair and test '.repeat(40);
+    const text = buildCertificatePdf({ certNo: 'CERT-2026-ABC123', studentName: 'Asha', title, hours: 2 }).toString('latin1');
+    expect(text).toContain('...');
+    expect(text).not.toContain(title);
+    expect(textWidth('Hello', 10)).toBeGreaterThan(0);
+  });
+
+  it('verifies an ID in public, naming the student only by first name and last initial', async () => {
+    const cert = await issue();
+    const res = await call('get', `${S}/certificates/verify/${cert.certNo.toLowerCase()}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ valid: true, certNo: cert.certNo, title: 'Diagnose a laptop that will not power on', hours: 6, supervisorName: 'Ravi Kumar' });
+    expect(res.body.data.studentName).toBe('Meera N.');
+    expect(JSON.stringify(res.body)).not.toContain(student.doc.email);
+    expect(res.body.data.studentName).toMatch(/^\S+( \S\.)?$/);
+  });
+
+  it('says the same "not found" for an ID that was never issued or is not an ID at all', async () => {
+    await issue();
+    expect((await call('get', `${S}/certificates/verify/CERT-2026-FFFFFF`)).status).toBe(404);
+    expect((await call('get', `${S}/certificates/verify/nonsense`)).status).toBe(404);
+    expect((await call('get', `${S}/certificates/verify/${encodeURIComponent('{"$ne":1}')}`)).status).toBe(404);
   });
 });

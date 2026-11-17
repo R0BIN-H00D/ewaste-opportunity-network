@@ -48,3 +48,21 @@ Added in Phase 10.
 | Mobile (Slices 7I and refurbisher, supervision, recycler report) | `cd mobile && flutter analyze` and `flutter test` | 2026-11-16 (user, Windows, Flutter 3.50.0) | `flutter analyze`: no issues. `flutter test`: **546 tests passed**. Fixes found by the run: ListTile inside a glass panel needs its own transparent Material (task form, product form); the edit forms now fall back to My tasks / My products when there is nothing to pop. |
 | Mobile (phone run, 2026-11-16) | Physical Android phone (I2304, Android 16) over USB, `adb reverse tcp:5000 tcp:5000`, `flutter run -d <id> --dart-define=API_BASE_URL=http://localhost:5000/api --dart-define=SOCKET_URL=http://localhost:5000` | 2026-11-16 (user) | Checked by hand: refurbisher sign-in, home tiles, devices, jobs list, My products; technician Student tasks form; recycler Activity report. No defects reported. |
 | Mobile (offline cache, written 2026-11-16) | `cd mobile && flutter analyze` and `flutter test` | 2026-11-16 (user, Windows, Flutter 3.50.0) | `flutter analyze`: no issues. `flutter test`: **577 tests passed**. New: `test/core/response_cache_test.dart` (what may be saved, keys, size and count caps, eviction order, concurrent writes, clear, damaged entry, saved-at label), `test/services/api_client_cache_test.dart` (saved while online, served on lost connection or time-out, never for other paths, other people, other filters or server errors; wiped at sign-out), `test/widgets/saved_data_banner_test.dart`. |
+
+## Added 2026-11-17
+
+Backend (`npm test`, 37 suites): `tests/ai.test.js` (rule classifier, mocked Gemini, daily allowance), `tests/education.test.js`, `tests/changeFeed.test.js` (who hears a change, over real sockets), `tests/security.test.js` (a sweep of the whole route table: signed-out, admin-only, malformed ids, operator queries), `tests/rateLimit.test.js`, `tests/geoApi.test.js` (mocked address service: queue, cache, failures), `tests/storage.test.js` (a fake Cloudinary), `tests/push.test.js` (a fake Firebase), `tests/emailTemplates.test.js`, and new cases in `tests/pickups.test.js` (time windows, confirming a changed time), `tests/learning.test.js` (certificate PDF and public check) and `tests/impact.test.js` (yearly and by-kind views).
+
+Web (`npm test`, 32 files): live refresh in `liveFetch.test.jsx`, the learning centre and its admin in `education.test.jsx`, `aiSuggestion.test.jsx`, `addressSearch.test.jsx`, `slotChoices.test.jsx`, `certificateDownload.test.jsx`, plus new cases in `pickups`, `impact`, `donations` and `publicSite`.
+
+Mobile (`flutter test`): the same features in `test/screens`, `test/models`, `test/services` and `test/providers/live_providers_test.dart`.
+
+**Against a real backend (P7-18).** `mobile/test/integration/live_backend_test.dart` reads one of everything through the app's own repositories and models. Start the backend with the demo data (`npm run seed`, `npm run dev`), then:
+
+```bash
+flutter test test/integration --dart-define=LIVE_API=http://localhost:5000/api
+```
+
+Without `LIVE_API` those tests are skipped, so the normal run needs no server. It only reads; the one write is signing in.
+
+**Not covered by automated tests:** the real Gemini, Cloudinary, Firebase, SMTP and Nominatim services (each is tested with a fake and has a fallback), and the real-device behaviour of share sheets and push.

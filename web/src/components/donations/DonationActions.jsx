@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Award, CalendarClock, HandHeart, PackageCheck, XCircle } from 'lucide-react';
 import GlassCard from '../glass/GlassCard';
+import MessageButton from '../chat/MessageButton';
 import Alert from '../ui/Alert';
 import Badge from '../ui/Badge';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -100,6 +101,7 @@ function RequestList({ donation: d, run, busy, onChoose }) {
                 <p className="mt-2 text-sm text-ink dark:text-[#E8F1EB]">{r.justification}</p>
                 {r.intendedUse && <p className="mt-1 text-sm text-ink-muted dark:text-[#9FB2A7]">Intended use: {r.intendedUse}</p>}
                 <p className="mt-1 text-xs text-ink-muted dark:text-[#9FB2A7]">Asked on {formatDate(r.createdAt)}</p>
+                {r._id && <div className="mt-3"><MessageButton contextType="donation" contextId={r._id} label={`Message ${r.requester.orgName || r.requester.name}`} /></div>}
                 {r.status === 'pending' && d.actions.includes('decide') && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button type="button" className="btn btn-primary" disabled={busy} onClick={() => onChoose(r)} aria-label={`Accept request from ${r.requester.orgName || r.requester.name}`}>Accept</button>
@@ -162,6 +164,7 @@ export default function DonationActions({ donation: d, signedIn, onChanged }) {
     panels.push(
       <Box key="mine" title="Your request is with the donor" icon={HandHeart}>
         <p className="text-sm text-ink dark:text-[#E8F1EB]">You will be notified when the donor decides.</p>
+        {mine._id && <div><MessageButton contextType="donation" contextId={mine._id} label="Message the donor" /></div>}
         {has('withdraw') && <button type="button" className="btn btn-glass" disabled={busy} onClick={() => run(() => donationApi.withdraw(d._id), 'Request withdrawn')}>Withdraw my request</button>}
       </Box>,
     );

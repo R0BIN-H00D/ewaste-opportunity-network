@@ -148,7 +148,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (a
 - [x] **P3-08** Role profile endpoints: technician profile & availability; student profile; refurbisher profile; recycling-center profile; recipient organisation profile.
 - [~] **P3-09** Verification: `POST /api/technicians/verification`, `POST /api/verification/documents`, `GET /api/verification/me`; private document storage + status model. *(written as `/api/verification/{status,documents}`; `/api/technicians/verification` alias not done)*
 - [x] **P3-10** Account status transitions (active / pending / suspended / deleted) enforced in auth middleware.
-- [~] **P3-11** Tests: register/login/refresh/logout/reset flows; role escalation attempt; suspended login; unverified provider gating; rate-limit on login. *(register/login/refresh/reset/verify/lockout/suspended/escalation tests pass; still missing: `requireVerified` gating test and a rate-limit test)*
+- [~] **P3-11** *(Added backend/tests/rateLimit.test.js: a limiter set low answers 429 in the usual shape and counts callers separately; the login, register, reset, verify, contact, upload and admin routes are checked to use their limiter. The verified-provider gate (equireVerified) is covered through the donation and learning tests.)* Tests: register/login/refresh/logout/reset flows; role escalation attempt; suspended login; unverified provider gating; rate-limit on login. *(register/login/refresh/reset/verify/lockout/suspended/escalation tests pass; still missing: `requireVerified` gating test and a rate-limit test)*
 
 ### Web
 - [x] **P3-12** Login, Registration (role selection cards, role-specific fields), Forgot/Reset password pages with React Hook Form + Zod, inline errors, success states. *(web tests pass; live browser run done 2026-11-15)*
@@ -158,7 +158,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (a
 **Phase 3 status (2026-11-15): functionally complete and verified live.** Backend 114 tests, web 49 tests, plus a live browser pass (register, resend + verify email, cookie session restore in a new tab, logout/login, account update, technician document upload in the UI, guard redirects, ~45 API validation/security checks).
 
 **Known gaps carried forward (not blockers):**
-- [ ] `requireVerified` gating test and a login rate-limit test (P3-11).
+- [x] `requireVerified` gating test and a login rate-limit test (P3-11). *(Done: see P3-11.)*
 - [ ] Public `GET /api/users/:id` and a `/api/technicians/verification` alias (P3-07/09); do these with the technician directory in P5.
 - [ ] Refresh race: two tabs refreshing with the same cookie at the same instant count as token reuse and revoke the family. Add a short grace window (about 10 s) in `authService.refresh`.
 - [ ] Access tokens stay valid until they expire (15 min) after a single-device logout. By design (stateless JWT); `logoutAll`/password change bump `tokenVersion` and kill them at once.
@@ -301,7 +301,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked (a
 - [x] **P7-15** Location permission flow with manual-entry fallback; map pin selection. *(Done: "Use my location" and "Pick on map" (OpenStreetMap tiles, credited) on the list-a-device form, and "Near me" distances (5, 10, 25, 50 km) in the Browse filters. Refused, blocked, switched-off and no-signal each show their own message and a way out, and city and area always still work. Tested with a fake phone, and checked on a physical phone for the switched-off case, the map and the saved pin. The success path through the real GPS is not yet seen on the device because location is off in that phone's settings.)*
 - [x] **P7-16** Verification submission (documents via camera/gallery) for provider roles. Photos only (JPEG/PNG/WebP); PDF upload needs a file-picker package (later).
 - [x] **P7-17** Android polish: edge-to-edge, adaptive layouts, large-text check, back-button behaviour. *(Done: predictive back gesture enabled in the manifest; large-text check, with 14 of the newer screens at 1.5x and 2x text in `test/screens/large_text_test.dart`; edge-to-edge system bars with theme-matched icons; page content kept to 720 dp and the bottom bar to 560 dp on tablets and wide windows, tested in `test/widgets/wide_screen_test.dart`. Not yet seen on a real tablet.)*
-- [ ] **P7-18** Flutter tests: auth, navigation, device submission (mock), request tracking, API integration (against local backend).
+- [~] **P7-18** *(Added mobile/test/integration/live_backend_test.dart: with --dart-define=LIVE_API=http://localhost:5000/api it signs in and reads one of everything through the app's own repositories and models against the real backend, and checks the impact views agree; skipped otherwise. It passed against the dev server on 2026-11-17. Not done: writing flows (creating and changing things), and running it in CI.)* Flutter tests: auth, navigation, device submission (mock), request tracking, API integration (against local backend).
 
 **Exit criteria:** repair E2E scenario succeeds from the mobile app; web↔mobile sync verified both directions; `flutter analyze` and tests green; APK builds.
 

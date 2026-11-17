@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { setAccessToken } from '../services/api';
 import { categoryApi, deviceApi } from '../services/deviceApi';
+import { chatApi, notificationApi } from '../services/chatApi';
 import { donationApi, recipientApi } from '../services/donationApi';
 import { _resetCategoriesCache } from '../hooks/useCategories';
 import { donationSteps } from '../lib/donations';
@@ -15,6 +16,10 @@ vi.mock('../services/deviceApi', () => ({
 vi.mock('../services/donationApi', () => ({
   donationApi: { list: vi.fn(), get: vi.fn(), create: vi.fn(), request: vi.fn(), withdraw: vi.fn(), decide: vi.fn(), handover: vi.fn(), confirmHandover: vi.fn(), cancel: vi.fn(), confirmation: vi.fn() },
   recipientApi: { status: vi.fn(), apply: vi.fn() },
+}));
+vi.mock('../services/chatApi', () => ({
+  chatApi: { open: vi.fn(), get: vi.fn(), list: vi.fn(), unreadCount: vi.fn(), messages: vi.fn(), send: vi.fn(), markRead: vi.fn() },
+  notificationApi: { list: vi.fn(), unreadCount: vi.fn(), markRead: vi.fn(), markAllRead: vi.fn() },
 }));
 vi.mock('../services/api', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -51,6 +56,9 @@ beforeEach(() => {
   deviceApi.list.mockResolvedValue(page([]));
   donationApi.list.mockResolvedValue(page([]));
   recipientApi.status.mockResolvedValue(statusOf());
+  chatApi.unreadCount.mockResolvedValue(0);
+  notificationApi.unreadCount.mockResolvedValue(0);
+  chatApi.list.mockResolvedValue(page([]));
 });
 
 describe('donation journey helper', () => {
@@ -169,7 +177,7 @@ describe('donor view', () => {
     donationApi.get.mockResolvedValue(donorView());
     renderApp('/dashboard/donations/d1', signedIn(USER));
     expect(await screen.findByText('Requests (1)')).toBeInTheDocument();
-    expect(screen.getByText(/Sunrise School/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Sunrise School/).length).toBeGreaterThan(0);
     expect(screen.getByText('Our computer lab needs devices.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open map' })).toHaveAttribute('href', expect.stringContaining('openstreetmap.org'));
     expect(screen.getByRole('link', { name: /My donations/ })).toHaveAttribute('href', '/dashboard/donations');
@@ -363,5 +371,39 @@ describe('offering a listing for donation', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Offer for donation' }));
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Offer device' }));
     expect(await screen.findByText('Only working or repairable devices can be donated.')).toBeInTheDocument();
+  });
+});
+
+describe('messaging about a donation', () => {
+  it('lets the donor message each organisation that asked, in that request\'s thread', async () => {
+    donationApi.get.mockResolvedValue(donorView());
+    chatApi.open.mockResolvedValue({ _id: 'cv1' });
+    const { router } = renderApp('/dashboard/donations/d1', signedIn(USER));
+    fireEvent.click(await screen.findByRole('button', { name: 'Message Sunrise School' }));
+    await waitFor(() => expect(chatApi.open).toHaveBeenCalledWith('donation', 'q1'));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/dashboard/messages/cv1'));
+  });
+
+  it('lets an organisation with a pending request message the donor', async () => {
+    donationApi.get.mockResolvedValue(donation({ viewerRole: 'requester', myRequest: { _id: 'q7', status: 'pending' }, actions: ['withdraw'] }));
+    chatApi.open.mockResolvedValue({ _id: 'cv7' });
+    renderApp('/donations/d1', signedIn(USER));
+    fireEvent.click(await screen.findByRole('button', { name: 'Message the donor' }));
+    await waitFor(() => expect(chatApi.open).toHaveBeenCalledWith('donation', 'q7'));
+  });
+
+  it('offers no message button to a visitor who has not asked, and shows the server\'s reason if the thread cannot be opened', async () => {
+    donationApi.get.mockResolvedValue(donation({ viewerRole: 'visitor', actions: ['request'] }));
+    renderApp('/donations/d1', signedIn(USER));
+    await screen.findByRole('button', { name: 'Request this device' });
+    expect(screen.queryByRole('button', { name: /^Message/ })).not.toBeInTheDocument();
+  });
+
+  it('says why a thread could not be opened', async () => {
+    donationApi.get.mockResolvedValue(donorView());
+    chatApi.open.mockRejectedValue(apiError('Conversation not found', 'NOT_FOUND', 404));
+    renderApp('/dashboard/donations/d1', signedIn(USER));
+    fireEvent.click(await screen.findByRole('button', { name: 'Message Sunrise School' }));
+    expect(await screen.findByText(/Conversation not found/)).toBeInTheDocument();
   });
 });

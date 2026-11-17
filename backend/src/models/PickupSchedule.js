@@ -13,10 +13,17 @@ const schema = baseSchema({
   exactAddressShared: { type: Boolean, default: false }, // BR-08
   status: { type: String, enum: PICKUP_STATUS, default: 'requested' },
   proposedBy: { type: ObjectId, ref: 'User' }, // who set or last changed the time; the other side confirms it
+  timeSetAt: Date, // when the current time was set or last changed (reminders need enough notice to be useful)
+  reminders: new Schema({ day: Date, hour: Date }, { _id: false }), // when each reminder was sent; a changed time starts again
   rescheduleCount: { type: Number, default: 0, max: 3 },
   handoverConfirmed: new Schema({ byOwner: Date, byProvider: Date }, { _id: false }),
   checklistAcknowledgedAt: Date, // data-protection checklist (NFR-SEC-14)
   notes: { type: String, maxlength: 500 },
+});
+// Stamped when a pickup is made. Not a schema default: an older pickup read back from the database would then look as if its time had just been set.
+schema.pre('validate', function stampTime(next) {
+  if (this.isNew && !this.timeSetAt) this.timeSetAt = new Date();
+  next();
 });
 schema.index({ contextType: 1, contextId: 1 });
 schema.index({ provider: 1, date: 1, status: 1 });

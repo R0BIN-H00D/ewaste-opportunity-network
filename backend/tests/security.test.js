@@ -40,7 +40,7 @@ const PUBLIC = new Set([
   'POST /api/auth/reset-password', 'POST /api/auth/verify-email',
   'GET /api/devices', 'GET /api/devices/:id',
   'GET /api/technicians', 'GET /api/technicians/nearby', 'GET /api/technicians/:id',
-  'GET /api/recycling-centers', 'GET /api/recycling-centers/:id',
+  'GET /api/recycling-centers', 'GET /api/recycling-centers/compare', 'GET /api/recycling-centers/:id',
   'GET /api/donations', 'GET /api/donations/:id',
   'GET /api/marketplace', 'GET /api/marketplace/:id',
   'GET /api/reviews',

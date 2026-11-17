@@ -91,7 +91,7 @@ export default function Listings() {
       ) : loading && !data ? (
         <div className="space-y-3" aria-busy>{[0, 1, 2].map((i) => <Skeleton key={i} className="h-28 w-full !rounded-3xl" />)}</div>
       ) : items.length === 0 ? (
-        <EmptyState icon={Boxes} title={filtered ? 'No listing matches this search' : 'There are no listings yet'}>
+        <EmptyState icon={Boxes} art="devices" title={filtered ? 'No listing matches this search' : 'There are no listings yet'}>
           {filtered ? 'Check the spelling or clear the filters.' : 'Listings appear here as soon as people publish them.'}
         </EmptyState>
       ) : (

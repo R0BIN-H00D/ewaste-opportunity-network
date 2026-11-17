@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Clock, MapPin, Recycle, Search, ShieldCheck, X } from 'lucide-react';
+import { ArrowLeft, Clock, MapPin, Scale, Recycle, Search, ShieldCheck, X } from 'lucide-react';
 import GlassCard from '../../components/glass/GlassCard';
 import Badge from '../../components/ui/Badge';
 import EmptyState from '../../components/ui/EmptyState';
@@ -14,6 +14,10 @@ import { useAuth } from '../../hooks/useAuth';
 import { useCategories } from '../../hooks/useCategories';
 import { centerApi } from '../../services/recyclingApi';
 import { formatKg } from '../../lib/recycling';
+import { centerMarkers, unplaced } from '../../lib/maps';
+
+// The map and its tiles load only when someone asks for the map.
+const MapView = lazy(() => import('../../components/maps/MapView'));
 
 const KEYS = ['q', 'city', 'category'];
 const PAGE_SIZE = 12;
@@ -65,13 +69,19 @@ export function RecyclingCenterDirectory() {
   const { data, error, loading, reload } = useFetch((signal) => centerApi.list({ ...filters, page, limit: PAGE_SIZE }, signal), [key, page]);
   const items = data?.items || [];
   const active = KEYS.some((k) => filters[k]);
-  const apply = (next) => setParams(Object.fromEntries(Object.entries(next).filter(([, v]) => v)));
+  const showMap = params.get('view') === 'map';
+  const markers = showMap ? centerMarkers(items) : [];
+  const missing = unplaced(items, markers);
+  // The view (list or map) is kept in the address, like the filters, so a link opens the same picture.
+  const keepView = showMap ? { view: 'map' } : {};
+  const apply = (next) => setParams({ ...Object.fromEntries(Object.entries(next).filter(([, v]) => v)), ...keepView });
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
       <header className="mb-6 space-y-2">
         <h1 className="text-3xl font-extrabold text-ink dark:text-white sm:text-4xl">Recycling centres</h1>
         <p className="max-w-3xl text-ink-muted dark:text-[#9FB2A7]">Authorised centres that recycle responsibly. Each one is checked by an administrator, and a centre whose authorisation has run out is not listed.</p>
+        <p><Link to="/recycling-centers/compare" className="inline-flex items-center gap-1 text-sm font-semibold text-primary underline dark:text-primary-tint"><Scale size={14} aria-hidden /> Compare centres side by side</Link></p>
       </header>
 
       <form role="search" aria-label="Search recycling centres" noValidate onSubmit={(e) => { e.preventDefault(); apply(draft); }} className="glass mb-6 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4 lg:items-end">
@@ -92,16 +102,106 @@ export function RecyclingCenterDirectory() {
       ) : loading && !data ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy>{[0, 1, 2].map((i) => <Skeleton key={i} className="h-48 w-full !rounded-3xl" />)}</div>
       ) : items.length === 0 ? (
-        <EmptyState icon={Recycle} title={active ? 'No centres match your search' : 'No authorised centres yet'} action={active ? <button type="button" className="btn btn-primary" onClick={() => setParams({})}>Clear filters</button> : <Link to="/register" className="btn btn-primary">Join as a recycling centre</Link>}>
+        <EmptyState icon={Recycle} art="recycle" title={active ? 'No centres match your search' : 'No authorised centres yet'} action={active ? <button type="button" className="btn btn-primary" onClick={() => setParams({})}>Clear filters</button> : <Link to="/register" className="btn btn-primary">Join as a recycling centre</Link>}>
           {active ? 'Try fewer filters or another city.' : 'Centres appear here once an administrator has verified them.'}
         </EmptyState>
       ) : (
         <>
-          <p className="mb-3 text-sm text-ink-muted dark:text-[#9FB2A7]" aria-live="polite">{data.meta.total} {data.meta.total === 1 ? 'centre' : 'centres'} found</p>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-ink-muted dark:text-[#9FB2A7]" aria-live="polite">{data.meta.total} {data.meta.total === 1 ? 'centre' : 'centres'} found</p>
+            <div className="glass-subtle flex p-1" role="group" aria-label="Layout">
+              {[['list', 'List view', Recycle], ['map', 'Map view', MapPin]].map(([value, label, Glyph]) => {
+                const Icon = Glyph;
+                const on = (value === 'map') === showMap;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-label={label}
+                    aria-pressed={on}
+                    onClick={() => setParams({ ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), ...(value === 'map' ? { view: 'map' } : {}) })}
+                    className={`grid h-10 w-10 place-items-center rounded-xl transition ${on ? 'bg-primary text-white dark:bg-primary-tint dark:text-canvas-dark' : 'text-ink-muted'}`}
+                  >
+                    <Icon size={18} aria-hidden />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {showMap && (
+            <div className={`mb-6 ${loading ? 'opacity-60' : ''}`}>
+              <Suspense fallback={<div className="h-[30rem] animate-pulse rounded-3xl bg-black/5 dark:bg-white/10" aria-busy />}>
+                <MapView label="Map of recycling centres" markers={markers} />
+              </Suspense>
+              {missing > 0 && <p className="mt-2 text-xs text-ink-muted dark:text-[#9FB2A7]">{missing} of these {missing === 1 ? 'has' : 'have'} no map location and {missing === 1 ? 'is' : 'are'} only in the list below.</p>}
+            </div>
+          )}
           <ul className={`grid gap-4 sm:grid-cols-2 lg:grid-cols-3 ${loading ? 'opacity-60' : ''}`}>{items.map((c) => <li key={c._id}><CenterCard center={c} /></li>)}</ul>
         </>
       )}
-      {data?.meta && <Pagination page={data.meta.page} pages={data.meta.pages} onChange={(n) => setParams({ ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), ...(n > 1 ? { page: String(n) } : {}) })} />}
+      {data?.meta && <Pagination page={data.meta.page} pages={data.meta.pages} onChange={(n) => setParams({ ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), ...keepView, ...(n > 1 ? { page: String(n) } : {}) })} />}
+    </div>
+  );
+}
+
+const SORTS = [['rating', 'Best rated'], ['measured', 'Most weighed'], ['completed', 'Most requests finished']];
+
+/** Public side-by-side of the centres. Weighed and estimated kilograms are separate columns and never added together (P9-06). */
+export function RecyclingCenterCompare() {
+  const [params, setParams] = useSearchParams();
+  const sort = SORTS.some(([v]) => v === params.get('sort')) ? params.get('sort') : 'rating';
+  const { data, error, loading, reload } = useFetch((signal) => centerApi.compare({ sort }, signal), [sort]);
+  const rows = data || [];
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-10">
+      <Link to="/recycling-centers" className="inline-flex items-center gap-1 text-sm font-medium text-primary dark:text-primary-tint"><ArrowLeft size={16} aria-hidden /> Recycling centres</Link>
+      <header className="mb-6 mt-2 space-y-2">
+        <h1 className="text-3xl font-extrabold text-ink dark:text-white sm:text-4xl">Compare recycling centres</h1>
+        <p className="max-w-3xl text-ink-muted dark:text-[#9FB2A7]">Weighed kilograms were measured by the centre. Estimated kilograms are the centre's own guess. The two are shown apart and never added together.</p>
+      </header>
+      <div className="mb-4 max-w-xs">
+        <TextField as="select" label="Order by" value={sort} onChange={(e) => setParams(e.target.value === 'rating' ? {} : { sort: e.target.value })}>
+          {SORTS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+        </TextField>
+      </div>
+      {error ? (
+        <ErrorState error={error} onRetry={reload} title="Could not load the comparison" />
+      ) : loading && !data ? (
+        <Skeleton className="h-64 w-full !rounded-3xl" aria-busy />
+      ) : rows.length === 0 ? (
+        <EmptyState icon={Recycle} art="recycle" title="No authorised centres to compare yet">Centres appear here once an administrator has verified them.</EmptyState>
+      ) : (
+        <div className={`glass overflow-x-auto ${loading ? 'opacity-60' : ''}`}>
+          <table className="w-full min-w-[40rem] text-left text-sm">
+            <caption className="sr-only">Recycling centres compared</caption>
+            <thead>
+              <tr className="border-b border-black/10 text-xs uppercase tracking-wide text-ink-muted dark:border-white/10 dark:text-[#9FB2A7]">
+                <th scope="col" className="p-3">Centre</th>
+                <th scope="col" className="p-3">Rating</th>
+                <th scope="col" className="p-3 text-right">Requests finished</th>
+                <th scope="col" className="p-3 text-right">Devices recycled</th>
+                <th scope="col" className="p-3 text-right">Weighed</th>
+                <th scope="col" className="p-3 text-right">Estimated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((c) => (
+                <tr key={c._id} className="border-b border-black/5 last:border-0 dark:border-white/5">
+                  <th scope="row" className="p-3 font-semibold text-ink dark:text-white">
+                    <Link to={`/recycling-centers/${c._id}`} className="hover:underline">{c.name}</Link>
+                    {c.city && <span className="block text-xs font-normal text-ink-muted dark:text-[#9FB2A7]">{c.city}</span>}
+                  </th>
+                  <td className="p-3"><Rating avg={c.ratingAvg} count={c.ratingCount} /></td>
+                  <td className="p-3 text-right font-numeric">{c.completedRequests}</td>
+                  <td className="p-3 text-right font-numeric">{c.devicesRecycled}</td>
+                  <td className="p-3 text-right font-numeric">{formatKg(c.totals?.actualKg || 0)}</td>
+                  <td className="p-3 text-right font-numeric">{formatKg(c.totals?.estimatedKg || 0)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

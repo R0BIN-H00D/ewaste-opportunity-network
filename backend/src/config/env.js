@@ -14,6 +14,7 @@ const schema = z.object({
   JWT_ACCESS_SECRET: z.string().default('change-me'),
   JWT_REFRESH_SECRET: z.string().default('change-me'),
   JWT_ACCESS_TTL: z.string().default('15m'),
+  REFRESH_GRACE_SECONDS: z.coerce.number().int().min(0).max(60).default(10), // 0 turns the grace for two refreshes at once off
   REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(14),
   BCRYPT_COST: z.coerce.number().int().min(4).max(15).default(12),
   STORAGE_DRIVER: z.enum(['cloudinary', 'local']).default('local'),
@@ -21,6 +22,7 @@ const schema = z.object({
   CLOUDINARY_API_KEY: z.string().optional().default(''),
   CLOUDINARY_API_SECRET: z.string().optional().default(''),
   FIREBASE_SERVICE_ACCOUNT_PATH: z.string().optional().default(''),
+  SCHEDULER_ENABLED: z.preprocess((v) => String(v ?? 'true').toLowerCase() !== 'false', z.boolean()), // on unless set to false
   GEMINI_ENABLED: bool,
   GEMINI_API_KEY: z.string().optional().default(''),
   GEMINI_DAILY_LIMIT: z.coerce.number().int().nonnegative().default(50),

@@ -28,7 +28,7 @@ function ChooseListing({ onPick }) {
   const items = data?.items || [];
   if (items.length === 0) {
     return (
-      <EmptyState icon={Wrench} title="You have no devices waiting for repair" action={<Link to="/list-device" className="btn btn-primary">List a device</Link>}>
+      <EmptyState icon={Wrench} art="tools" title="You have no devices waiting for repair" action={<Link to="/list-device" className="btn btn-primary">List a device</Link>}>
         List a device and choose “Repair” as the service. Then you can ask a technician to look at it.
       </EmptyState>
     );

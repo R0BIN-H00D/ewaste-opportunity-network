@@ -94,4 +94,24 @@ async function updateRoleProfile(user, rawBody) {
   return profile;
 }
 
-module.exports = { updateUser, updateProfile, updateAvatar, removeAvatar, getRoleProfile, updateRoleProfile, toPoint };
+/**
+ * The small public card for one person (name, picture, role, how long they have been here and whether a provider is verified).
+ * Admins, suspended and removed accounts are answered as not found, so this cannot be used to list or probe them. No contact
+ * details, no location and no email: those stay private (BR-08).
+ */
+async function getPublicCard(id) {
+  const user = await User.findById(id).select('name avatar role status createdAt').lean();
+  if (!user || user.status !== 'active' || user.role === 'admin') throw ApiError.notFound('Person not found');
+  const Model = ROLE_PROFILE_MODEL[user.role];
+  const roleProfile = Model ? await Model.findOne({ user: user._id }).select('verification.status').lean() : null;
+  return {
+    _id: user._id,
+    name: user.name,
+    avatarUrl: user.avatar?.url || null,
+    role: user.role,
+    memberSince: user.createdAt,
+    ...(Model ? { verified: roleProfile?.verification?.status === 'approved' } : {}),
+  };
+}
+
+module.exports = { getPublicCard, updateUser, updateProfile, updateAvatar, removeAvatar, getRoleProfile, updateRoleProfile, toPoint };

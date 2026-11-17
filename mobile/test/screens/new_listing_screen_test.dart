@@ -358,6 +358,43 @@ void main() {
       expect(find.text('Address search is unavailable'), findsNothing); // optional help says nothing when it fails
     });
 
+    testWidgets('finds a typed address, keeps its spot and fills in the area and city', (tester) async {
+      final geo = FakeGeoRepository();
+      await _pump(tester, _repo(), FakePhotoPicker(), geo: geo);
+      await toLastStep(tester);
+      await tester.ensureVisible(find.text('Search an address'));
+      await tester.enterText(find.widgetWithText(TextField, 'Search an address'), 'Indiranagar Bengaluru');
+      await _tap(tester, find.byTooltip('Search'));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(geo.searched.single, 'Indiranagar Bengaluru');
+      await _tap(tester, find.text('Indiranagar, Bengaluru, Karnataka, India').last);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.textContaining('Location saved (12.97160, 77.64123)'), findsOneWidget);
+      expect(geo.asked.single, (12.9716, 77.64123));
+      expect(text(tester, 'City (optional)'), 'Bengaluru');
+    });
+
+    testWidgets('asks for a few more letters, says when nothing matches and when the service is out of reach', (tester) async {
+      final geo = FakeGeoRepository()..found = const [];
+      await _pump(tester, _repo(), FakePhotoPicker(), geo: geo);
+      await toLastStep(tester);
+      await tester.ensureVisible(find.text('Search an address'));
+      await tester.enterText(find.widgetWithText(TextField, 'Search an address'), 'ab');
+      await _tap(tester, find.byTooltip('Search'));
+      expect(find.text('Type at least three letters of the address.'), findsOneWidget);
+      expect(geo.searched, isEmpty);
+      await tester.enterText(find.widgetWithText(TextField, 'Search an address'), 'nowhere at all');
+      await _tap(tester, find.byTooltip('Search'));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.textContaining('No places found'), findsOneWidget);
+      geo.error = const ApiException('Address search is unavailable. Please enter the area and city yourself.', failure: ApiFailure.server, statusCode: 503);
+      await _tap(tester, find.byTooltip('Search'));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.textContaining('Address search is unavailable'), findsOneWidget);
+      expect(find.textContaining('pick a spot on the map'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('leaves the fields alone for a spot nothing is known about', (tester) async {
       await _pump(tester, _repo(), FakePhotoPicker(), phone: FakeLocationService.at(const GeoPoint(0.001, 0.001)), geo: FakeGeoRepository(place: null));
       await toLastStep(tester);

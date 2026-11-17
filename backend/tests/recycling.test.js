@@ -129,6 +129,25 @@ describe('GET /api/recycling-centers', () => {
     expect(res.body.data.acceptedCategories.map((c) => c.slug).sort()).toEqual(['laptop', 'smartphone']);
   });
 
+  it('compares centres publicly with weighed and estimated kilograms kept apart (P9-06)', async () => {
+    const second = await makeCenter({ name: 'Second Recyclers', ratingAvg: 4.8, ratingCount: 5, totals: { actualKg: 90, estimatedKg: 10 } });
+    await makeCenter({ name: 'Hidden Recyclers', verification: { status: 'pending' } });
+    await RecyclingCenter.updateOne({ _id: center.doc._id }, { $set: { totals: { actualKg: 12.5, estimatedKg: 30 } } });
+    await RecyclingRecord.create({ requester: owner.id, center: center.doc._id, status: 'completed', deviceCount: 3 });
+    await RecyclingRecord.create({ requester: owner.id, center: center.doc._id, status: 'requested', deviceCount: 9 });
+    const res = await call('get', '/api/recycling-centers/compare');
+    expect(res.status).toBe(200);
+    expect(res.body.data.map((c) => c.name)).toEqual(['Second Recyclers', 'GreenCycle Recyclers']); // best rated first, hidden one absent
+    const mine = res.body.data.find((c) => c.name === 'GreenCycle Recyclers');
+    expect(mine).toMatchObject({ completedRequests: 1, devicesRecycled: 3, totals: { actualKg: 12.5, estimatedKg: 30 } });
+    expect(res.body.data[0]).toMatchObject({ completedRequests: 0, totals: { actualKg: 90, estimatedKg: 10 } });
+    expect(JSON.stringify(res.body.data)).not.toMatch(/"user"|email|"phone"/i);
+    const byWeight = await call('get', '/api/recycling-centers/compare?sort=completed');
+    expect(byWeight.body.data[0].name).toBe('GreenCycle Recyclers');
+    expect((await call('get', '/api/recycling-centers/compare?sort=nonsense')).status).toBe(422);
+    expect(second.doc.name).toBe('Second Recyclers');
+  });
+
   it('hides a centre that is not approved and treats a bad id as not found', async () => {
     const hidden = await makeCenter({ verification: { status: 'pending' } });
     expect((await call('get', `/api/recycling-centers/${hidden.doc._id}`)).status).toBe(404);

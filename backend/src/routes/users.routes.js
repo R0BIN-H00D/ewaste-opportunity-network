@@ -7,6 +7,11 @@ const { uploadLimiter, authLimiter } = require('../middleware/rateLimit');
 const v = require('../validators/profile.validators');
 const ctrl = require('../controllers/users.controller');
 
+const { validObjectIdParam } = require('../middleware/guards');
+
+// The one public route: a small card for a person who has shown up in a listing, review or chat. It is before authenticate on purpose.
+router.get('/:id([0-9a-fA-F]{24})', validObjectIdParam(), ctrl.getPublic);
+
 router.use(authenticate);
 
 router.patch('/me', validate({ body: v.updateUserBody }), ctrl.updateMe);

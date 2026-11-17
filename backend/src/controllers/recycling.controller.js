@@ -8,6 +8,7 @@ exports.listCenters = asyncHandler(async (req, res) => {
   const { items, meta } = await centers.listCenters(req.query);
   ok(res, items, 'OK', meta);
 });
+exports.compareCenters = asyncHandler(async (req, res) => ok(res, await centers.compareCenters(req.query)));
 exports.getCenter = asyncHandler(async (req, res) => ok(res, await centers.getCenter(req.params.id)));
 
 exports.create = asyncHandler(async (req, res) => created(res, await svc.createRequest(req.user, req.body, req.files || []), 'Recycling request sent'));

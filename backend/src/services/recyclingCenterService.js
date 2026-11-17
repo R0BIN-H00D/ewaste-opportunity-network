@@ -5,6 +5,7 @@ const { isValidObjectId } = require('mongoose');
 const RecyclingCenter = require('../models/RecyclingCenter');
 const Category = require('../models/Category');
 const User = require('../models/User');
+const RecyclingRecord = require('../models/RecyclingRecord');
 const ApiError = require('../utils/ApiError');
 const { parsePagination, buildMeta } = require('../utils/pagination');
 const { serializeCenter } = require('../serializers/recycling');
@@ -51,6 +52,38 @@ async function getCenter(id) {
 }
 
 /**
+ * A public side-by-side of the selectable centres (P9-06): how many requests each has finished, and the kilograms that were
+ * weighed kept apart from the kilograms that were only estimated (BR-06). Nothing is added across the two, and a centre with
+ * nothing finished yet shows zeros rather than being left out.
+ */
+async function compareCenters(query) {
+  const filter = await selectableFilter();
+  if (query.city) filter.city = new RegExp(`^${escapeRegex(query.city)}$`, 'i');
+  if (query.category) {
+    const cat = await Category.findOne({ slug: query.category }).select('_id').lean();
+    filter.acceptedCategories = cat ? cat._id : null;
+  }
+  const rows = await RecyclingCenter.find(filter).populate(POPULATE).lean();
+  const done = await RecyclingRecord.aggregate([
+    { $match: { center: { $in: rows.map((c) => c._id) }, status: 'completed' } },
+    { $group: { _id: '$center', completed: { $sum: 1 }, devices: { $sum: '$deviceCount' } } },
+  ]);
+  const byCenter = new Map(done.map((d) => [String(d._id), d]));
+  const items = rows.map((c) => ({
+    ...serializeCenter(c, { detail: true }),
+    completedRequests: byCenter.get(String(c._id))?.completed || 0,
+    devicesRecycled: byCenter.get(String(c._id))?.devices || 0,
+  }));
+  const sorts = {
+    rating: (a, b) => b.ratingAvg - a.ratingAvg,
+    measured: (a, b) => b.totals.actualKg - a.totals.actualKg,
+    completed: (a, b) => b.completedRequests - a.completedRequests,
+  };
+  items.sort((a, b) => (sorts[query.sort] || sorts.rating)(a, b) || a.name.localeCompare(b.name));
+  return items.slice(0, query.limit || 20);
+}
+
+/**
  * Loads a centre a requester wants to use. Throws 409 when it cannot be chosen and 422 when it does not take a category.
  * @returns the centre document
  */
@@ -66,4 +99,4 @@ async function assertSelectable(centerId, categoryIds, requesterId) {
   return center;
 }
 
-module.exports = { listCenters, getCenter, assertSelectable, selectableFilter };
+module.exports = { listCenters, compareCenters, getCenter, assertSelectable, selectableFilter };

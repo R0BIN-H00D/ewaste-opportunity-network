@@ -210,3 +210,45 @@ describe('DELETE /users/me', () => {
     expect((await request(app).post('/api/auth/register').send({ ...u.body })).status).toBe(201); // same email can sign up again
   });
 });
+
+describe('GET /users/:id (public card)', () => {
+  it('shows only a name, picture, role, join date and the verified flag, with no sign-in', async () => {
+    const tech = await signup(app, { role: 'technician' });
+    await TechnicianProfile.updateOne({ user: tech.id }, { $set: { 'verification.status': 'approved' } });
+    await User.updateOne({ _id: tech.id }, { $set: { status: 'active' } });
+    const res = await request(app).get(`/api/users/${tech.id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ _id: tech.id, role: 'technician', verified: true, avatarUrl: null });
+    expect(Object.keys(res.body.data).sort()).toEqual(['_id', 'avatarUrl', 'memberSince', 'name', 'role', 'verified']);
+    expect(JSON.stringify(res.body)).not.toContain(tech.email);
+  });
+
+  it('leaves the verified flag out for ordinary members', async () => {
+    const u = await signup(app);
+    const res = await request(app).get(`/api/users/${u.id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.verified).toBeUndefined();
+  });
+
+  it('answers not found for suspended people, admins and bad ids, and keeps /users/me private', async () => {
+    const u = await signup(app);
+    const admin = await signup(app);
+    await User.updateOne({ _id: admin.id }, { $set: { role: 'admin' } });
+    await User.updateOne({ _id: u.id }, { $set: { status: 'suspended' } });
+    expect((await request(app).get(`/api/users/${u.id}`)).status).toBe(404);
+    expect((await request(app).get(`/api/users/${admin.id}`)).status).toBe(404);
+    expect((await request(app).get('/api/users/0123456789abcdef01234567')).status).toBe(404);
+    expect((await request(app).get('/api/users/me/profile')).status).toBe(401);
+  });
+});
+
+describe('/technicians/verification alias', () => {
+  it('serves the same verification status as /verification/status', async () => {
+    const tech = await signup(app, { role: 'technician' });
+    const a = await request(app).get('/api/verification/status').set(tech.auth);
+    const b = await request(app).get('/api/technicians/verification/status').set(tech.auth);
+    expect(b.status).toBe(200);
+    expect(b.body.data).toEqual(a.body.data);
+    expect((await request(app).get('/api/technicians/verification/status')).status).toBe(401);
+  });
+});

@@ -25,4 +25,25 @@ Web: `@fontsource/inter`, `@fontsource/plus-jakarta-sans`, `@fontsource/manrope`
 Mobile: download the same families (OFL) into `mobile/assets/fonts/` and enable the `fonts:` block in `pubspec.yaml`. Until then Flutter uses the platform font.
 
 ## Graphics
-None added yet (Phase 4). Record every asset's source and licence here.
+Every drawing in the app is original work, written as SVG in code, so there is nothing to license and nothing to download.
+
+| Asset | Where | Source | Licence |
+|---|---|---|---|
+| Spot illustrations: devices, search, recycle, inbox, map, tools, gift, learn | `web/src/components/art/Illustrations.jsx`, shown by `EmptyState` | Drawn for this project | Project code |
+| Landing hero and background layers | CSS and SVG in `web/src/components/landing/` | Drawn for this project | Project code |
+| Favicon | `web/public/favicon.svg` | Drawn for this project | Project code |
+
+How the illustrations are built: each is 160 by 120, uses `currentColor` at different strengths (so one drawing works on light and dark), takes the lime and mint accents from the palette, carries `aria-hidden` (they are decoration) and is a few hundred bytes. Because they are vector there is no WebP or AVIF version to make; photographs, if ever added, must be added as WebP or AVIF with their licence in the table above.
+
+### Third-party material the app uses
+| What | Used for | Licence and what it asks of us |
+|---|---|---|
+| Lucide icons (`lucide-react`) | Interface icons | ISC |
+| OpenStreetMap map tiles | Website and phone maps | ODbL. The map must show "OpenStreetMap contributors" (both do), and tiles are fetched only when someone opens a map. Heavy use needs a tile provider of our own. |
+| Leaflet and React Leaflet | Website maps | Leaflet is BSD-2-Clause; React Leaflet is Hippocratic-2.1 licensed, so check it before any commercial release (it can be replaced by plain Leaflet) |
+| flutter_map | Phone maps | BSD-3-Clause |
+| Nominatim (OpenStreetMap address search) | Address search through our server | ODbL data, with a usage policy (a real User-Agent, one search at a time, results kept) that the server follows |
+| Inter, Plus Jakarta Sans, Manrope (fontsource) | Fonts | SIL OFL 1.1 |
+
+### Not done
+Article cover photographs and any real photography need your own files or a stock licence you choose. Until then articles show the plain gradient cover.

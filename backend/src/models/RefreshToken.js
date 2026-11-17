@@ -10,6 +10,7 @@ const schema = baseSchema({
   expiresAt: { type: Date, required: true },
   revokedAt: Date,
   replacedBy: { type: ObjectId, ref: 'RefreshToken' },
+  graceUses: { type: Number, default: 0 }, // times a just-rotated token was answered as a harmless race (see authService.refresh)
 });
 schema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // TTL
 

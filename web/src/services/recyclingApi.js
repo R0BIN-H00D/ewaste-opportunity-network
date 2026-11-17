@@ -8,6 +8,7 @@ const clean = (params) => Object.fromEntries(Object.entries(params || {}).filter
 export const centerApi = {
   list: (params, signal) => page(api.get('/recycling-centers', { params: clean(params), signal })),
   get: (id, signal) => data(api.get(`/recycling-centers/${id}`, { signal })),
+  compare: (params, signal) => data(api.get("/recycling-centers/compare", { params: clean(params), signal })),
 };
 
 export const recyclingApi = {

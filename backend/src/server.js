@@ -17,6 +17,8 @@ async function main() {
     logger.error({ err: err.message }, 'MongoDB connection failed — API will run but DB-backed routes will fail');
   }
 
+  if (env.SCHEDULER_ENABLED) require('./jobs/scheduler').start();
+
   server.listen(env.PORT, () => logger.info(`API listening on :${env.PORT} (${env.NODE_ENV})`));
 
   const shutdown = async (signal) => {

@@ -146,28 +146,46 @@ async function refresh(rawToken, ctx) {
     { new: true },
   );
 
+  // Two tabs (or an app and a widget) can refresh with the same token at the same instant. The second one is not theft, so for a
+  // few seconds after a token was rotated, presenting it again is answered with a second, separate session on the same chain
+  // instead of ending the chain. Each token can be answered this way at most twice, and only if it was really replaced (a token
+  // that was revoked by logging out never qualifies).
+  let grace = null;
   if (!claimed) {
     const existing = await RefreshToken.findOne({ tokenHash }).lean();
     if (existing?.revokedAt) {
-      // A rotated/revoked token came back: assume theft, end the whole session chain.
-      await revokeFamily(existing.family, now);
-      throw new ApiError(401, 'Session ended. Please log in again.', 'TOKEN_REUSED');
+      const graceMs = env.REFRESH_GRACE_SECONDS * 1000;
+      const justRotated = Boolean(existing.replacedBy) && graceMs > 0 && now.getTime() - existing.revokedAt.getTime() <= graceMs;
+      if (justRotated) {
+        grace = await RefreshToken.findOneAndUpdate(
+          { _id: existing._id, $or: [{ graceUses: { $exists: false } }, { graceUses: { $lt: 2 } }] },
+          { $inc: { graceUses: 1 } },
+          { new: true },
+        );
+      }
+      if (!grace) {
+        // A rotated/revoked token came back: assume theft, end the whole session chain.
+        await revokeFamily(existing.family, now);
+        throw new ApiError(401, 'Session ended. Please log in again.', 'TOKEN_REUSED');
+      }
+    } else {
+      throw ApiError.unauthorized('Invalid or expired refresh token');
     }
-    throw ApiError.unauthorized('Invalid or expired refresh token');
   }
 
-  const user = await User.findById(claimed.user);
+  const source = claimed || grace;
+  const user = await User.findById(source.user);
   if (!user || user.status === ACCOUNT_STATUS.DELETED) {
-    await revokeFamily(claimed.family, now);
+    await revokeFamily(source.family, now);
     throw ApiError.unauthorized('Account not found');
   }
   if (user.status === ACCOUNT_STATUS.SUSPENDED) {
-    await revokeFamily(claimed.family, now);
+    await revokeFamily(source.family, now);
     throw ApiError.forbidden('Your account is suspended', 'ACCOUNT_SUSPENDED');
   }
 
-  const session = await issueSession(user, ctx, claimed.family);
-  await RefreshToken.updateOne({ _id: claimed._id }, { $set: { replacedBy: session.tokenId } });
+  const session = await issueSession(user, ctx, source.family);
+  if (claimed) await RefreshToken.updateOne({ _id: claimed._id }, { $set: { replacedBy: session.tokenId } });
   return { user, session };
 }
 

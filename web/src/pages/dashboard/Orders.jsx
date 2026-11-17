@@ -69,9 +69,9 @@ export default function Orders() {
         <div className="space-y-3" aria-busy>{[0, 1, 2].map((i) => <Skeleton key={i} className="h-24 w-full !rounded-3xl" />)}</div>
       ) : items.length === 0 ? (
         as === 'seller' ? (
-          <EmptyState icon={ShoppingBag} title="No orders yet" action={<Link to="/dashboard/products" className="btn btn-primary">See my products</Link>}>Orders from buyers appear here as soon as someone orders one of your products.</EmptyState>
+          <EmptyState icon={ShoppingBag} art="devices" title="No orders yet" action={<Link to="/dashboard/products" className="btn btn-primary">See my products</Link>}>Orders from buyers appear here as soon as someone orders one of your products.</EmptyState>
         ) : (
-          <EmptyState icon={ShoppingBag} title="You have not ordered anything yet" action={<Link to="/marketplace" className="btn btn-primary">Browse refurbished devices</Link>}>Orders you place on the marketplace appear here.</EmptyState>
+          <EmptyState icon={ShoppingBag} art="devices" title="You have not ordered anything yet" action={<Link to="/marketplace" className="btn btn-primary">Browse refurbished devices</Link>}>Orders you place on the marketplace appear here.</EmptyState>
         )
       ) : (
         <ul className={`space-y-3 ${loading ? 'opacity-60' : ''}`}>{items.map((o) => <li key={o._id}><OrderCard order={o} /></li>)}</ul>

@@ -112,7 +112,7 @@ export default function Opportunities() {
       ) : loading && !data ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-busy>{Array.from({ length: 3 }, (_, i) => <DeviceCardSkeleton key={i} />)}</div>
       ) : items.length === 0 ? (
-        <EmptyState icon={Recycle} title={active ? 'No devices match your search' : 'No devices to refurbish right now'} action={active ? <button type="button" className="btn btn-glass" onClick={() => setParams({})}>Clear filters</button> : null}>
+        <EmptyState icon={Recycle} art="recycle" title={active ? 'No devices match your search' : 'No devices to refurbish right now'} action={active ? <button type="button" className="btn btn-glass" onClick={() => setParams({})}>Clear filters</button> : null}>
           {active ? 'Try fewer filters or a different keyword.' : 'When an owner lists a device for refurbishment it appears here.'}
         </EmptyState>
       ) : (

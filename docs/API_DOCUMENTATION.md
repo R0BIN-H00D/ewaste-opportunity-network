@@ -11,7 +11,7 @@ Auth: none. Returns service status.
 `db` is one of `disconnected | connected | connecting | disconnecting`.
 
 ## Authentication
-Tokens: a short-lived **access token** (JWT, `Authorization: Bearer …`) and a rotating opaque **refresh token** (stored hashed; reuse of a rotated token revokes the whole session chain → `401 TOKEN_REUSED`).
+Tokens: a short-lived **access token** (JWT, `Authorization: Bearer …`) and a rotating opaque **refresh token** (stored hashed; reuse of a rotated token revokes the whole session chain → `401 TOKEN_REUSED`). One exception: two tabs or devices refreshing with the same token at the same moment is a race, not theft, so for `REFRESH_GRACE_SECONDS` (default 10; 0 turns it off) a just-rotated token is answered with a second, separate session on the same chain, at most twice per token. A token that was revoked by logging out never gets this. The trade-off: a thief who replays a stolen token within those seconds is also answered once or twice; after that, or later, the whole chain ends.
 - **Web** gets the refresh token only as an `httpOnly` cookie (`ewaste_rt`, path `/api/auth`). Calling `refresh`/`logout` with the cookie needs the header `X-Requested-With: ewaste-web` (else `403 CSRF_BLOCKED`). Send requests with credentials.
 - **Mobile** sends header `X-Client-Type: mobile` and receives `refreshToken` in the JSON body; it sends it back as `{ "refreshToken": "…" }`.
 - Session response: `data: { user, accessToken, expiresIn (seconds), refreshToken? }`.
@@ -21,7 +21,7 @@ Tokens: a short-lived **access token** (JWT, `Authorization: Bearer …`) and a 
 |---|---|---|
 | `POST /api/auth/register` | – | `{ name, email, password, role? (user\|technician\|student\|refurbisher\|recycler), phone?, organizationName? }` (`organizationName` required for refurbisher/recycler). Provider roles start as `pending_verification`. `201` + session. `409 EMAIL_TAKEN`. |
 | `POST /api/auth/login` | – | `{ email, password }`. Same `401` for wrong password and unknown email. 5 failures → `429 ACCOUNT_LOCKED` for 15 min. Suspended → `403 ACCOUNT_SUSPENDED`. |
-| `POST /api/auth/refresh` | cookie or body | Rotates the refresh token. `401` invalid/expired, `401 TOKEN_REUSED`. |
+| `POST /api/auth/refresh` | cookie or body | Rotates the refresh token. `401` invalid/expired, `401 TOKEN_REUSED` (see the grace for simultaneous refreshes above). |
 | `POST /api/auth/logout` | cookie or body | Idempotent; revokes that session chain. |
 | `POST /api/auth/logout-all` | Bearer | Ends every session and invalidates all access tokens. |
 | `POST /api/auth/forgot-password` | – | `{ email }`. Always `200` (no email enumeration). Emails a 1-hour single-use link. |
@@ -38,6 +38,7 @@ In development without SMTP configured, verification/reset emails are printed in
 ## Users and profiles (all Bearer)
 | Endpoint | Notes |
 |---|---|
+| `GET /api/users/:id` (**public, no sign-in**) | A small card: `{ _id, name, avatarUrl, role, memberSince, verified? }` (`verified` only for provider roles). Suspended, pending, removed and admin accounts and bad ids are all `404`. No contact details or location. |
 | `PATCH /api/users/me` | `{ name?, phone? (null clears) }`. Role/status/email cannot be changed. |
 | `GET /api/users/me/profile` · `PATCH /api/users/me/profile` | `bio, addressLine, addressArea, city, state, pincode, location {lat,lng} \| null, orgProfile {isOrg, orgType, orgName, registrationNo}, preferences {emailNotifications, pushNotifications, theme}`. Nested objects merge. Exact `location` is owner-only; a fuzzed `publicLocation` is derived. |
 | `POST /api/users/me/avatar` · `DELETE /api/users/me/avatar` | multipart field `avatar` (one JPEG/PNG/WebP ≤ 5 MB, verified by magic bytes). |
@@ -201,6 +202,7 @@ No money passes through the platform (BR-10): payment is `cod` or `offline`, rec
 ## Recycling centres (public)
 Only verified centres with a current authorisation are listed. Responses carry an `authorized` flag; the detail adds `facilityDetails`, `collectionAreas` and `totals { actualKg, estimatedKg }` (kept apart, BR-06).
 - `GET /api/recycling-centers?q&city&category&page&limit` — directory; `category` is a category slug the centre accepts.
+- `GET /api/recycling-centers/compare?city&category&sort=rating|measured|completed&limit` — the same centres side by side: `completedRequests`, `devicesRecycled`, and `totals { actualKg, estimatedKg }` kept apart (never added). Public; no owner details. Zeros, not omissions, for a centre with nothing finished yet.
 - `GET /api/recycling-centers/:id` — detail. An unknown or unlisted centre is `404`.
 
 ## Recycling requests (Bearer)

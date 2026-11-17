@@ -66,3 +66,14 @@ flutter test test/integration --dart-define=LIVE_API=http://localhost:5000/api
 Without `LIVE_API` those tests are skipped, so the normal run needs no server. It only reads; the one write is signing in.
 
 **Not covered by automated tests:** the real Gemini, Cloudinary, Firebase, SMTP and Nominatim services (each is tested with a fake and has a fallback), and the real-device behaviour of share sheets and push.
+
+## Full run, 2026-11-17 (after maps, reminders, emails, comparison, address search and graphics)
+| Suite | Result |
+|---|---|
+| Backend `npm test` | **40 suites, 816 tests passed**; eslint 0 errors (3 old warnings) |
+| Web `npm test` | **34 files, 702 tests passed**; eslint clean |
+| Mobile `flutter analyze` / `flutter test` | no issues; **821 passed, 6 skipped** (the live-backend tests, which need `LIVE_API`) |
+
+New in this stretch: `reminders.test.js` (a day and two hours before, once each, reset on a new time), `notificationEmail.test.js` (only listed types, respects the preference, own-site links only), refresh-token race tests in `auth.test.js` (twice at most, never after logout, theft still ends the chain), the recycling comparison and the public user card, web `maps.test.jsx` and `art.test.jsx`, and on the phone `pin_picker_screen_test.dart` and the address-search tests in `new_listing_screen_test.dart`.
+
+**Checked by eye in a real browser:** the website map (pins, popups, attribution), the comparison page against live data, and an empty-state illustration in the dark theme. **Not checked:** tiles actually drawing in the sandbox (the tile elements existed; the picture was grey), and the new phone screens on the physical phone.

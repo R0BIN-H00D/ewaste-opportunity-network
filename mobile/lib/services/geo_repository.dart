@@ -20,4 +20,13 @@ class GeoRepository {
           rethrow;
         }
       });
+
+  /// Places that match a typed address (at most five), or an empty list. Needs at least three characters.
+  Future<List<GeoPlace>> search(String query) => guard(() async {
+        final q = query.trim();
+        if (q.length < 3) return const <GeoPlace>[];
+        final res = await _api.dio.get<dynamic>('/geo/search', queryParameters: {'q': q});
+        final list = (res.data as Map)['data'] as List;
+        return [for (final j in list) GeoPlace.fromJson((j as Map).cast<String, dynamic>())];
+      });
 }

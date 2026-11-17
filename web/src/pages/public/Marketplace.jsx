@@ -85,7 +85,7 @@ export default function Marketplace() {
       ) : loading && !data ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" aria-busy>{Array.from({ length: 4 }, (_, i) => <ProductCardSkeleton key={i} />)}</div>
       ) : items.length === 0 ? (
-        <EmptyState icon={Store} title={active ? 'No products match your search' : 'No refurbished products yet'} action={active ? <button type="button" className="btn btn-glass" onClick={() => setParams({})}>Clear filters</button> : <Link to="/register" className="btn btn-primary">Join as a refurbisher</Link>}>
+        <EmptyState icon={Store} art="devices" title={active ? 'No products match your search' : 'No refurbished products yet'} action={active ? <button type="button" className="btn btn-glass" onClick={() => setParams({})}>Clear filters</button> : <Link to="/register" className="btn btn-primary">Join as a refurbisher</Link>}>
           {active ? 'Try fewer filters or a different keyword.' : 'Verified refurbishers publish tested devices here, each with its condition and what was done to it.'}
         </EmptyState>
       ) : (

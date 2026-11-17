@@ -60,7 +60,7 @@ export default function MyProducts() {
       ) : loading && !data ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-busy>{[0, 1, 2].map((i) => <ProductCardSkeleton key={i} />)}</div>
       ) : items.length === 0 ? (
-        <EmptyState icon={Store} title={status ? 'No products here' : 'You have no products yet'} action={<Link to="/dashboard/refurbishment" className="btn btn-primary">Go to my refurbishment jobs</Link>}>
+        <EmptyState icon={Store} art="devices" title={status ? 'No products here' : 'You have no products yet'} action={<Link to="/dashboard/refurbishment" className="btn btn-primary">Go to my refurbishment jobs</Link>}>
           Finish a refurbishment job and list it from there, or add a product yourself.
         </EmptyState>
       ) : (

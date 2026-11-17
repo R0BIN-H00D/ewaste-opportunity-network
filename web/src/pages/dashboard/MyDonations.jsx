@@ -65,11 +65,11 @@ export default function MyDonations() {
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-busy>{Array.from({ length: 3 }, (_, i) => <DeviceCardSkeleton key={i} />)}</div>
       ) : items.length === 0 ? (
         as === 'donor' ? (
-          <EmptyState icon={Heart} title="You have not offered any donations yet" action={<Link to="/dashboard/listings" className="btn btn-primary">Go to my listings</Link>}>
+          <EmptyState icon={Heart} art="gift" title="You have not offered any donations yet" action={<Link to="/dashboard/listings" className="btn btn-primary">Go to my listings</Link>}>
             List a working or repairable device with the service set to Donation, then offer it from your listings.
           </EmptyState>
         ) : (
-          <EmptyState icon={Heart} title="You have not asked for any devices yet" action={<Link to="/donations" className="btn btn-primary">See available donations</Link>}>
+          <EmptyState icon={Heart} art="gift" title="You have not asked for any devices yet" action={<Link to="/donations" className="btn btn-primary">See available donations</Link>}>
             Verified organisations can request devices from the donation marketplace.
           </EmptyState>
         )

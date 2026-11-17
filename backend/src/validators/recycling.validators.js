@@ -83,4 +83,13 @@ const reportQuery = z
   })
   .strict();
 
-module.exports = { MAX_REQUEST_PHOTOS, centersQuery, createBody, listQuery, statusBody, pickupBody, confirmBody, cancelBody, materialsBody, reportQuery };
+const compareQuery = z
+  .object({
+    city: z.string().trim().min(1).max(80).optional(),
+    category: z.string().trim().min(1).max(60).optional(),
+    sort: z.enum(['rating', 'measured', 'completed']).optional(),
+    limit: z.coerce.number().int().min(1).max(50).optional(),
+  })
+  .strict();
+
+module.exports = { MAX_REQUEST_PHOTOS, centersQuery, compareQuery, createBody, listQuery, statusBody, pickupBody, confirmBody, cancelBody, materialsBody, reportQuery };

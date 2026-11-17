@@ -37,7 +37,7 @@ export default function LearningTasks() {
       ) : loading && !data ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy>{[0, 1, 2].map((i) => <Skeleton key={i} className="h-56 w-full !rounded-3xl" />)}</div>
       ) : items.length === 0 ? (
-        <EmptyState icon={GraduationCap} title={status ? 'No tasks with this status' : 'You have not posted a task yet'} action={<Link to="/dashboard/learning-tasks/new" className="btn btn-primary">Post a task</Link>}>
+        <EmptyState icon={GraduationCap} art="learn" title={status ? 'No tasks with this status' : 'You have not posted a task yet'} action={<Link to="/dashboard/learning-tasks/new" className="btn btn-primary">Post a task</Link>}>
           {status ? 'Choose another status to see the rest.' : 'A task can be diagnosing a laptop, replacing a keyboard or testing a power supply, always with you supervising.'}
         </EmptyState>
       ) : (

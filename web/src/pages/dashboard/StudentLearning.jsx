@@ -114,7 +114,7 @@ export default function StudentLearning() {
         ) : loading && !data ? (
           <div className="space-y-3" aria-busy>{[0, 1].map((i) => <Skeleton key={i} className="h-20 w-full !rounded-3xl" />)}</div>
         ) : items.length === 0 ? (
-          <EmptyState icon={GraduationCap} title={status ? 'No applications with this status' : 'You have not applied yet'} action={<Link to="/opportunities" className="btn btn-primary">Browse opportunities</Link>}>
+          <EmptyState icon={GraduationCap} art="learn" title={status ? 'No applications with this status' : 'You have not applied yet'} action={<Link to="/opportunities" className="btn btn-primary">Browse opportunities</Link>}>
             {status ? 'Choose another status to see the rest.' : 'Supervised tasks from verified technicians are open for applications.'}
           </EmptyState>
         ) : (

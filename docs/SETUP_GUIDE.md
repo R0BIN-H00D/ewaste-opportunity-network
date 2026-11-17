@@ -51,6 +51,8 @@ Nothing below is needed to run the app. Each service is switched on by environme
 
 | Service | Needs | Variables | Without it |
 |---|---|---|---|
+| Reminders and the scheduler | nothing to sign up for | `SCHEDULER_ENABLED` (default on; `false` to stop the five-minute job) | Pickup reminders go out a day before and about two hours before, to both people, once each |
+| Simultaneous refresh grace | nothing | `REFRESH_GRACE_SECONDS` (default 10, `0` off) | Two tabs refreshing together are not treated as theft |
 | Email (SMTP) | any SMTP account, e.g. a free Brevo or Gmail app password | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | Emails are printed in the server log in development (verification and reset links are visible there) |
 | Image and document storage | a free Cloudinary account | `STORAGE_DRIVER=cloudinary`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Files go to `backend/uploads` on this computer; in production a missing Cloudinary setup is refused rather than quietly using the disk |
 | Phone push | a free Firebase project, a service-account key file | `FIREBASE_SERVICE_ACCOUNT_PATH=C:/path/to/key.json` | Push is off; in-app notifications and live updates still work. The app also needs its own `google-services.json` (not committed) |

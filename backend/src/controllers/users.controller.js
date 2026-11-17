@@ -6,6 +6,8 @@ const auth = require('../services/authService');
 const UserProfile = require('../models/UserProfile');
 const { toUser, toOwnProfile, toOwnRoleProfile } = require('../serializers/user');
 
+exports.getPublic = asyncHandler(async (req, res) => ok(res, await profiles.getPublicCard(req.params.id)));
+
 exports.updateMe = asyncHandler(async (req, res) => {
   ok(res, toUser(await profiles.updateUser(req.user.id, req.body)), 'Account updated');
 });

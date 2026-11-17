@@ -8,6 +8,7 @@ router.use('/health', require('./health.routes'));
 router.use('/auth', require('./auth.routes'));
 router.use('/users', require('./users.routes'));
 router.use('/verification', require('./verification.routes'));
+router.use('/technicians/verification', require('./verification.routes')); // the same routes under the name the spec uses (before /technicians/:id)
 router.use('/categories', require('./category.routes'));
 router.use('/devices', require('./device.routes'));
 router.use('/reports', require('./report.routes'));

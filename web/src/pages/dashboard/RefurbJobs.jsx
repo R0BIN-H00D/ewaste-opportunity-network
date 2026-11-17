@@ -68,11 +68,11 @@ export default function RefurbJobs() {
         <div className="space-y-3" aria-busy>{[0, 1, 2].map((i) => <Skeleton key={i} className="h-24 w-full !rounded-3xl" />)}</div>
       ) : items.length === 0 ? (
         as === 'owner' ? (
-          <EmptyState icon={Recycle} title="No offers on your devices yet" action={<Link to="/dashboard/listings" className="btn btn-primary">Go to my listings</Link>}>
+          <EmptyState icon={Recycle} art="recycle" title="No offers on your devices yet" action={<Link to="/dashboard/listings" className="btn btn-primary">Go to my listings</Link>}>
             List a device with the service set to Refurbishment. Verified refurbishers can then make you an offer.
           </EmptyState>
         ) : (
-          <EmptyState icon={Recycle} title="You have no refurbishment jobs yet" action={<Link to="/dashboard/opportunities" className="btn btn-primary">See available devices</Link>}>
+          <EmptyState icon={Recycle} art="recycle" title="You have no refurbishment jobs yet" action={<Link to="/dashboard/opportunities" className="btn btn-primary">See available devices</Link>}>
             Make an offer on a device. Once the owner accepts it, the job appears here.
           </EmptyState>
         )

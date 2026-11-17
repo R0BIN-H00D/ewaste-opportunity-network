@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:material_ui/material_ui.dart';
 import '../../services/location_service.dart';
+import '../../models/geo_place.dart';
+import '../../widgets/address_search.dart';
 import '../../widgets/glass_app_bar.dart';
 
 /// Where the map opens when there is no saved point yet: the middle of India, zoomed out, so the person looks for their own area.
@@ -21,6 +23,20 @@ class PinPickerScreen extends StatefulWidget {
 
 class _PinPickerScreenState extends State<PinPickerScreen> {
   late GeoPoint? _pin = widget.initial;
+  final _map = MapController();
+
+  /// An address was chosen from the search: put the pin there and bring it into view.
+  void _goTo(GeoPlace place) {
+    final point = GeoPoint(place.lat!, place.lng!).rounded();
+    setState(() => _pin = point);
+    _map.move(ll.LatLng(point.lat, point.lng), 16);
+  }
+
+  @override
+  void dispose() {
+    _map.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +48,7 @@ class _PinPickerScreenState extends State<PinPickerScreen> {
       body: Stack(
         children: [
           FlutterMap(
+            mapController: _map,
             options: MapOptions(
               initialCenter: ll.LatLng(centre.lat, centre.lng),
               initialZoom: _pin == null ? 4.5 : 15,
@@ -56,6 +73,17 @@ class _PinPickerScreenState extends State<PinPickerScreen> {
           Positioned(
             left: 16,
             right: 16,
+            top: 8,
+            child: Material(
+              color: theme.colorScheme.surface,
+              elevation: 4,
+              borderRadius: BorderRadius.circular(20),
+              child: Padding(padding: const EdgeInsets.fromLTRB(12, 8, 12, 8), child: AddressSearch(onPicked: _goTo, label: 'Search an address or place')),
+            ),
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
             bottom: 16,
             child: SafeArea(
               child: Material(
@@ -68,7 +96,7 @@ class _PinPickerScreenState extends State<PinPickerScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(pin == null ? 'Tap the map where the device is.' : 'Pin at ${pin.label}', style: theme.textTheme.bodyLarge),
+                      Text(pin == null ? 'Search above, or tap the map where the device is.' : 'Pin at ${pin.label}', style: theme.textTheme.bodyLarge),
                       const SizedBox(height: 4),
                       Text('Others only see a blurred spot, never this exact pin.', style: theme.textTheme.bodyMedium),
                       const SizedBox(height: 12),

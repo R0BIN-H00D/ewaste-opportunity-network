@@ -100,7 +100,7 @@ export default function NotificationsPage() {
       {state.error && <p role="alert" className="text-sm text-danger">{state.error.message}</p>}
 
       {state.items.length === 0 ? (
-        <EmptyState icon={Bell} title="You are all caught up">Updates about your listings, requests and verification will appear here.</EmptyState>
+        <EmptyState icon={Bell} art="inbox" title="You are all caught up">Updates about your listings, requests and verification will appear here.</EmptyState>
       ) : (
         <ul className="space-y-2" aria-label="Notifications">
           {state.items.map((n) => (

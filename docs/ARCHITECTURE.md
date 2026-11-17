@@ -60,3 +60,8 @@ Flutter 3.50 deprecates the in-SDK Material library. The mobile app imports `pac
 **Checked live (2026-11-17):** a draft listing created and then edited on the website appeared and changed on a phone that was only sitting on My listings; removing it on the phone made it disappear from the open web page.
 
 **Trade-offs.** An event can cause a refetch on screens it does not concern (the event names a resource but screens do not filter by it); the delay and the visible-tab rule keep this cheap. A list refreshed this way returns to its first page.
+
+## Decision: a small in-process scheduler, and a grace for simultaneous refreshes (2026-11-17)
+- **Scheduler.** `backend/src/jobs/scheduler.js` runs the jobs every five minutes inside the API process: no second service, no queue. A run never overlaps the one before it, and a job that fails is logged and does not stop the others. Today it has one job, pickup reminders (`reminderService`). Each reminder is claimed with one atomic update, so even two API processes would send it once. Turn it off with `SCHEDULER_ENABLED=false` (for example on all but one instance when the API is scaled out).
+- **Refresh grace.** Rotating refresh tokens treat a reused token as theft. Two tabs refreshing together look the same, so for `REFRESH_GRACE_SECONDS` (10) a just-rotated token is answered with a sibling session on the same chain, at most twice. The cost is that a thief replaying a stolen token inside that window is also answered; the next replay, or any later one, ends the whole chain. Logging out never gets the grace.
+- **Emails for notifications** follow a fixed list of types and the person's email preference, and link only to our own pages.

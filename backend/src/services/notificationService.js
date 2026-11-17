@@ -5,6 +5,7 @@ const Notification = require('../models/Notification');
 const logger = require('../utils/logger');
 const { emitToUser } = require('../sockets/emitter');
 const push = require('./integrations/push');
+const notificationEmail = require('./integrations/notificationEmail');
 
 async function notify(userIds, { type, title, body, data = {} }) {
   // Callers may pass plain ids or populated documents; a populated document must never be stringified (it would not be an id).
@@ -16,6 +17,7 @@ async function notify(userIds, { type, title, body, data = {} }) {
     await pushLive(saved); // a hiccup in live delivery must not look like a failed save
     // Phone push, not waited for: a slow or failing push service must never slow down or fail the request.
     push.sendToUsers(ids, { title, body, data }).catch(() => {});
+    notificationEmail.sendForNotification(ids, { type, title, body, data }).catch(() => {}); // email for the ones that matter
   } catch (err) {
     logger.warn({ err: err.message, type }, 'notification not saved');
   }

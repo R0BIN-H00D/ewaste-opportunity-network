@@ -66,7 +66,7 @@ export function OpportunityDirectory() {
       ) : loading && !data ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy>{[0, 1, 2].map((i) => <Skeleton key={i} className="h-56 w-full !rounded-3xl" />)}</div>
       ) : items.length === 0 ? (
-        <EmptyState icon={GraduationCap} title={active ? 'No opportunities match your search' : 'No open opportunities right now'} action={active ? <button type="button" className="btn btn-primary" onClick={() => setParams({})}>Clear filters</button> : <Link to="/register" className="btn btn-primary">Join as a student</Link>}>
+        <EmptyState icon={GraduationCap} art="learn" title={active ? 'No opportunities match your search' : 'No open opportunities right now'} action={active ? <button type="button" className="btn btn-primary" onClick={() => setParams({})}>Clear filters</button> : <Link to="/register" className="btn btn-primary">Join as a student</Link>}>
           {active ? 'Try fewer filters or another skill.' : 'Verified technicians post tasks here. Check back soon, or join so you are ready to apply.'}
         </EmptyState>
       ) : (

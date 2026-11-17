@@ -291,6 +291,18 @@ class FakeGeoRepository extends GeoRepository {
   ApiException? error;
   final asked = <(double, double)>[];
 
+  /// What a typed address is said to match, and what was typed.
+  List<GeoPlace> found = const [GeoPlace(label: 'Indiranagar, Bengaluru, Karnataka, India', area: 'Indiranagar', city: 'Bengaluru', lat: 12.9716, lng: 77.64123)];
+  final searched = <String>[];
+
+  @override
+  Future<List<GeoPlace>> search(String query) async {
+    searched.add(query);
+    final e = error;
+    if (e != null) throw e;
+    return found;
+  }
+
   @override
   Future<GeoPlace?> reverse(double lat, double lng) async {
     asked.add((lat, lng));

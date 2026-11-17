@@ -13,7 +13,7 @@ vi.mock('../services/deviceApi', () => ({
   reportApi: { create: vi.fn() },
 }));
 vi.mock('../services/recyclingApi', () => ({
-  centerApi: { list: vi.fn(), get: vi.fn() },
+  centerApi: { list: vi.fn(), get: vi.fn(), compare: vi.fn() },
   recyclingApi: { create: vi.fn(), list: vi.fn(), get: vi.fn(), setStatus: vi.fn(), pickup: vi.fn(), confirmHandover: vi.fn(), materials: vi.fn(), cancel: vi.fn(), report: vi.fn(), reportCsv: vi.fn() },
 }));
 vi.mock('../services/api', async (importOriginal) => ({
@@ -62,6 +62,43 @@ describe('recycling helpers', () => {
     expect(Object.values(state({ status: 'completed' })).every((s) => s === 'done')).toBe(true);
     expect(state({ status: 'cancelled', history: [{ status: 'requested' }, { status: 'accepted' }, { status: 'cancelled' }] })).toMatchObject({ accepted: 'done', pickup_scheduled: 'todo' });
     expect(state({ status: 'rejected', history: [{ status: 'requested' }, { status: 'rejected' }] })).toMatchObject({ requested: 'done', accepted: 'todo' });
+  });
+});
+
+describe('recycling centre comparison', () => {
+  const row = (over) => center({ completedRequests: 0, devicesRecycled: 0, ...over });
+  it('shows weighed and estimated kilograms in separate columns, with a link to each centre', async () => {
+    centerApi.compare.mockResolvedValue([
+      row({ _id: 'c1', name: 'GreenCycle Recyclers', completedRequests: 4, devicesRecycled: 11, totals: { actualKg: 12.5, estimatedKg: 30 } }),
+      row({ _id: 'c2', name: 'Second Recyclers', totals: { actualKg: 0, estimatedKg: 0 } }),
+    ]);
+    renderApp('/recycling-centers/compare', anonymous());
+    expect(await screen.findByRole('heading', { name: 'Compare recycling centres' })).toBeInTheDocument();
+    const table = await screen.findByRole('table');
+    const first = within(within(table).getByRole('link', { name: 'GreenCycle Recyclers' }).closest('tr'));
+    expect(first.getByText('12.5 kg')).toBeInTheDocument();
+    expect(first.getByText('30 kg')).toBeInTheDocument();
+    expect(first.getByText('11')).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Weighed' })).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Estimated' })).toBeInTheDocument();
+    expect(within(table).getByRole('link', { name: 'Second Recyclers' })).toHaveAttribute('href', '/recycling-centers/c2');
+    expect(centerApi.compare).toHaveBeenCalledWith({ sort: 'rating' }, expect.anything());
+  });
+  it('re-fetches in the chosen order', async () => {
+    centerApi.compare.mockResolvedValue([row()]);
+    renderApp('/recycling-centers/compare', anonymous());
+    await screen.findByRole('table');
+    fireEvent.change(screen.getByLabelText('Order by'), { target: { value: 'measured' } });
+    await waitFor(() => expect(centerApi.compare).toHaveBeenLastCalledWith({ sort: 'measured' }, expect.anything()));
+  });
+  it('says so when there is nothing to compare', async () => {
+    centerApi.compare.mockResolvedValue([]);
+    renderApp('/recycling-centers/compare', anonymous());
+    expect(await screen.findByText('No authorised centres to compare yet')).toBeInTheDocument();
+  });
+  it('is linked from the directory', async () => {
+    renderApp('/recycling-centers', anonymous());
+    expect(await screen.findByRole('link', { name: /Compare centres side by side/ })).toHaveAttribute('href', '/recycling-centers/compare');
   });
 });
 

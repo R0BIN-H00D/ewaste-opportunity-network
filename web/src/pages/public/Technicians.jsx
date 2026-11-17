@@ -73,7 +73,7 @@ export function TechnicianDirectory() {
       ) : loading && !data ? (
         <div className="space-y-3" aria-busy>{[0, 1, 2].map((i) => <Skeleton key={i} className="h-28 w-full !rounded-3xl" />)}</div>
       ) : items.length === 0 ? (
-        <EmptyState icon={Wrench} title={active ? 'No technicians match these filters' : 'No verified technicians yet'} action={<Link to="/register" className="btn btn-primary">Join as a technician</Link>}>
+        <EmptyState icon={Wrench} art="tools" title={active ? 'No technicians match these filters' : 'No verified technicians yet'} action={<Link to="/register" className="btn btn-primary">Join as a technician</Link>}>
           {active ? 'Try a different city or device type.' : 'Technicians appear here once an administrator has verified them.'}
         </EmptyState>
       ) : (

@@ -83,11 +83,11 @@ export default function RecyclingRequests() {
         <div className="space-y-3" aria-busy>{[0, 1, 2].map((i) => <Skeleton key={i} className="h-24 w-full !rounded-3xl" />)}</div>
       ) : items.length === 0 ? (
         status ? (
-          <EmptyState icon={Recycle} title="No requests with this status" action={<button type="button" className="btn btn-primary" onClick={() => keep({ status: undefined })}>Show all</button>} />
+          <EmptyState icon={Recycle} art="recycle" title="No requests with this status" action={<button type="button" className="btn btn-primary" onClick={() => keep({ status: undefined })}>Show all</button>} />
         ) : as === 'center' ? (
-          <EmptyState icon={Recycle} title="No requests have come in yet">When someone sends devices to your centre, the request appears here for you to accept or decline.</EmptyState>
+          <EmptyState icon={Recycle} art="recycle" title="No requests have come in yet">When someone sends devices to your centre, the request appears here for you to accept or decline.</EmptyState>
         ) : (
-          <EmptyState icon={Recycle} title="You have not sent any recycling requests" action={<Link to="/recycling-centers" className="btn btn-primary">Find a recycling centre</Link>}>
+          <EmptyState icon={Recycle} art="recycle" title="You have not sent any recycling requests" action={<Link to="/recycling-centers" className="btn btn-primary">Find a recycling centre</Link>}>
             Pick an authorised centre, say what you are sending and where, and the centre will arrange the pickup.
           </EmptyState>
         )

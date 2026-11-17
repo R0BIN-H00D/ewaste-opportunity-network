@@ -38,7 +38,7 @@ import MyProducts from '../pages/dashboard/MyProducts';
 import ProductForm from '../pages/dashboard/ProductForm';
 import Orders from '../pages/dashboard/Orders';
 import OrderDetail from '../pages/dashboard/OrderDetail';
-import { RecyclingCenterDetail, RecyclingCenterDirectory } from '../pages/public/RecyclingCenters';
+import { RecyclingCenterCompare, RecyclingCenterDetail, RecyclingCenterDirectory } from '../pages/public/RecyclingCenters';
 import RecyclingRequests from '../pages/dashboard/RecyclingRequests';
 import RecyclingNew from '../pages/dashboard/RecyclingNew';
 import RecyclingDetail from '../pages/dashboard/RecyclingDetail';
@@ -101,6 +101,7 @@ export const routeConfig = [
       { path: 'marketplace', element: <Marketplace /> },
       { path: 'marketplace/:id', element: <ProductDetails /> },
       { path: 'recycling-centers', element: <RecyclingCenterDirectory /> },
+      { path: 'recycling-centers/compare', element: <RecyclingCenterCompare /> },
       { path: 'recycling-centers/:id', element: <RecyclingCenterDetail /> },
       { path: 'opportunities', element: <OpportunityDirectory /> },
       { path: 'opportunities/:id', element: <OpportunityDetail /> },

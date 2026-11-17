@@ -1,9 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
+import '../models/geo_place.dart';
 import '../providers/location_providers.dart';
 import '../routes/route_paths.dart';
 import '../services/location_service.dart';
+import 'address_search.dart';
 import 'glass_container.dart';
 import 'message_banner.dart';
 
@@ -44,6 +46,12 @@ class _LocationFieldState extends ConsumerState<LocationField> {
       setState(() => _problem = null);
       widget.onChanged(picked);
     }
+  }
+
+  /// An address was chosen from the search: it becomes the shared spot, and the form fills in the area and city from it.
+  void _useAddress(GeoPlace place) {
+    setState(() => _problem = null);
+    widget.onChanged(GeoPoint(place.lat!, place.lng!).rounded());
   }
 
   (String, String, VoidCallback)? _help() {
@@ -101,6 +109,8 @@ class _LocationFieldState extends ConsumerState<LocationField> {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          AddressSearch(onPicked: _useAddress),
           if (help != null) ...[
             const SizedBox(height: 12),
             MessageBanner(tone: BannerTone.warning, message: help.$1, action: TextButton(onPressed: help.$3, child: Text(help.$2))),

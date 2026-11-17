@@ -146,11 +146,40 @@ describe('refresh tokens', () => {
   it('treats reuse of a rotated token as theft and kills the whole session chain', async () => {
     const u = await signup(app);
     const next = await post('/refresh', { refreshToken: u.refreshToken }, MOBILE);
+    await RefreshToken.updateMany({ revokedAt: { $ne: null } }, { $set: { revokedAt: new Date(Date.now() - 60_000) } }); // well past the grace window
     const reuse = await post('/refresh', { refreshToken: u.refreshToken }, MOBILE);
     expect(reuse.status).toBe(401);
     expect(reuse.body.code).toBe('TOKEN_REUSED');
     const newest = await post('/refresh', { refreshToken: next.body.data.refreshToken }, MOBILE);
     expect(newest.status).toBe(401); // the legitimate holder is logged out too
+  });
+
+  it('treats a second refresh with the same token a moment later as a race, not theft', async () => {
+    const u = await signup(app);
+    const first = await post('/refresh', { refreshToken: u.refreshToken }, MOBILE);
+    const second = await post('/refresh', { refreshToken: u.refreshToken }, MOBILE);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(second.body.data.refreshToken).not.toBe(first.body.data.refreshToken);
+    expect((await post('/refresh', { refreshToken: first.body.data.refreshToken }, MOBILE)).status).toBe(200);
+    expect((await post('/refresh', { refreshToken: second.body.data.refreshToken }, MOBILE)).status).toBe(200);
+  });
+
+  it('allows the race only twice, then treats further reuse as theft', async () => {
+    const u = await signup(app);
+    await post('/refresh', { refreshToken: u.refreshToken }, MOBILE);
+    expect((await post('/refresh', { refreshToken: u.refreshToken }, MOBILE)).status).toBe(200);
+    expect((await post('/refresh', { refreshToken: u.refreshToken }, MOBILE)).status).toBe(200);
+    const third = await post('/refresh', { refreshToken: u.refreshToken }, MOBILE);
+    expect(third.status).toBe(401);
+    expect(third.body.code).toBe('TOKEN_REUSED');
+  });
+
+  it('never gives the grace to a token that was revoked by logging out', async () => {
+    const u = await signup(app);
+    await post('/logout', { refreshToken: u.refreshToken }, MOBILE);
+    const again = await post('/refresh', { refreshToken: u.refreshToken }, MOBILE);
+    expect(again.status).toBe(401);
   });
 
   it('works with the httpOnly cookie, but only with the CSRF header', async () => {

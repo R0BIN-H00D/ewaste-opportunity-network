@@ -1,6 +1,6 @@
 'use strict';
 const asyncHandler = require('../utils/asyncHandler');
-const { ok } = require('../utils/response');
+const { ok, created } = require('../utils/response');
 const users = require('../services/adminUserService');
 const verifications = require('../services/adminVerificationService');
 const dashboard = require('../services/adminDashboardService');
@@ -15,6 +15,7 @@ const auditLog = require('../services/adminAuditService');
 const analytics = require('../services/adminAnalyticsService');
 const exportsSvc = require('../services/adminExportService');
 const certificates = require('../services/adminCertificateService');
+const education = require('../services/educationService');
 
 // ---- users ----
 exports.listUsers = asyncHandler(async (req, res) => {
@@ -135,3 +136,13 @@ exports.listCertificates = asyncHandler(async (req, res) => {
   return ok(res, items, 'OK', meta);
 });
 exports.issueCertificate = asyncHandler(async (req, res) => ok(res, await certificates.issue(req.user, req.body.applicationId, req.ip), 'Certificate issued', undefined, 201));
+
+// ---- learning-centre articles ----
+exports.listArticles = asyncHandler(async (req, res) => {
+  const { items, meta } = await education.listAll(req.query);
+  return ok(res, items, 'OK', meta);
+});
+exports.getArticle = asyncHandler(async (req, res) => ok(res, await education.getForAdmin(req.params.id)));
+exports.createArticle = asyncHandler(async (req, res) => created(res, await education.create(req.user, req.body, req.ip), 'Article saved'));
+exports.updateArticle = asyncHandler(async (req, res) => ok(res, await education.update(req.user, req.params.id, req.body, req.ip), 'Article saved'));
+exports.deleteArticle = asyncHandler(async (req, res) => ok(res, await education.remove(req.user, req.params.id, req.ip), 'Article deleted'));

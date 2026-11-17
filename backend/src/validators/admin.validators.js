@@ -114,6 +114,27 @@ const categoryOrderBody = z
   .object({ ids: z.array(objectId).min(1).max(200).refine((a) => new Set(a).size === a.length, 'Each category once') })
   .strict();
 
+// ---- learning-centre articles ----
+const { TOPICS: EDU_TOPICS } = require('../models/EducationArticle');
+const articleFields = {
+  title: z.string().trim().min(3).max(160),
+  topic: z.enum(EDU_TOPICS),
+  summary: z.string().trim().max(300),
+  body: z.string().trim().min(20, 'Write at least a few sentences').max(20000),
+  featured: z.boolean(),
+  status: z.enum(['draft', 'published']),
+};
+const articleCreateBody = z
+  .object({ title: articleFields.title, topic: articleFields.topic, summary: articleFields.summary.optional(), body: articleFields.body, featured: articleFields.featured.optional(), status: articleFields.status.optional() })
+  .strict();
+const articleUpdateBody = z
+  .object({ title: articleFields.title.optional(), topic: articleFields.topic.optional(), summary: articleFields.summary.optional(), body: articleFields.body.optional(), featured: articleFields.featured.optional(), status: articleFields.status.optional() })
+  .strict()
+  .refine((b) => Object.keys(b).length > 0, { message: 'Nothing to change' });
+const articleListQuery = z
+  .object({ ...pageQuery, status: z.enum(['draft', 'published']).optional(), topic: z.enum(EDU_TOPICS).optional(), q: z.string().trim().min(1).max(100).optional() })
+  .strict();
+
 // ---- complaints, announcements, audit log ----
 const complaintListQuery = z
   .object({
@@ -185,7 +206,7 @@ const certificateIssueBody = z.object({ applicationId: objectId }).strict();
 module.exports = {
   analyticsQuery, exportQuery, certificateListQuery, certificateIssueBody,
   listingListQuery, listingModerationBody, reviewListQuery, reviewStatusBody, reportListQuery, reportDecisionBody,
-  categoryCreateBody, categoryUpdateBody, categoryOrderBody,
+  categoryCreateBody, categoryUpdateBody, categoryOrderBody, articleCreateBody, articleUpdateBody, articleListQuery,
   complaintListQuery, complaintActionBody, announcementCreateBody, announcementUpdateBody, announcementListQuery, auditListQuery,
   userListQuery, userStatusBody, verificationListQuery, verificationTypeQuery, verificationDecisionBody, monitorQuery,
 };

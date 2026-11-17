@@ -36,6 +36,10 @@ async function main() {
   const adminEmail = env.ADMIN_SEED_EMAIL || 'admin@example.com';
   await upsertUser({ email: adminEmail, name: 'Platform Admin', role: ROLES.ADMIN }, env.ADMIN_SEED_PASSWORD || 'ChangeMe!12345');
 
+  // learning-centre guides
+  const adminUser = await M.User.findOne({ role: ROLES.ADMIN });
+  logger.info(`education guides added: ${await require('./services/educationService').seedStarter(adminUser)}`);
+
   // demo accounts
   const user = await upsertUser({ email: 'user@demo.local', name: 'Demo User', role: ROLES.USER }, DEMO_PASSWORD);
   const tech = await upsertUser({ email: 'tech@demo.local', name: 'Demo Technician', role: ROLES.TECHNICIAN }, DEMO_PASSWORD);

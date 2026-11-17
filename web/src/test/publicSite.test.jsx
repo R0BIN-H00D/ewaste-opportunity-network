@@ -9,6 +9,13 @@ import Modal from '../components/ui/Modal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { USER, anonymous, renderApp, signedIn } from './helpers';
 
+vi.mock('../services/educationApi', () => ({
+  educationApi: {
+    list: () => Promise.reject(new Error('offline')),
+    get: (slug) => Promise.reject(slug === 'does-not-exist' ? Object.assign(new Error('Article not found'), { response: { status: 404 } }) : new Error('offline')),
+  },
+}));
+
 vi.mock('../services/authApi', () => ({ authApi: { me: vi.fn(), resendVerification: vi.fn() }, userApi: {}, verificationApi: {} }));
 vi.mock('../services/deviceApi', () => ({
   categoryApi: { list: vi.fn() },

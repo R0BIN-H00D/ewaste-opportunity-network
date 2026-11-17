@@ -59,8 +59,9 @@ class _SlotSheetState extends ConsumerState<_SlotSheet> {
 
   Future<void> _manual() async {
     final when = await pickPickupTime(context);
-    if (when != null && mounted)
+    if (when != null && mounted) {
       Navigator.pop(context, PickupChoice(date: when));
+    }
   }
 
   @override

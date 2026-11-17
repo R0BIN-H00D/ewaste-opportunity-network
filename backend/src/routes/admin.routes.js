@@ -43,6 +43,13 @@ router.put('/categories/order', validate({ body: v.categoryOrderBody }), ctrl.re
 router.put('/categories/:id', validObjectIdParam('id'), validate({ body: v.categoryUpdateBody }), ctrl.updateCategory);
 router.delete('/categories/:id', validObjectIdParam('id'), ctrl.deleteCategory);
 
+// Learning-centre articles
+router.get('/education', validate({ query: v.articleListQuery }), ctrl.listArticles);
+router.post('/education', validate({ body: v.articleCreateBody }), ctrl.createArticle);
+router.get('/education/:id', validObjectIdParam('id'), ctrl.getArticle);
+router.put('/education/:id', validObjectIdParam('id'), validate({ body: v.articleUpdateBody }), ctrl.updateArticle);
+router.delete('/education/:id', validObjectIdParam('id'), ctrl.deleteArticle);
+
 // Complaints
 router.get('/complaints', validate({ query: v.complaintListQuery }), ctrl.listComplaints);
 router.get('/complaints/:id', validObjectIdParam('id'), ctrl.getComplaint);

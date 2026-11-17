@@ -267,8 +267,15 @@ Every state change is written to the audit log (`AdminLog`) with the admin, the 
 ## Announcements
 - `GET /api/announcements` — public (`optionalAuth`; `Cache-Control: no-cache`). The announcements showing now for everyone, or for the signed-in role; newest 5; fields `_id`, `title`, `body`, `startsAt`.
 
+## Learning centre (`/api/education`, public) and its administration
+- `GET /api/education?topic&q&page&limit` — published guides as cards (`slug, title, topic, summary, featured, publishedAt, readMinutes`), featured first, then newest. `q` is searched as plain text in the title and summary. Unknown query keys or topics → `422`.
+- `GET /api/education/:slug` — one published guide with its Markdown `body` and `next` (`{ slug, title }`, the guide to read after it). A draft, a deleted guide and a slug that never existed all answer the same `404`. The author is not shown.
+- Administration (admin only, under the same guard as the rest of `/api/admin`): `GET /api/admin/education?status&topic&q&page&limit` (drafts included), `POST /api/admin/education`, `GET|PUT|DELETE /api/admin/education/:id`. Create/update take `title` (3–160), `topic` (`ewaste-problem|safe-disposal|reuse|repair-benefits|recycling|data-security|sustainability`), `summary` (≤ 300), `body` (Markdown, 20–20000 characters), `featured`, `status` (`draft|published`); anything else, including a `slug`, is refused `422`. The slug is made from the first title, never changes, and a deleted article's slug is not reused. `publishedAt` is set on the first publish and kept. Delete is a soft delete. Every change is audited as `education.created|published|updated|unpublished|deleted`.
+- The body is stored as written. Clients draw it with a renderer that builds elements itself and never inserts HTML (web `lib/markdown.jsx`, mobile `markdown_view.dart`); links must be http(s), mailto or a path on the site.
+- `npm run seed` adds the seven starting guides that are missing, published, and never overwrites an edited or deleted one. The website shows its built-in copies of these seven while the server cannot be reached.
+
 ## Planned (currently `501 NOT_IMPLEMENTED`)
-`geo` (P8) · `ai, education` (P9).
+`geo` (P8).
 
 ## CORS
 

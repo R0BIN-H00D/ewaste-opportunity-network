@@ -19,6 +19,11 @@ abstract class Routes {
   /// The Green Score, badges, history and the person's impact.
   static const impact = '/impact';
 
+  /// The learning centre and one guide.
+  static const learn = '/learn';
+  static const articlePattern = '/learn/:slug';
+  static String article(String slug) => '/learn/$slug';
+
   /// Every pickup, collection and handover the person is part of.
   static const pickups = '/pickups';
 

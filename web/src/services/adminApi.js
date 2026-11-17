@@ -94,3 +94,11 @@ export const adminVerificationApi = {
   /** A private document as a Blob. It needs the administrator's token, so it cannot be a plain link. */
   document: (viewUrl, signal) => api.get(viewUrl.replace(/^\/api/, ''), { responseType: 'blob', signal }).then((r) => r.data),
 };
+
+export const adminEducationApi = {
+  list: (params, signal) => api.get('/admin/education', { params: clean(params), signal }).then(page),
+  get: (id, signal) => api.get(`/admin/education/${id}`, { signal }).then(one),
+  create: (body) => api.post('/admin/education', body).then(one),
+  update: (id, body) => api.put(`/admin/education/${id}`, body).then(one),
+  remove: (id) => api.delete(`/admin/education/${id}`).then(one),
+};

@@ -14,6 +14,7 @@ import '../models/chat.dart';
 import '../screens/chat/chat_screen.dart';
 import '../screens/chat/conversations_screen.dart';
 import '../screens/impact/impact_screen.dart';
+import '../screens/learn/learn_screens.dart';
 import '../screens/pickups/pickups_screen.dart';
 import '../screens/location/pin_picker_screen.dart';
 import '../services/location_service.dart';
@@ -114,6 +115,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: Routes.myListings, builder: (_, __) => const MyListingsPage()),
       GoRoute(path: Routes.impact, builder: (_, __) => const ImpactPage()),
       GoRoute(path: Routes.pickups, builder: (_, __) => const PickupsPage()),
+      GoRoute(path: Routes.learn, builder: (_, __) => const LearnPage()),
+      GoRoute(path: Routes.articlePattern, builder: (_, state) => ArticleScreen(slug: state.pathParameters['slug']!)),
       GoRoute(path: Routes.messages, builder: (_, __) => const ConversationsPage()),
       GoRoute(
         path: Routes.messagePattern,

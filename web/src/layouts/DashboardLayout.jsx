@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { Activity, Award, BarChart3, Bell, Flag, Megaphone, MessageSquareWarning, ScrollText, Shapes, Star, ShieldCheck, Users, CalendarClock, Boxes, Factory, GraduationCap, Heart, LayoutDashboard, Leaf, LogOut, MessageCircle, PackageSearch, Recycle, ReceiptText, Settings, ShoppingBag, Store, Wrench } from 'lucide-react';
+import { Activity, Award, BarChart3, Bell, BookOpen, Flag, Megaphone, MessageSquareWarning, ScrollText, Shapes, Star, ShieldCheck, Users, CalendarClock, Boxes, Factory, GraduationCap, Heart, LayoutDashboard, Leaf, LogOut, MessageCircle, PackageSearch, Recycle, ReceiptText, Settings, ShoppingBag, Store, Wrench } from 'lucide-react';
 import ThemeToggle from '../components/layout/ThemeToggle';
 import AnnouncementBanner from '../components/layout/AnnouncementBanner';
 import { logoutUser } from '../store/authSlice';
@@ -62,6 +62,7 @@ export default function DashboardLayout() {
               <NavLink to="/dashboard/admin/categories" className={link}><Shapes size={18} aria-hidden /> Categories</NavLink>
               <NavLink to="/dashboard/admin/complaints" className={link}><MessageSquareWarning size={18} aria-hidden /> Complaints</NavLink>
               <NavLink to="/dashboard/admin/announcements" className={link}><Megaphone size={18} aria-hidden /> Announcements</NavLink>
+              <NavLink to="/dashboard/admin/education" className={link}><BookOpen size={18} aria-hidden /> Learning centre</NavLink>
               <NavLink to="/dashboard/admin/audit" className={link}><ScrollText size={18} aria-hidden /> Audit log</NavLink>
               <NavLink to="/dashboard/admin/analytics" className={link}><BarChart3 size={18} aria-hidden /> Analytics</NavLink>
               <NavLink to="/dashboard/admin/certificates" className={link}><Award size={18} aria-hidden /> Certificates</NavLink>

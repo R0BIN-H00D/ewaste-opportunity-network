@@ -7,6 +7,8 @@ import 'package:ewaste_opportunity/models/impact.dart';
 import 'package:ewaste_opportunity/services/impact_repository.dart';
 import 'package:ewaste_opportunity/models/pickup.dart';
 import 'package:ewaste_opportunity/models/ai_suggestion.dart';
+import 'package:ewaste_opportunity/models/article.dart';
+import 'package:ewaste_opportunity/services/article_repository.dart';
 import 'package:ewaste_opportunity/services/ai_repository.dart';
 import 'package:ewaste_opportunity/services/pickup_repository.dart';
 import 'package:ewaste_opportunity/models/account.dart';
@@ -234,6 +236,36 @@ class FakeAiRepository extends AiRepository {
     final e = error;
     if (e != null) throw e;
     return answer;
+  }
+}
+Map<String, dynamic> articleJson({String slug = 'safe-disposal', String title = 'Safe disposal', String summary = 'How to get rid of it.', String body = '- One\n- Two\n\n## What you can do\n\nList the device.', Map<String, dynamic>? next, int minutes = 2}) => {
+      'slug': slug, 'title': title, 'topic': 'safe-disposal', 'summary': summary, 'body': body, 'readMinutes': minutes, 'featured': false, if (next != null) 'next': next,
+    };
+
+class FakeArticleRepository extends ArticleRepository {
+  FakeArticleRepository({List<Map<String, dynamic>>? articles, Map<String, Map<String, dynamic>>? full}) : listJson = articles ?? [articleJson()], fullJson = full ?? {'safe-disposal': articleJson(next: {'slug': 'reuse', 'title': 'Reuse and donation'})}, super(ApiClient(store: MemoryKeyValueStore()));
+
+  List<Map<String, dynamic>> listJson;
+  Map<String, Map<String, dynamic>> fullJson;
+  ApiException? error;
+  final asked = <String>[];
+
+  @override
+  Future<PageResult<Article>> list({int page = 1}) async {
+    final e = error;
+    if (e != null) throw e;
+    final rows = [for (final j in listJson) Article.fromJson(j)];
+    return PageResult(items: rows, page: 1, pages: 1, total: rows.length);
+  }
+
+  @override
+  Future<Article> get(String slug) async {
+    asked.add(slug);
+    final e = error;
+    if (e != null) throw e;
+    final j = fullJson[slug];
+    if (j == null) throw const ApiException('Article not found', failure: ApiFailure.notFound, statusCode: 404);
+    return Article.fromJson(j);
   }
 }
 class FakeImpactRepository extends ImpactRepository {

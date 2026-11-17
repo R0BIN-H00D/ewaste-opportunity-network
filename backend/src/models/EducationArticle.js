@@ -11,6 +11,8 @@ const schema = baseSchema({
   body: { type: String, required: true }, // Markdown (sanitised on render)
   cover: photoSchema,
   status: { type: String, enum: ['draft', 'published'], default: 'draft' },
+  publishedAt: Date, // the first time it was published; later edits do not move it
+  featured: { type: Boolean, default: false }, // shown first on the learning centre
   author: { type: ObjectId, ref: 'User' },
 });
 softDelete(schema);

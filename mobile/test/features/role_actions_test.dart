@@ -50,11 +50,13 @@ void main() {
     expect(student['Certificates'], Routes.experience);
   });
 
-  test('everyone who can chat has Messages as the last tile, and administrators do not', () {
+  test('everyone who can chat has Messages, then the Learning centre, as the last tiles, and administrators do not', () {
     for (final role in UserRole.values.where((r) => r != UserRole.admin)) {
       final actions = actionsFor(role);
-      expect(actions.last.title, 'Messages', reason: role.name);
-      expect(actions.last.route, Routes.messages, reason: role.name);
+      expect(actions.last.title, 'Learning centre', reason: role.name);
+      expect(actions.last.route, Routes.learn, reason: role.name);
+      expect(actions[actions.length - 2].title, 'Messages', reason: role.name);
+      expect(actions[actions.length - 2].route, Routes.messages, reason: role.name);
       expect(actions.where((a) => a.title == 'Messages'), hasLength(1), reason: role.name);
     }
     expect(actionsFor(UserRole.admin).where((a) => a.title == 'Messages'), isEmpty);

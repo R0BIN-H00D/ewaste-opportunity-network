@@ -37,9 +37,10 @@ String pickupRoute(PickupItem p) {
 
 /// "Confirmed", "Moved", ...: where the pickup stands, or "Time passed" when it never happened. [now] is for tests.
 String pickupStatusLabel(PickupItem p, {DateTime? now}) {
-  if (const {'requested', 'confirmed', 'rescheduled'}.contains(p.status) &&
-      p.date != null &&
-      p.date!.isBefore(now ?? DateTime.now())) return 'Time passed';
+  final gone = p.date != null && p.date!.isBefore(now ?? DateTime.now());
+  if (const {'requested', 'confirmed', 'rescheduled'}.contains(p.status) && gone) {
+    return 'Time passed';
+  }
   switch (p.status) {
     case 'requested':
       return 'Waiting';

@@ -62,6 +62,7 @@ import AdminCategories from '../pages/admin/Categories';
 import AdminComplaints from '../pages/admin/Complaints';
 import AdminComplaintDetail from '../pages/admin/ComplaintDetail';
 import AdminAnnouncements from '../pages/admin/Announcements';
+import AdminEducation from '../pages/admin/Education';
 import AdminAuditLog from '../pages/admin/AuditLog';
 import AdminAnalytics from '../pages/admin/Analytics';
 import AdminCertificates from '../pages/admin/Certificates';
@@ -170,6 +171,7 @@ export const routeConfig = [
               { path: 'dashboard/admin/complaints', element: <AdminComplaints /> },
               { path: 'dashboard/admin/complaints/:id', element: <AdminComplaintDetail /> },
               { path: 'dashboard/admin/announcements', element: <AdminAnnouncements /> },
+              { path: 'dashboard/admin/education', element: <AdminEducation /> },
               { path: 'dashboard/admin/audit', element: <AdminAuditLog /> },
               { path: 'dashboard/admin/analytics', element: <AdminAnalytics /> },
               { path: 'dashboard/admin/certificates', element: <AdminCertificates /> },

@@ -286,13 +286,13 @@ async function schedulePickup(id, user, input) {
   if (request.status === 'technician_assigned') {
     pickup = await PickupSchedule.create({
       contextType: 'service', contextId: request._id, requester: request.customer, provider: request.technician,
-      date: input.date, timeSlot: input.timeSlot, notes: input.notes, addressArea: listing?.addressArea, exactAddressShared: true, status: 'confirmed',
+      date: input.date, timeSlot: input.timeSlot, notes: input.notes, addressArea: listing?.addressArea, exactAddressShared: true, status: 'confirmed', proposedBy: user.id,
     });
     await applyTransition(request, 'device_collection_pending', role, { by: user.id, note: 'Pickup scheduled', set: { pickup: pickup._id } });
   } else if (request.status === 'device_collection_pending') {
     pickup = await PickupSchedule.findById(request.pickup);
     if (!pickup) throw ApiError.notFound('Pickup not found');
-    await reschedule(pickup, input, 'pickup');
+    await reschedule(pickup, input, 'pickup', user.id);
   } else {
     throw ApiError.conflict('A pickup cannot be scheduled at this stage', 'INVALID_TRANSITION');
   }

@@ -160,7 +160,7 @@ Map<String, dynamic> slotDayJson(String date, {Set<int> open = const {0, 1, 2, 3
   };
 }
 
-Map<String, dynamic> pickupJson({String id = 'pk1', String kind = 'repair', String title = 'Dell Inspiron', String status = 'confirmed', DateTime? date, String timeSlot = '10:00-12:00', int count = 0, bool canChange = true, String viewer = 'requester'}) => {
+Map<String, dynamic> pickupJson({String id = 'pk1', String kind = 'repair', String title = 'Dell Inspiron', String status = 'confirmed', DateTime? date, String timeSlot = '10:00-12:00', int count = 0, bool canChange = true, String viewer = 'requester', bool awaitingMe = false, bool proposedByMe = false}) => {
       '_id': id,
       'kind': kind,
       'contextId': 'ctx-$id',
@@ -176,6 +176,8 @@ Map<String, dynamic> pickupJson({String id = 'pk1', String kind = 'repair', Stri
       'canChange': canChange,
       'viewerRole': viewer,
       'counterpart': {'_id': 'u2', 'name': 'Ravi Kumar'},
+      'awaitingMe': awaitingMe,
+      'proposedByMe': proposedByMe,
     };
 
 class FakePickupRepository extends PickupRepository {
@@ -191,6 +193,17 @@ class FakePickupRepository extends PickupRepository {
   ApiException? slotsError;
   ApiException? listError;
   int slotCalls = 0;
+  ApiException? confirmError;
+  final confirmed = <String>[];
+
+  @override
+  Future<void> confirm(String id) async {
+    final e = confirmError;
+    if (e != null) throw e;
+    confirmed.add(id);
+    // The server would now say it is settled.
+    upcomingJson = [for (final j in upcomingJson) j['_id'] == id ? {...j, 'status': 'confirmed', 'awaitingMe': false} : j];
+  }
   final asked = <bool>[];
 
   @override

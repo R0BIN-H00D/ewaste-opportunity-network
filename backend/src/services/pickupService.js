@@ -11,6 +11,8 @@ const User = require('../models/User');
 const { parsePagination, buildMeta } = require('../utils/pagination');
 const { MAX_RESCHEDULES, RESCHEDULE_CUTOFF_MS } = require('./pickupRules');
 const { SLOTS, SLOT_DAYS, IST_OFFSET_MS, slotStart, istDay } = require('../config/pickupSlots');
+const ApiError = require('../utils/ApiError');
+const { notify } = require('./notificationService');
 
 const ACTIVE = ['requested', 'confirmed', 'rescheduled'];
 const idOf = (v) => String(v && v._id ? v._id : v);
@@ -75,6 +77,9 @@ async function listPickups(user, query = {}) {
       changeableUntil: new Date(p.date.getTime() - RESCHEDULE_CUTOFF_MS),
       canChange: ACTIVE.includes(p.status) && (p.rescheduleCount || 0) < MAX_RESCHEDULES && p.date.getTime() - now.getTime() >= RESCHEDULE_CUTOFF_MS,
       viewerRole: asRequester ? 'requester' : 'provider',
+      // A time somebody else set or changed, waiting for this person to confirm it (or to answer with a new time).
+      awaitingMe: ['requested', 'rescheduled'].includes(p.status) && Boolean(p.proposedBy) && idOf(p.proposedBy) !== user.id,
+      proposedByMe: Boolean(p.proposedBy) && idOf(p.proposedBy) === user.id,
       counterpart: { _id: otherId, name: people.get(otherId) || '' },
     };
   });
@@ -114,4 +119,25 @@ async function listSlots(user, now = new Date()) {
   return { timezone: 'Asia/Kolkata', cutoffHours: RESCHEDULE_CUTOFF_MS / 3600000, maxReschedules: MAX_RESCHEDULES, days };
 }
 
-module.exports = { listPickups, listSlots };
+/**
+ * The other side accepts the time that was set or changed (FR-PICK-002). Only the person who did NOT propose it can, only while
+ * it is waiting, and not after it has passed. To suggest another time instead, they use the request's own "reschedule".
+ */
+async function confirmPickup(user, id, now = new Date()) {
+  const p = await PickupSchedule.findById(id);
+  if (!p || ![idOf(p.requester), idOf(p.provider)].includes(user.id)) throw ApiError.notFound('Pickup not found');
+  if (!['requested', 'rescheduled'].includes(p.status)) throw ApiError.conflict('This time does not need confirming', 'NOT_AWAITING');
+  if (p.proposedBy && idOf(p.proposedBy) === user.id) throw ApiError.conflict('You suggested this time; the other person confirms it', 'OWN_PROPOSAL');
+  if (p.date.getTime() <= now.getTime()) throw ApiError.conflict('This time has already passed', 'TIME_PASSED');
+  const done = await PickupSchedule.findOneAndUpdate({ _id: p._id, status: p.status }, { $set: { status: 'confirmed' } }, { new: true });
+  if (!done) throw ApiError.conflict('This pickup was just changed. Reload and try again.', 'STALE_STATE');
+  const spec = KINDS[p.contextType];
+  const proposer = p.proposedBy || (idOf(p.requester) === user.id ? p.provider : p.requester);
+  await notify(proposer, {
+    type: 'pickup.confirmed', title: 'Pickup time confirmed', body: `${p.date.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' })}${p.timeSlot ? ` (${p.timeSlot})` : ''}`,
+    data: { id: p.contextId, deepLink: spec ? spec.link(idOf(p.contextId)) : '/dashboard/pickups' },
+  });
+  return { _id: done._id, status: done.status };
+}
+
+module.exports = { listPickups, listSlots, confirmPickup };

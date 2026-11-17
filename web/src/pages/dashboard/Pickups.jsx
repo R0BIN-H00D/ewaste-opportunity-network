@@ -7,6 +7,7 @@ import ErrorState from '../../components/ui/ErrorState';
 import Pagination from '../../components/ui/Pagination';
 import Skeleton from '../../components/ui/Skeleton';
 import { useFetch } from '../../hooks/useFetch';
+import { useSave } from '../../hooks/useSave';
 import { pickupApi } from '../../services/pickupApi';
 import { formatDate } from '../../lib/requests';
 
@@ -20,8 +21,13 @@ const STATUS = {
   cancelled: ['Cancelled', 'neutral'],
 };
 
-function PickupCard({ pickup: p }) {
+function PickupCard({ pickup: p, onChanged }) {
   const [label, tone] = STATUS[p.status] || [p.status, 'neutral'];
+  const save = useSave();
+  const confirm = async () => {
+    const res = await save.run(() => pickupApi.confirm(p._id), 'Confirmed');
+    if (res.ok) onChanged();
+  };
   return (
     <GlassCard as="article" className="flex flex-wrap items-start justify-between gap-3 !p-4">
       <div className="min-w-0 space-y-1">
@@ -43,8 +49,20 @@ function PickupCard({ pickup: p }) {
               : (p.reschedulesLeft === 0 ? 'Cannot be changed again' : 'Too close to the start to change')}
           </p>
         )}
+        {p.awaitingMe && (
+          <p className="text-sm font-semibold text-warning" role="status">
+            {p.counterpart?.name || 'The other person'} suggested this time. Confirm it, or open the request to suggest another.
+          </p>
+        )}
+        {p.proposedByMe && p.status === 'rescheduled' && (
+          <p className="text-xs text-ink-muted dark:text-[#9FB2A7]">Waiting for {p.counterpart?.name || 'the other person'} to confirm this time.</p>
+        )}
+        {save.status === 'error' && <p role="alert" className="text-xs font-medium text-danger dark:text-red-300">{save.message}</p>}
       </div>
-      <Link to={p.link} className="btn btn-glass !px-3 !py-1.5 text-sm">Open</Link>
+      <div className="flex flex-wrap gap-2">
+        {p.awaitingMe && <button type="button" className="btn btn-primary !px-3 !py-1.5 text-sm" onClick={confirm} disabled={save.saving}>{save.saving ? 'Confirming…' : 'Confirm this time'}</button>}
+        <Link to={p.link} className="btn btn-glass !px-3 !py-1.5 text-sm">Open</Link>
+      </div>
     </GlassCard>
   );
 }
@@ -80,7 +98,7 @@ export default function Pickups() {
           {when === 'past' ? 'Pickups that were completed, cancelled or have gone by appear here.' : 'When a pickup, collection or handover is scheduled it appears here.'}
         </EmptyState>
       ) : (
-        <ul className={`space-y-3 ${loading ? 'opacity-60' : ''}`}>{items.map((p) => <li key={p._id}><PickupCard pickup={p} /></li>)}</ul>
+        <ul className={`space-y-3 ${loading ? 'opacity-60' : ''}`}>{items.map((p) => <li key={p._id}><PickupCard pickup={p} onChanged={reload} /></li>)}</ul>
       )}
       {data?.meta && <Pagination page={data.meta.page} pages={data.meta.pages} onChange={(n) => setParams({ ...(when === 'past' ? { when } : {}), ...(n > 1 ? { page: String(n) } : {}) })} />}
     </div>

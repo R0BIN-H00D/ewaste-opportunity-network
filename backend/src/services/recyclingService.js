@@ -228,7 +228,7 @@ async function schedulePickup(id, user, input) {
   if (request.status === 'accepted') {
     const pickup = await PickupSchedule.create({
       contextType: 'recycling', contextId: request._id, requester: idOf(request.requester), provider: request.center.user,
-      date: input.date, timeSlot: input.timeSlot, notes: input.notes, addressArea: request.pickupAddressArea, exactAddressShared: true, status: 'confirmed',
+      date: input.date, timeSlot: input.timeSlot, notes: input.notes, addressArea: request.pickupAddressArea, exactAddressShared: true, status: 'confirmed', proposedBy: user.id,
     });
     const updated = await RecyclingRecord.findOneAndUpdate(
       { _id: request._id, status: 'accepted', pickup: { $exists: false } },
@@ -241,7 +241,7 @@ async function schedulePickup(id, user, input) {
   } else {
     const pickup = await PickupSchedule.findById(idOf(request.pickup));
     if (!pickup) throw ApiError.notFound('Pickup not found');
-    await reschedule(pickup, input, 'pickup');
+    await reschedule(pickup, input, 'pickup', user.id);
   }
   await notify(idOf(request.requester), { type: 'recycling.pickup', title: 'Pickup scheduled', body: input.date.toISOString(), data: { id: request._id, deepLink: linkTo(request._id) } });
   return fetchView(id, user);

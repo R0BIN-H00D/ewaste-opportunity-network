@@ -13,9 +13,10 @@ function assertCanReschedule(pickup, noun = 'pickup', now = Date.now()) {
 }
 
 /** Checks the rules, then moves the pickup to the new time and counts the change. */
-async function reschedule(pickup, input, noun = 'pickup') {
+async function reschedule(pickup, input, noun = 'pickup', actorId) {
   assertCanReschedule(pickup, noun);
-  pickup.set({ date: input.date, timeSlot: input.timeSlot, notes: input.notes, status: 'rescheduled' });
+  // A change is a proposal: the other side confirms it (POST /api/pickups/:id/confirm) or answers with a new time.
+  pickup.set({ date: input.date, timeSlot: input.timeSlot, notes: input.notes, status: 'rescheduled', ...(actorId ? { proposedBy: actorId } : {}) });
   pickup.rescheduleCount += 1;
   await pickup.save();
   return pickup;

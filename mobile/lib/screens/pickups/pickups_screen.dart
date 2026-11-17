@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import '../../core/format.dart';
+import '../../core/network/api_exception.dart';
 import '../../models/pickup.dart';
 import '../../providers/pickup_providers.dart';
 import '../../routes/route_paths.dart';
@@ -93,15 +94,37 @@ class PickupsScreen extends ConsumerWidget {
   }
 }
 
-class _PickupCard extends StatelessWidget {
+class _PickupCard extends ConsumerStatefulWidget {
   const _PickupCard({required this.pickup});
 
   final PickupItem pickup;
 
   @override
+  ConsumerState<_PickupCard> createState() => _PickupCardState();
+}
+
+class _PickupCardState extends ConsumerState<_PickupCard> {
+  bool _busy = false;
+
+  /// Accepts the time the other side set or changed.
+  Future<void> _confirm() async {
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(pickupRepositoryProvider).confirm(widget.pickup.id);
+      await ref.read(pickupsProvider.notifier).load();
+      messenger.showSnackBar(const SnackBar(content: Text('Time confirmed')));
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final p = pickup;
+    final p = widget.pickup;
     final when = [formatDateTime(p.date), if (p.timeSlot.isNotEmpty) p.timeSlot]
         .join(' · ');
     final tone = p.status == 'collected'
@@ -168,6 +191,21 @@ class _PickupCard extends StatelessWidget {
                   if (change != null) ...[
                     const SizedBox(height: 8),
                     Text(change, style: theme.textTheme.bodySmall)
+                  ],
+                  if (p.awaitingMe) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                        '${p.counterpartName.isEmpty ? 'The other person' : p.counterpartName} suggested this time. Confirm it, or open the request to suggest another.',
+                        style: theme.textTheme.bodyMedium),
+                    const SizedBox(height: 8),
+                    FilledButton(
+                        onPressed: _busy ? null : _confirm,
+                        child: Text(_busy ? 'Confirming...' : 'Confirm this time')),
+                  ] else if (p.proposedByMe && p.status == 'rescheduled') ...[
+                    const SizedBox(height: 8),
+                    Text(
+                        'Waiting for ${p.counterpartName.isEmpty ? 'the other person' : p.counterpartName} to confirm this time.',
+                        style: theme.textTheme.bodySmall),
                   ],
                 ],
               ),

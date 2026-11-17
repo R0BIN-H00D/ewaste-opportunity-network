@@ -7,7 +7,8 @@ const db = require('./helpers/db');
 const { makeUser, authHeader, seedCategories } = require('./helpers/factories');
 const RecyclingCenter = require('../src/models/RecyclingCenter');
 const PickupSchedule = require('../src/models/PickupSchedule');
-const { assertCanReschedule, MAX_RESCHEDULES } = require('../src/services/pickupRules');
+const Notification = require('../src/models/Notification');
+const { assertCanReschedule, reschedule, MAX_RESCHEDULES } = require('../src/services/pickupRules');
 
 const app = createApp();
 let cats; let center; let centerUser; let owner; let other; let admin;
@@ -209,5 +210,100 @@ describe('what the list says about changing a pickup', () => {
     expect(used.reschedulesLeft).toBe(0);
     expect(used.canChange).toBe(false);
     expect(items.find((i) => i.rescheduleCount === 0).canChange).toBe(false);
+  });
+});
+
+describe('confirming a changed time (FR-PICK-002)', () => {
+  const move = (rec, who, days = 4) => call('post', `${REQ}/${rec._id}/pickup`, who, { date: later(days), timeSlot: '14:00-16:00' });
+  const mine = async (who) => (await list(who)).body.data[0];
+  const notifications = (who, type) => Notification.countDocuments({ user: who.id, type });
+
+  it('does not ask anyone to confirm a time that was just set when the request was accepted', async () => {
+    await scheduled();
+    expect(await mine(owner)).toMatchObject({ status: 'confirmed', awaitingMe: false, proposedByMe: false });
+    expect(await mine(centerUser)).toMatchObject({ awaitingMe: false, proposedByMe: true });
+  });
+
+  it('asks the other side to confirm a change, and the person who made it is told it is waiting', async () => {
+    const rec = await scheduled();
+    expect((await move(rec, centerUser)).status).toBe(200);
+    expect(await mine(owner)).toMatchObject({ status: 'rescheduled', awaitingMe: true, proposedByMe: false });
+    expect(await mine(centerUser)).toMatchObject({ status: 'rescheduled', awaitingMe: false, proposedByMe: true });
+  });
+
+  it('lets only the other side confirm, once, and tells the one who proposed it', async () => {
+    const rec = await scheduled();
+    await move(rec, centerUser);
+    const id = (await mine(owner))._id;
+
+    const res = await call('post', `/api/pickups/${id}/confirm`, owner);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({ _id: id, status: 'confirmed' });
+    expect(await mine(owner)).toMatchObject({ status: 'confirmed', awaitingMe: false });
+    expect(await mine(centerUser)).toMatchObject({ status: 'confirmed', proposedByMe: true });
+    expect(await notifications(centerUser, 'pickup.confirmed')).toBe(1);
+
+    const again = await call('post', `/api/pickups/${id}/confirm`, owner);
+    expect(again.status).toBe(409);
+    expect(again.body.code).toBe('NOT_AWAITING');
+    expect(await notifications(centerUser, 'pickup.confirmed')).toBe(1);
+  });
+
+  it('does not let the person who proposed a time confirm it', async () => {
+    const rec = await scheduled();
+    await move(rec, centerUser);
+    const id = (await mine(owner))._id;
+    const res = await call('post', `/api/pickups/${id}/confirm`, centerUser);
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('OWN_PROPOSAL');
+    expect((await PickupSchedule.findById(id)).status).toBe('rescheduled');
+  });
+
+  it('lets the other side answer with a new time instead (in the flows where both sides can schedule), which then waits for the first side', async () => {
+    const rec = await scheduled();
+    await move(rec, centerUser, 4);
+    // Recycling lets only the centre set times; repairs, donations and refurbishment let both, through the same shared rule.
+    const pickup = await PickupSchedule.findOne({ contextType: 'recycling' });
+    await reschedule(pickup, { date: new Date(Date.now() + 6 * day), timeSlot: '16:00-18:00' }, 'pickup', owner.id);
+    expect(await mine(centerUser)).toMatchObject({ status: 'rescheduled', awaitingMe: true, rescheduleCount: 2 });
+    expect(await mine(owner)).toMatchObject({ awaitingMe: false, proposedByMe: true });
+  });
+  it('keeps strangers, administrators and unknown pickups out with the same "not found"', async () => {
+    const rec = await scheduled();
+    await move(rec, centerUser);
+    const id = (await mine(owner))._id;
+    for (const who of [other]) {
+      const res = await call('post', `/api/pickups/${id}/confirm`, who);
+      expect(res.status).toBe(404);
+      expect(res.body.message).toBe('Pickup not found');
+    }
+    expect((await call('post', `/api/pickups/${id}/confirm`, admin)).status).toBe(403);
+    expect((await call('post', `/api/pickups/${id}/confirm`)).status).toBe(401);
+    expect((await call('post', `/api/pickups/${new mongoose.Types.ObjectId()}/confirm`, owner)).status).toBe(404);
+    expect((await call('post', '/api/pickups/not-an-id/confirm', owner)).status).toBe(404);
+    expect((await PickupSchedule.findById(id)).status).toBe('rescheduled');
+  });
+
+  it('will not confirm a time that has already passed, or a pickup that is finished', async () => {
+    const past = await direct({ date: new Date(Date.now() - 3600 * 1000), status: 'rescheduled', proposedBy: centerUser.id });
+    const res = await call('post', `/api/pickups/${past._id}/confirm`, owner);
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('TIME_PASSED');
+    const done = await direct({ status: 'collected', proposedBy: centerUser.id });
+    expect((await call('post', `/api/pickups/${done._id}/confirm`, owner)).body.code).toBe('NOT_AWAITING');
+  });
+
+  it('is safe when two confirmations arrive together: one wins, one is told it changed', async () => {
+    const rec = await scheduled();
+    await move(rec, centerUser);
+    const id = (await mine(owner))._id;
+    const [a, b] = await Promise.all([call('post', `/api/pickups/${id}/confirm`, owner), call('post', `/api/pickups/${id}/confirm`, owner)]);
+    expect([a.status, b.status].sort()).toEqual([200, 409]);
+    expect(await notifications(centerUser, 'pickup.confirmed')).toBe(1);
+  });
+
+  it('treats an old pickup that has no proposer as not waiting for anyone', async () => {
+    await direct({ status: 'rescheduled' });
+    expect(await mine(owner)).toMatchObject({ awaitingMe: false, proposedByMe: false });
   });
 });

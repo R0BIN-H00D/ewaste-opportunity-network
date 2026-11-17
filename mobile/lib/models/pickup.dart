@@ -109,6 +109,8 @@ class PickupItem {
     this.canChange = false,
     this.asRequester = true,
     this.counterpartName = '',
+    this.awaitingMe = false,
+    this.proposedByMe = false,
   });
 
   final String id;
@@ -129,6 +131,12 @@ class PickupItem {
   final bool asRequester;
   final String counterpartName;
 
+  /// The other side set or changed this time and it waits for this person to confirm it (or to suggest another).
+  final bool awaitingMe;
+
+  /// This person set or changed the time and is waiting for the other side.
+  final bool proposedByMe;
+
   factory PickupItem.fromJson(Map<String, dynamic> json) {
     final other = json['counterpart'];
     return PickupItem(
@@ -148,6 +156,8 @@ class PickupItem {
       canChange: json['canChange'] == true,
       asRequester: json['viewerRole'] != 'provider',
       counterpartName: other is Map ? (other['name'] as String? ?? '') : '',
+      awaitingMe: json['awaitingMe'] == true,
+      proposedByMe: json['proposedByMe'] == true,
     );
   }
 }

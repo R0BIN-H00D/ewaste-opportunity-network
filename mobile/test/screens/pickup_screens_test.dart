@@ -301,4 +301,46 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
-}
+
+  group('confirming a time (FR-PICK-002)', () {
+    testWidgets('asks the person to confirm a time the other side set, and confirms it', (tester) async {
+      final repo = FakePickupRepository(upcoming: [pickupJson(status: 'rescheduled', awaitingMe: true)]);
+      await _pump(tester, const PickupsScreen(), repo);
+      expect(find.textContaining('Ravi Kumar suggested this time'), findsOneWidget);
+      await tester.ensureVisible(find.text('Confirm this time'));
+      await tester.tap(find.text('Confirm this time'));
+      await _settle(tester);
+      expect(repo.confirmed, ['pk1']);
+      expect(find.text('Confirm this time'), findsNothing); // the list was fetched again and it is settled
+      expect(find.text('Confirmed'), findsOneWidget);
+      expect(find.text('Time confirmed'), findsOneWidget);
+    });
+
+    testWidgets('says the person is waiting when they suggested the time, with no button', (tester) async {
+      final repo = FakePickupRepository(upcoming: [pickupJson(status: 'rescheduled', proposedByMe: true)]);
+      await _pump(tester, const PickupsScreen(), repo);
+      expect(find.text('Waiting for Ravi Kumar to confirm this time.'), findsOneWidget);
+      expect(find.text('Confirm this time'), findsNothing);
+    });
+
+    testWidgets('shows nothing extra for a settled time', (tester) async {
+      await _pump(tester, const PickupsScreen(), FakePickupRepository());
+      expect(find.text('Confirm this time'), findsNothing);
+      expect(find.textContaining('Waiting for'), findsNothing);
+    });
+
+    testWidgets('says why a confirmation failed and keeps the button', (tester) async {
+      final repo = FakePickupRepository(upcoming: [pickupJson(status: 'rescheduled', awaitingMe: true)])..confirmError = const ApiException('This time has already passed', failure: ApiFailure.conflict, statusCode: 409);
+      await _pump(tester, const PickupsScreen(), repo);
+      await tester.ensureVisible(find.text('Confirm this time'));
+      await tester.tap(find.text('Confirm this time'));
+      await _settle(tester);
+      expect(find.text('This time has already passed'), findsOneWidget);
+      expect(find.text('Confirm this time'), findsOneWidget);
+    });
+
+    testWidgets('fits at the largest text size', (tester) async {
+      await _pump(tester, const PickupsScreen(), FakePickupRepository(upcoming: [pickupJson(status: 'rescheduled', awaitingMe: true)]), scale: 2);
+      expect(tester.takeException(), isNull);
+    });
+  });}

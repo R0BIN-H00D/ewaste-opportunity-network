@@ -202,7 +202,7 @@ async function scheduleHandover(id, user, input) {
   if (!job.pickup) {
     const pickup = await PickupSchedule.create({
       contextType: 'offer', contextId: job._id, requester: idOf(job.owner), provider: idOf(job.refurbisher),
-      date: input.date, timeSlot: input.timeSlot, notes: input.notes, addressArea: job.listing?.addressArea, exactAddressShared: true, status: 'confirmed',
+      date: input.date, timeSlot: input.timeSlot, notes: input.notes, addressArea: job.listing?.addressArea, exactAddressShared: true, status: 'confirmed', proposedBy: user.id,
     });
     const updated = await RefurbishmentJob.findOneAndUpdate({ _id: job._id, status: 'accepted', pickup: { $exists: false } }, { $set: { pickup: pickup._id } });
     if (!updated) {
@@ -212,7 +212,7 @@ async function scheduleHandover(id, user, input) {
   } else {
     const pickup = await PickupSchedule.findById(job.pickup._id || job.pickup);
     if (!pickup) throw ApiError.notFound('Handover not found');
-    await reschedule(pickup, input, 'handover');
+    await reschedule(pickup, input, 'handover', user.id);
   }
   const other = role === ACTORS.OWNER ? job.refurbisher : job.owner;
   await notify(other, { type: 'refurbishment.handover', title: 'Collection scheduled', body: input.date.toISOString(), data: { id: job._id, deepLink: linkTo(job._id) } });

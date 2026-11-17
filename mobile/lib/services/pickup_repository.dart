@@ -17,6 +17,11 @@ class PickupRepository {
             ((res.data as Map)['data'] as Map).cast<String, dynamic>());
       });
 
+  /// Accepts a time the other side set or changed. Only the person who did not propose it can; the server says why if not.
+  Future<void> confirm(String id) => guard(() async {
+        await _dio.post<dynamic>('/pickups/$id/confirm');
+      });
+
   /// [upcoming] false lists finished, cancelled and past ones.
   Future<PageResult<PickupItem>> list({bool upcoming = true, int page = 1}) =>
       guard(() async {

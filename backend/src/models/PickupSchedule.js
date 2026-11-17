@@ -12,6 +12,7 @@ const schema = baseSchema({
   addressArea: String,
   exactAddressShared: { type: Boolean, default: false }, // BR-08
   status: { type: String, enum: PICKUP_STATUS, default: 'requested' },
+  proposedBy: { type: ObjectId, ref: 'User' }, // who set or last changed the time; the other side confirms it
   rescheduleCount: { type: Number, default: 0, max: 3 },
   handoverConfirmed: new Schema({ byOwner: Date, byProvider: Date }, { _id: false }),
   checklistAcknowledgedAt: Date, // data-protection checklist (NFR-SEC-14)

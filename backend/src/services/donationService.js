@@ -326,7 +326,7 @@ async function scheduleHandover(id, user, input) {
     workflow.assertTransition('accepted', 'handover_scheduled', role);
     const pickup = await PickupSchedule.create({
       contextType: 'donation', contextId: donation._id, requester: donation.donor, provider: recipientId,
-      date: input.date, timeSlot: input.timeSlot, notes: input.notes, addressArea: donation.listing?.addressArea, exactAddressShared: true, status: 'confirmed',
+      date: input.date, timeSlot: input.timeSlot, notes: input.notes, addressArea: donation.listing?.addressArea, exactAddressShared: true, status: 'confirmed', proposedBy: user.id,
     });
     const updated = await Donation.findOneAndUpdate(
       { _id: donation._id, status: 'accepted' },
@@ -342,7 +342,7 @@ async function scheduleHandover(id, user, input) {
     }
     const pickup = await PickupSchedule.findById(donation.pickup);
     if (!pickup) throw ApiError.notFound('Handover not found');
-    await reschedule(pickup, input, 'handover');
+    await reschedule(pickup, input, 'handover', user.id);
   } else {
     throw ApiError.conflict('A handover cannot be scheduled at this stage', 'INVALID_TRANSITION');
   }

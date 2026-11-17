@@ -10,7 +10,7 @@ vi.mock('../services/deviceApi', () => ({
   deviceApi: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), setStatus: vi.fn(), remove: vi.fn() },
   reportApi: { create: vi.fn() },
 }));
-vi.mock('../services/pickupApi', () => ({ pickupApi: { list: vi.fn() } }));
+vi.mock('../services/pickupApi', () => ({ pickupApi: { list: vi.fn(), confirm: vi.fn() } }));
 vi.mock('../services/api', async (importOriginal) => ({
   ...(await importOriginal()),
   getHealth: () => Promise.resolve({ success: true, data: { db: 'connected' } }),
@@ -105,5 +105,42 @@ describe('Pickups page', () => {
     renderApp('/dashboard', signedIn(ADMIN));
     await screen.findAllByRole('link', { name: /Notifications/ });
     expect(screen.queryByRole('link', { name: /Pickups/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('Pickups page: confirming a time (FR-PICK-002)', () => {
+  const open = () => renderApp('/dashboard/pickups', signedIn(USER));
+
+  it('asks the person to confirm a time the other side set, and confirms it', async () => {
+    pickupApi.list.mockResolvedValue(page([pickup({ status: 'rescheduled', awaitingMe: true, proposedByMe: false })]));
+    pickupApi.confirm.mockResolvedValue({ _id: 'p1', status: 'confirmed' });
+    open();
+    expect(await screen.findByText(/GreenCycle Recyclers suggested this time/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm this time' }));
+    await waitFor(() => expect(pickupApi.confirm).toHaveBeenCalledWith('p1'));
+    await waitFor(() => expect(pickupApi.list).toHaveBeenCalledTimes(2)); // the list is fetched again
+  });
+
+  it('says the person who suggested a time is waiting for the other, and offers no button', async () => {
+    pickupApi.list.mockResolvedValue(page([pickup({ status: 'rescheduled', awaitingMe: false, proposedByMe: true })]));
+    open();
+    expect(await screen.findByText(/Waiting for GreenCycle Recyclers to confirm this time/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Confirm this time' })).not.toBeInTheDocument();
+  });
+
+  it('offers nothing for a time that is already settled', async () => {
+    open();
+    await screen.findByRole('heading', { name: 'Recycling request ER-1' });
+    expect(screen.queryByRole('button', { name: 'Confirm this time' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Waiting for/)).not.toBeInTheDocument();
+  });
+
+  it('shows why a confirmation failed and keeps the button', async () => {
+    pickupApi.list.mockResolvedValue(page([pickup({ status: 'rescheduled', awaitingMe: true })]));
+    pickupApi.confirm.mockRejectedValue(Object.assign(new Error('This time has already passed'), { response: { status: 409, data: { message: 'This time has already passed', code: 'TIME_PASSED' } } }));
+    open();
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm this time' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('already passed');
+    expect(screen.getByRole('button', { name: 'Confirm this time' })).toBeEnabled();
   });
 });

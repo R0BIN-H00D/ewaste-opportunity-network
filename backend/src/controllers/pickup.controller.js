@@ -9,3 +9,5 @@ exports.list = asyncHandler(async (req, res) => {
 });
 
 exports.slots = asyncHandler(async (req, res) => ok(res, await svc.listSlots(req.user)));
+
+exports.confirm = asyncHandler(async (req, res) => ok(res, await svc.confirmPickup(req.user, req.params.id), 'Time confirmed'));

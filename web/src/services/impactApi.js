@@ -11,6 +11,10 @@ export const impactApi = {
   rules: (signal) => data(api.get('/analytics/rules', { signal })),
   /** Month by month, oldest first, every month present. `scope: 'me'` limits it to the signed-in person. */
   monthly: (params, signal) => data(api.get('/analytics/monthly', { params: clean(params), signal })),
+  /** Year by year, oldest first, every year present. scope: 'me' limits it to the signed-in person. */
+  yearly: (params, signal) => data(api.get('/analytics/yearly', { params: clean(params), signal })),
+  /** Which kinds of device the impact came from, most devices first. scope: 'me' limits it to the signed-in person. */
+  byCategory: (params, signal) => data(api.get('/analytics/by-category', { params: clean(params), signal })),
   /** The signed-in person's own impact. */
   mine: (signal) => data(api.get('/analytics/user-impact', { signal })),
   /** Score, level, badges and one page of the history. */

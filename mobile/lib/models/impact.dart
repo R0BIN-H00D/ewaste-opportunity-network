@@ -207,3 +207,38 @@ class ScoringRules {
     );
   }
 }
+
+/// One bar of a breakdown: a year, or a kind of device, with how many devices and what the activity was.
+class BreakdownRow {
+  const BreakdownRow({required this.key, required this.label, this.devices = 0, this.byType = const {}});
+
+  final String key;
+  final String label;
+  final int devices;
+  final Map<String, int> byType;
+
+  /// "Repaired 4 · Recycled 3", in the usual order, leaving out kinds with nothing.
+  String get detail => [for (final e in impactTypeLabels.entries) if ((byType[e.key] ?? 0) > 0) '${e.value} ${byType[e.key]}'].join(' · ');
+
+  static Map<String, int> _types(Object? v) => {for (final e in _map(v).entries) e.key: (e.value as num?)?.toInt() ?? 0};
+
+  factory BreakdownRow.year(Map<String, dynamic> json) {
+    final year = (json['year'] as num?)?.toInt();
+    return BreakdownRow(key: '$year', label: year == null ? '' : '$year', devices: (json['devices'] as num?)?.toInt() ?? 0, byType: _types(json['byType']));
+  }
+
+  /// A row with no category is "Other": the server keeps those so the rows add up to the total.
+  factory BreakdownRow.category(Map<String, dynamic> json) {
+    final c = json['category'];
+    final category = c is Map ? c.cast<String, dynamic>() : null;
+    final name = category?['name'] as String?;
+    return BreakdownRow(
+      key: (category?['_id'] as String?) ?? 'other',
+      label: (name != null && name.isNotEmpty) ? name : 'Other',
+      devices: (json['devices'] as num?)?.toInt() ?? 0,
+      byType: _types(json['byType']),
+    );
+  }
+}
+
+bool hasActivity(List<BreakdownRow> rows) => rows.any((r) => r.devices > 0);

@@ -24,7 +24,7 @@ vi.mock('../services/deviceApi', () => ({
 }));
 vi.mock('../services/marketplaceApi', () => ({ marketApi: { list: vi.fn() }, orderApi: {} }));
 // The impact figures have their own tests (impact.test.jsx); here the landing and impact pages only need to render.
-vi.mock('../services/impactApi', () => ({ impactApi: { platform: vi.fn(), rules: vi.fn(), monthly: vi.fn(), mine: vi.fn(), score: vi.fn() } }));
+vi.mock('../services/impactApi', () => ({ impactApi: { platform: vi.fn(), rules: vi.fn(), monthly: vi.fn(), yearly: vi.fn(), byCategory: vi.fn(), mine: vi.fn(), score: vi.fn() } }));
 vi.mock('../services/api', async (importOriginal) => ({
   ...(await importOriginal()),
   getHealth: () => Promise.resolve({ success: true, data: { db: 'connected' } }),
@@ -42,6 +42,8 @@ beforeEach(() => {
   impactApi.platform.mockRejectedValue(new Error('not needed here'));
   impactApi.rules.mockRejectedValue(new Error('not needed here'));
   impactApi.monthly.mockRejectedValue(new Error('not needed here'));
+  impactApi.yearly.mockRejectedValue(new Error('not needed here'));
+  impactApi.byCategory.mockRejectedValue(new Error('not needed here'));
 });
 
 describe('public navigation', () => {

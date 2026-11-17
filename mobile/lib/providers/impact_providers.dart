@@ -38,5 +38,15 @@ final monthlyImpactProvider = FutureProvider.autoDispose<List<MonthImpact>>((ref
   return ref.watch(impactRepositoryProvider).monthly();
 });
 
+final yearlyImpactProvider = FutureProvider.autoDispose<List<BreakdownRow>>((ref) {
+  ref.watch(authControllerProvider.select((s) => s.user?.id));
+  return ref.watch(impactRepositoryProvider).yearly();
+});
+
+final categoryImpactProvider = FutureProvider.autoDispose<List<BreakdownRow>>((ref) {
+  ref.watch(authControllerProvider.select((s) => s.user?.id));
+  return ref.watch(impactRepositoryProvider).byCategory();
+});
+
 /// The public scoring rules. The same for everyone, so no sign-in is needed to read them.
 final scoringRulesProvider = FutureProvider.autoDispose<ScoringRules>((ref) => ref.watch(impactRepositoryProvider).rules());

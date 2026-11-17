@@ -260,6 +260,58 @@ async function monthly({ userId, months = 12, now = new Date() } = {}) {
   return { months: [...byMonth.values()], factorsProvisional: true, method: cfg.METHOD_NOTE };
 }
 
+/**
+ * Year by year, oldest first, every year present. Same figures as the monthly series, so the two always add up.
+ * `userId` limits it to one person; without it, the whole platform.
+ */
+async function yearly({ userId, years = 5, now = new Date() } = {}) {
+  const n = Math.min(Math.max(parseInt(years, 10) || 5, 1), 10);
+  const last = now.getUTCFullYear();
+  const keys = Array.from({ length: n }, (_, i) => last - n + 1 + i);
+  const rows = await EnvironmentalImpact.aggregate([
+    { $match: { reversedAt: null, year: { $gte: keys[0], $lte: last }, ...(userId ? { user: oid(userId) } : {}) } },
+    { $group: { _id: { y: '$year', t: '$type' }, devices: { $sum: '$devices' }, co2e: { $sum: '$co2eEstimate' }, measuredKg: { $sum: sumValues('$materials.actual') }, estimatedKg: { $sum: sumValues('$materials.estimated') } } },
+  ]);
+  const byYear = new Map(keys.map((k) => [k, { year: k, devices: 0, byType: emptyByType(), measuredKg: 0, estimatedKg: 0, co2eKgEstimated: 0 }]));
+  for (const r of rows) {
+    const bucket = byYear.get(r._id.y);
+    if (!bucket) continue;
+    bucket.byType[r._id.t] += r.devices;
+    bucket.devices += r.devices;
+    bucket.measuredKg = round2(bucket.measuredKg + (r.measuredKg || 0));
+    bucket.estimatedKg = round2(bucket.estimatedKg + (r.estimatedKg || 0));
+    bucket.co2eKgEstimated = round2(bucket.co2eKgEstimated + (r.co2e || 0));
+  }
+  return { years: [...byYear.values()], factorsProvisional: true, method: cfg.METHOD_NOTE };
+}
+
+/**
+ * Which kinds of device the impact came from, most devices first. An event recorded without a category is grouped as "Other"
+ * rather than dropped, so the rows add up to the total.
+ */
+async function byCategory({ userId } = {}) {
+  const rows = await EnvironmentalImpact.aggregate([
+    { $match: { reversedAt: null, ...(userId ? { user: oid(userId) } : {}) } },
+    { $group: { _id: { c: '$category', t: '$type' }, devices: { $sum: '$devices' }, co2e: { $sum: '$co2eEstimate' }, measuredKg: { $sum: sumValues('$materials.actual') }, estimatedKg: { $sum: sumValues('$materials.estimated') } } },
+  ]);
+  const ids = [...new Set(rows.map((r) => r._id.c).filter(Boolean).map(String))];
+  const names = new Map((await Category.find({ _id: { $in: ids } }).select('name slug').lean()).map((c) => [String(c._id), c]));
+  const groups = new Map();
+  for (const r of rows) {
+    const key = r._id.c ? String(r._id.c) : 'other';
+    const known = names.get(key);
+    const g = groups.get(key) || { category: known ? { _id: known._id, name: known.name, slug: known.slug } : null, devices: 0, byType: emptyByType(), measuredKg: 0, estimatedKg: 0, co2eKgEstimated: 0 };
+    g.byType[r._id.t] += r.devices;
+    g.devices += r.devices;
+    g.measuredKg = round2(g.measuredKg + (r.measuredKg || 0));
+    g.estimatedKg = round2(g.estimatedKg + (r.estimatedKg || 0));
+    g.co2eKgEstimated = round2(g.co2eKgEstimated + (r.co2e || 0));
+    groups.set(key, g);
+  }
+  const categories = [...groups.values()].sort((a, b) => b.devices - a.devices || String(a.category?.name || '~').localeCompare(String(b.category?.name || '~')));
+  return { categories, factorsProvisional: true, method: cfg.METHOD_NOTE };
+}
+
 /* ---------- platform-wide (public) ---------- */
 
 let cache = null;
@@ -343,4 +395,4 @@ async function rebuildAll() {
   return { added };
 }
 
-module.exports = { record, awardPoints, awardReview, reverse, greenScore, userImpact, monthly, platformImpact, rules, levelFor, statsFor, refreshBadges, rebuildAll, clearCache, factorsFor };
+module.exports = { record, awardPoints, awardReview, reverse, greenScore, userImpact, monthly, yearly, byCategory, platformImpact, rules, levelFor, statsFor, refreshBadges, rebuildAll, clearCache, factorsFor };

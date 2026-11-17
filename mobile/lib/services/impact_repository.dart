@@ -40,5 +40,19 @@ class ImpactRepository {
         return list is List ? [for (final m in list) if (m is Map) MonthImpact.fromJson(m.cast<String, dynamic>())] : const <MonthImpact>[];
       });
 
+  /// The last [years] calendar years, oldest first, every year present.
+  Future<List<BreakdownRow>> yearly({int years = 5}) => guard(() async {
+        final res = await _dio.get<dynamic>('/analytics/yearly', queryParameters: {'scope': 'me', 'years': years});
+        final list = _data(res)['years'];
+        return list is List ? [for (final y in list) if (y is Map) BreakdownRow.year(y.cast<String, dynamic>())] : const <BreakdownRow>[];
+      });
+
+  /// Which kinds of device the person's confirmed activity was about, most devices first.
+  Future<List<BreakdownRow>> byCategory() => guard(() async {
+        final res = await _dio.get<dynamic>('/analytics/by-category', queryParameters: {'scope': 'me'});
+        final list = _data(res)['categories'];
+        return list is List ? [for (final c in list) if (c is Map) BreakdownRow.category(c.cast<String, dynamic>())] : const <BreakdownRow>[];
+      });
+
   Future<ScoringRules> rules() => guard(() async => ScoringRules.fromJson(_data(await _dio.get<dynamic>('/analytics/rules'))));
 }

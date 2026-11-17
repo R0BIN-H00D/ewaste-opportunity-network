@@ -459,3 +459,87 @@ describe('rebuilding old data', () => {
     expect(await impact.rebuildAll()).toEqual({ added: 0 });
   });
 });
+
+describe('the year-by-year series', () => {
+  it('has every year with zeros where nothing happened, oldest first, and matches the monthly figures', async () => {
+    await impact.record(repairFor({ provider: undefined }));
+    await impact.record({ user: asha.id, type: 'recycling', refType: 'RecyclingRecord', refId: oid(), category: cats.laptop._id, devices: 2, materials: { actual: { copper: 2 }, estimated: { plastics: 3 } }, verifiedBy: other.id });
+    const res = await get('/yearly', null, { years: 3 });
+    expect(res.status).toBe(200);
+    const years = res.body.data.years;
+    const thisYear = new Date().getUTCFullYear();
+    expect(years.map((y) => y.year)).toEqual([thisYear - 2, thisYear - 1, thisYear]);
+    expect(years.slice(0, 2).every((y) => y.devices === 0)).toBe(true);
+    expect(years.at(-1)).toMatchObject({ devices: 3, byType: { repair: 1, recycling: 2 }, measuredKg: 2, estimatedKg: 3 });
+    expect(res.headers['cache-control']).toMatch(/public/);
+    const monthSum = (await get('/monthly', null, { months: 12 })).body.data.months.reduce((t, m) => t + m.devices, 0);
+    expect(monthSum).toBe(years.at(-1).devices); // everything recorded this year is in the last twelve months
+  });
+
+  it('puts an event in the year it was verified, not the year it is read', async () => {
+    await EnvironmentalImpact.create({ user: asha.id, type: 'repair', refType: 'ServiceRequest', refId: oid(), category: cats.laptop._id, devices: 1, verifiedAt: new Date(Date.UTC(2024, 5, 15)) });
+    const res = await get('/yearly', null, { years: 10 });
+    expect(res.body.data.years.find((y) => y.year === 2024).devices).toBe(1);
+    expect(res.body.data.years).toHaveLength(10);
+  });
+
+  it('defaults to five years, and refuses a silly range or an unknown option', async () => {
+    expect((await get('/yearly')).body.data.years).toHaveLength(5);
+    expect((await get('/yearly', null, { years: 0 })).status).toBe(422);
+    expect((await get('/yearly', null, { years: 11 })).status).toBe(422);
+    expect((await get('/yearly', null, { colour: 'red' })).status).toBe(422);
+  });
+
+  it('shows only my own events for scope=me, and needs a sign-in for it', async () => {
+    await impact.record(repairFor({ provider: undefined }));
+    await impact.record({ user: other.id, type: 'donation', refType: 'Donation', refId: oid(), category: cats.laptop._id, devices: 5, verifiedBy: asha.id });
+    expect((await get('/yearly', null, { scope: 'me' })).status).toBe(401);
+    const mine = await get('/yearly', asha, { scope: 'me', years: 1 });
+    expect(mine.body.data.years[0].devices).toBe(1);
+    expect(mine.headers['cache-control'] || '').not.toMatch(/public/);
+    expect((await get('/yearly', asha, { years: 1 })).body.data.years[0].devices).toBe(6);
+  });
+
+  it('leaves out an activity that was reversed', async () => {
+    const refId = oid();
+    await impact.record(repairFor({ refId, provider: undefined }));
+    await impact.reverse({ refType: 'ServiceRequest', refId });
+    expect((await get('/yearly', null, { years: 1 })).body.data.years[0].devices).toBe(0);
+  });
+});
+
+describe('the breakdown by kind of device', () => {
+  it('groups by category, most devices first, and the rows add up to the total', async () => {
+    await impact.record(repairFor());
+    await impact.record({ user: asha.id, type: 'donation', refType: 'Donation', refId: oid(), category: cats.laptop._id, devices: 2, verifiedBy: other.id });
+    await impact.record({ user: other.id, type: 'recycling', refType: 'RecyclingRecord', refId: oid(), category: cats.smartphone._id, devices: 5, materials: { actual: { copper: 1.5 }, estimated: {} }, verifiedBy: asha.id });
+    const res = await get('/by-category');
+    expect(res.status).toBe(200);
+    const rows = res.body.data.categories;
+    expect(rows.map((r) => [r.category.slug, r.devices])).toEqual([['smartphone', 5], ['laptop', 3]]);
+    expect(rows[1].byType).toMatchObject({ repair: 1, donation: 2 });
+    expect(rows[0].measuredKg).toBe(1.5);
+    expect(rows.reduce((t, r) => t + r.devices, 0)).toBe((await get('/user-impact', asha)).body.data.devices.total + 5);
+    expect(res.headers['cache-control']).toMatch(/public/);
+  });
+
+  it('keeps an activity with no category as "Other" so nothing is dropped', async () => {
+    await impact.record(repairFor({ category: undefined, provider: undefined }));
+    const rows = (await get('/by-category')).body.data.categories;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ category: null, devices: 1 });
+  });
+
+  it('shows only my own for scope=me, needs a sign-in for it, and checks its query', async () => {
+    await impact.record(repairFor({ provider: undefined }));
+    await impact.record({ user: other.id, type: 'donation', refType: 'Donation', refId: oid(), category: cats.smartphone._id, devices: 4, verifiedBy: asha.id });
+    expect((await get('/by-category', null, { scope: 'me' })).status).toBe(401);
+    const mine = (await get('/by-category', asha, { scope: 'me' })).body.data.categories;
+    expect(mine.map((r) => r.category.slug)).toEqual(['laptop']);
+    expect((await get('/by-category', null, { months: 3 })).status).toBe(422);
+  });
+
+  it('is empty, not an error, when nothing has happened', async () => {
+    expect((await get('/by-category')).body.data.categories).toEqual([]);
+  });
+});

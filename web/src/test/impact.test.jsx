@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { categoryItems, hasValues, yearlyItems } from '../lib/impact';
 import { impactApi } from '../services/impactApi';
 import GreenRing from '../components/impact/GreenRing';
 import ImpactStrip from '../components/impact/ImpactStrip';
@@ -19,7 +20,7 @@ vi.mock('../services/chatApi', () => ({
 vi.mock('../services/realtime', () => ({
   connectRealtime: vi.fn(), disconnectRealtime: vi.fn(), emitRealtime: vi.fn(), isRealtimeConnected: () => true, onRealtime: () => () => {}, onRealtimeStatus: () => () => {},
 }));
-vi.mock('../services/impactApi', () => ({ impactApi: { platform: vi.fn(), rules: vi.fn(), monthly: vi.fn(), mine: vi.fn(), score: vi.fn() } }));
+vi.mock('../services/impactApi', () => ({ impactApi: { platform: vi.fn(), rules: vi.fn(), monthly: vi.fn(), yearly: vi.fn(), byCategory: vi.fn(), mine: vi.fn(), score: vi.fn() } }));
 vi.mock('../services/deviceApi', () => ({
   categoryApi: { list: vi.fn().mockResolvedValue([]) },
   deviceApi: { list: vi.fn().mockResolvedValue({ items: [], meta: { total: 0, page: 1, pages: 1, limit: 12 } }), get: vi.fn(), create: vi.fn(), update: vi.fn(), setStatus: vi.fn(), remove: vi.fn() },
@@ -78,6 +79,8 @@ beforeEach(() => {
   impactApi.platform.mockResolvedValue(platform());
   impactApi.rules.mockResolvedValue(rules());
   impactApi.monthly.mockResolvedValue({ months: months(), factorsProvisional: true, method: 'm' });
+  impactApi.yearly.mockResolvedValue({ years: [{ year: 2025, devices: 0, byType: {} }, { year: 2026, devices: 7, byType: { repair: 4, recycling: 3 } }], factorsProvisional: true, method: 'm' });
+  impactApi.byCategory.mockResolvedValue({ categories: [{ category: { _id: 'c1', name: 'Laptop', slug: 'laptop' }, devices: 5, byType: { repair: 4, donation: 1 } }, { category: null, devices: 2, byType: { recycling: 2 } }], factorsProvisional: true, method: 'm' });
   impactApi.mine.mockResolvedValue(mine());
   impactApi.score.mockResolvedValue(score());
 });
@@ -306,5 +309,47 @@ describe('my Green Score page', () => {
     open({ ...USER, role: 'admin' });
     await screen.findByRole('heading', { name: 'Green Score' });
     expect(within(screen.getByRole('complementary', { name: 'Dashboard navigation' })).queryByRole('link', { name: /Green Score/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('the year-by-year and by-device breakdowns', () => {
+  it('turns the series into bar rows with what each was made of', () => {
+    expect(yearlyItems([{ year: 2026, devices: 7, byType: { repair: 4, recycling: 3 } }])).toEqual([{ key: '2026', label: '2026', value: 7, detail: 'Repaired 4 · Recycled 3' }]);
+    expect(categoryItems([{ category: { _id: 'c1', name: 'Laptop' }, devices: 5, byType: { repair: 5 } }, { category: null, devices: 1, byType: {} }])).toEqual([
+      { key: 'c1', label: 'Laptop', value: 5, detail: 'Repaired 5' },
+      { key: 'other', label: 'Other', value: 1, detail: '' },
+    ]);
+    expect(hasValues(yearlyItems([{ year: 2026, devices: 0, byType: {} }]))).toBe(false);
+    expect(hasValues([])).toBe(false);
+  });
+
+  it('shows both on the public page, with every number as text', async () => {
+    renderApp('/impact', anonymous());
+    const year = await screen.findByRole('region', { name: 'Year by year' });
+    expect(within(year).getByText('2026')).toBeInTheDocument();
+    expect(within(year).getByText('Repaired 4 · Recycled 3')).toBeInTheDocument();
+    const kinds = screen.getByRole('region', { name: 'By kind of device' });
+    expect(within(kinds).getByText('Laptop')).toBeInTheDocument();
+    expect(within(kinds).getByText('Other')).toBeInTheDocument();
+    expect(impactApi.yearly).toHaveBeenCalledWith({ years: 5 }, expect.anything());
+    expect(impactApi.byCategory).toHaveBeenCalledWith({}, expect.anything());
+  });
+
+  it('leaves them out when nothing has been confirmed, or when they cannot be loaded', async () => {
+    impactApi.yearly.mockResolvedValue({ years: [{ year: 2026, devices: 0, byType: {} }] });
+    impactApi.byCategory.mockRejectedValue(apiError('down'));
+    renderApp('/impact', anonymous());
+    await screen.findByRole('heading', { name: 'Environmental impact' });
+    await waitFor(() => expect(impactApi.byCategory).toHaveBeenCalled());
+    expect(screen.queryByRole('region', { name: 'Year by year' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'By kind of device' })).not.toBeInTheDocument();
+  });
+
+  it('shows my own on my Green Score page, asking for my scope only', async () => {
+    renderApp('/dashboard/impact', signedIn(USER));
+    expect(await screen.findByRole('region', { name: 'Year by year' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'By kind of device' })).toBeInTheDocument();
+    expect(impactApi.yearly).toHaveBeenCalledWith({ scope: 'me', years: 5 }, expect.anything());
+    expect(impactApi.byCategory).toHaveBeenCalledWith({ scope: 'me' }, expect.anything());
   });
 });

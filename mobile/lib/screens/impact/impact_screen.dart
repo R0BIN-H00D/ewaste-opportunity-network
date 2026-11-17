@@ -21,6 +21,8 @@ class ImpactScreen extends ConsumerWidget {
     ref.invalidate(greenScoreProvider);
     ref.invalidate(impactSummaryProvider);
     ref.invalidate(monthlyImpactProvider);
+    ref.invalidate(yearlyImpactProvider);
+    ref.invalidate(categoryImpactProvider);
     await ref.read(ledgerProvider.notifier).load();
   }
 
@@ -29,6 +31,8 @@ class ImpactScreen extends ConsumerWidget {
     final score = ref.watch(greenScoreProvider);
     final summary = ref.watch(impactSummaryProvider);
     final monthly = ref.watch(monthlyImpactProvider);
+    final yearly = ref.watch(yearlyImpactProvider);
+    final categories = ref.watch(categoryImpactProvider);
 
     return RefreshIndicator(
       onRefresh: () => _refresh(ref),
@@ -56,6 +60,15 @@ class ImpactScreen extends ConsumerWidget {
             error: (e, _) => ErrorState(error: ApiException.from(e), onRetry: () => ref.invalidate(monthlyImpactProvider)),
             data: (months) => _MonthlyCard(months: months),
           ),
+          // These two are extras: when they cannot be loaded, or there is nothing yet, they are simply left out.
+          if (yearly.valueOrNull != null && hasActivity(yearly.valueOrNull!)) ...[
+            const SizedBox(height: 16),
+            _BarsCard(title: 'Year by year', subtitle: 'Devices kept in use each year. Counts of real, confirmed activity.', rows: yearly.valueOrNull!),
+          ],
+          if (categories.valueOrNull != null && hasActivity(categories.valueOrNull!)) ...[
+            const SizedBox(height: 16),
+            _BarsCard(title: 'By kind of device', subtitle: 'Which devices your confirmed activity was about.', rows: categories.valueOrNull!),
+          ],
           const SizedBox(height: 16),
           const _HistoryCard(),
           const SizedBox(height: 16),
@@ -410,6 +423,52 @@ class _RulesCard extends ConsumerWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// A short list of bars: a name, a bar as long as its count, the count, and what the activity was. Plain widgets, so every number
+/// is real text that a screen reader reads in order; the bar is only a picture of it.
+class _BarsCard extends StatelessWidget {
+  const _BarsCard({required this.title, required this.subtitle, required this.rows});
+
+  final String title;
+  final String subtitle;
+  final List<BreakdownRow> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final peak = rows.fold<int>(1, (hi, r) => r.devices > hi ? r.devices : hi);
+    return GlassContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Semantics(header: true, child: Text(title, style: theme.textTheme.titleLarge)),
+          Text(subtitle, style: theme.textTheme.bodyMedium),
+          const SizedBox(height: 12),
+          for (final r in rows)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Semantics(
+                label: '${r.label}: ${r.devices} ${r.devices == 1 ? 'device' : 'devices'}${r.detail.isEmpty ? '' : ', ${r.detail}'}',
+                excludeSemantics: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Expanded(child: Text(r.label, style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600))),
+                      Text('${r.devices}', style: theme.textTheme.bodyLarge),
+                    ]),
+                    const SizedBox(height: 4),
+                    ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: r.devices / peak, minHeight: 8)),
+                    if (r.detail.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text(r.detail, style: theme.textTheme.bodySmall)),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

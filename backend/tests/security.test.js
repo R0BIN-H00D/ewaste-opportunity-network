@@ -49,6 +49,7 @@ const PUBLIC = new Set([
   'GET /api/announcements', 'POST /api/contact',
   'GET /api/analytics/platform-impact', 'GET /api/analytics/rules',
   'GET /api/analytics/monthly', // the platform-wide months are public; `scope=me` needs a login (checked below)
+  'GET /api/analytics/yearly', 'GET /api/analytics/by-category', // the same: platform-wide is public, `scope=me` needs a login
 ]);
 
 let admin; let user;
@@ -101,6 +102,10 @@ describe('signed-out callers', () => {
   it('keeps the personal scope of a public route behind a login', async () => {
     expect((await request(app).get('/api/analytics/monthly?scope=me')).status).toBe(401);
     expect((await request(app).get('/api/analytics/monthly')).status).toBe(200);
+    for (const path of ['yearly', 'by-category']) {
+      expect((await request(app).get(`/api/analytics/${path}?scope=me`)).status).toBe(401);
+      expect((await request(app).get(`/api/analytics/${path}`)).status).toBe(200);
+    }
   });
 
   it('every public route that is listed really exists', () => {

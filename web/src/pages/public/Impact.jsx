@@ -9,8 +9,9 @@ import { Tile } from '../../components/impact/Tiles';
 import RulesList from '../../components/impact/RulesList';
 import { useFetch } from '../../hooks/useFetch';
 import { impactApi } from '../../services/impactApi';
+import BarList from '../../components/impact/BarList';
 import { kg, number } from '../../lib/analytics';
-import { TYPE_ORDER, monthlyColumns, monthlyRows, monthlyTable, typeSeries } from '../../lib/impact';
+import { TYPE_ORDER, categoryItems, hasValues, monthlyColumns, monthlyRows, monthlyTable, typeSeries, yearlyItems } from '../../lib/impact';
 
 /**
  * What the platform has achieved. Every figure comes from recorded, verified activity (FR-IMP-006), counted devices are marked
@@ -19,6 +20,8 @@ import { TYPE_ORDER, monthlyColumns, monthlyRows, monthlyTable, typeSeries } fro
 export default function ImpactPage() {
   const platform = useFetch((signal) => impactApi.platform(signal), []);
   const monthly = useFetch((signal) => impactApi.monthly({ months: 12 }, signal), []);
+  const yearly = useFetch((signal) => impactApi.yearly({ years: 5 }, signal), []);
+  const categories = useFetch((signal) => impactApi.byCategory({}, signal), []);
   const d = platform.data;
 
   return (
@@ -83,6 +86,9 @@ export default function ImpactPage() {
           <MonthlyBars data={monthlyRows(monthly.data.months)} series={typeSeries.filter((s) => TYPE_ORDER.includes(s.key))} stacked />
         </ChartCard>
       )}
+
+      {yearly.data && hasValues(yearlyItems(yearly.data.years)) && <BarList title="Year by year" summary="Devices kept in use each year, from confirmed activity only." items={yearlyItems(yearly.data.years)} />}
+      {categories.data && hasValues(categoryItems(categories.data.categories)) && <BarList title="By kind of device" summary="Which devices the confirmed activity was about." items={categoryItems(categories.data.categories)} />}
 
       <RulesList />
       {d && <p className="text-xs text-ink-muted dark:text-[#9FB2A7]">{d.method}</p>}

@@ -33,3 +33,22 @@ export const badgeProgress = (b) => {
 
 /** True when nothing has been recorded at all, so a page can say so instead of showing a wall of zeros. */
 export const isEmptyImpact = (d) => !d || ((d.devices?.diverted ?? d.devices?.total ?? 0) === 0 && (d.materials?.measuredKg ?? 0) === 0 && (d.materials?.estimatedKg ?? 0) === 0);
+
+/** The yearly series as rows for a bar list: one bar per year, with what it was made of. */
+export const yearlyItems = (years = []) => years.map((y) => ({
+  key: String(y.year),
+  label: String(y.year),
+  value: y.devices || 0,
+  detail: TYPE_ORDER.filter((t) => y.byType?.[t] > 0).map((t) => `${TYPE_LABEL[t]} ${y.byType[t]}`).join(' · '),
+}));
+
+/** The category breakdown as rows for a bar list. A row with no category is "Other". */
+export const categoryItems = (categories = []) => categories.map((c) => ({
+  key: c.category?._id || 'other',
+  label: c.category?.name || 'Other',
+  value: c.devices || 0,
+  detail: TYPE_ORDER.filter((t) => c.byType?.[t] > 0).map((t) => `${TYPE_LABEL[t]} ${c.byType[t]}`).join(' · '),
+}));
+
+/** Whether a list of bar rows has anything to show. */
+export const hasValues = (items = []) => items.some((i) => i.value > 0);

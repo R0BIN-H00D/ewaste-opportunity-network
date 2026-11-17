@@ -10,8 +10,9 @@ import RulesList from '../../components/impact/RulesList';
 import { Tile } from '../../components/impact/Tiles';
 import { useFetch } from '../../hooks/useFetch';
 import { impactApi } from '../../services/impactApi';
+import BarList from '../../components/impact/BarList';
 import { kg, number } from '../../lib/analytics';
-import { TYPE_LABEL, TYPE_ORDER, badgeProgress, monthlyColumns, monthlyRows, monthlyTable, nextLevelText, signedPoints, typeSeries } from '../../lib/impact';
+import { TYPE_LABEL, TYPE_ORDER, badgeProgress, categoryItems, hasValues, monthlyColumns, monthlyRows, monthlyTable, nextLevelText, signedPoints, typeSeries, yearlyItems } from '../../lib/impact';
 import { toApiError } from '../../utils/errors';
 
 const when = (v) => (v ? new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium' }).format(new Date(v)) : '');
@@ -22,6 +23,8 @@ export default function ImpactDashboard() {
   const [ledger, setLedger] = useState({ items: [], page: 1, pages: 1, loadingMore: false });
   const mine = useFetch((signal) => impactApi.mine(signal), []);
   const monthly = useFetch((signal) => impactApi.monthly({ scope: 'me', months: 12 }, signal), []);
+  const yearly = useFetch((signal) => impactApi.yearly({ scope: 'me', years: 5 }, signal), []);
+  const categories = useFetch((signal) => impactApi.byCategory({ scope: 'me' }, signal), []);
 
   const load = useCallback(async () => {
     setScore((s) => ({ ...s, loading: s.data === null, error: null }));
@@ -117,6 +120,9 @@ export default function ImpactDashboard() {
           <MonthlyBars data={monthlyRows(monthly.data.months)} series={typeSeries} stacked />
         </ChartCard>
       )}
+
+      {yearly.data && hasValues(yearlyItems(yearly.data.years)) && <BarList title="Year by year" summary="Devices kept in use each year: counts of confirmed activity." items={yearlyItems(yearly.data.years)} />}
+      {categories.data && hasValues(categoryItems(categories.data.categories)) && <BarList title="By kind of device" summary="Which devices your confirmed activity was about." items={categoryItems(categories.data.categories)} />}
 
       <GlassCard as="section" aria-labelledby="history-h" className="space-y-3">
         <h2 id="history-h" className="text-lg font-bold text-ink dark:text-white">How you earned it</h2>

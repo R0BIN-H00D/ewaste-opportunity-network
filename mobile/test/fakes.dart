@@ -326,6 +326,31 @@ class FakeImpactRepository extends ImpactRepository {
     return monthList;
   }
 
+  /// What the year and kind-of-device bars show. Tests change these, or set [breakdownError] to see them left out.
+  List<BreakdownRow> yearRows = const [
+    BreakdownRow(key: '2025', label: '2025', devices: 0),
+    BreakdownRow(key: '2026', label: '2026', devices: 7, byType: {'repair': 4, 'recycling': 3}),
+  ];
+  List<BreakdownRow> categoryRows = const [
+    BreakdownRow(key: 'c1', label: 'Laptop', devices: 5, byType: {'repair': 4, 'donation': 1}),
+    BreakdownRow(key: 'other', label: 'Other', devices: 2, byType: {'recycling': 2}),
+  ];
+  ApiException? breakdownError;
+
+  @override
+  Future<List<BreakdownRow>> yearly({int years = 5}) async {
+    final e = breakdownError ?? error;
+    if (e != null) throw e;
+    return yearRows;
+  }
+
+  @override
+  Future<List<BreakdownRow>> byCategory() async {
+    final e = breakdownError ?? error;
+    if (e != null) throw e;
+    return categoryRows;
+  }
+
   @override
   Future<ScoringRules> rules() async => const ScoringRules(
         rules: [ScoringRule(key: 'repair_completed', points: 50, label: 'A repair you asked for was completed', who: 'the person who asked')],

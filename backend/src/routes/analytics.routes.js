@@ -10,6 +10,8 @@ const ctrl = require('../controllers/analytics.controller');
 router.get('/platform-impact', ctrl.platformImpact);
 router.get('/rules', ctrl.rules);
 router.get('/monthly', optionalAuth, validate({ query: v.monthlyQuery }), ctrl.monthly);
+router.get('/yearly', optionalAuth, validate({ query: v.yearlyQuery }), ctrl.yearly);
+router.get('/by-category', optionalAuth, validate({ query: v.categoryQuery }), ctrl.byCategory);
 router.get('/user-impact', authenticate, ctrl.userImpact);
 router.get('/green-score', authenticate, validate({ query: v.scoreQuery }), ctrl.greenScore);
 

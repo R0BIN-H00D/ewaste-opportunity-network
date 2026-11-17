@@ -6,9 +6,11 @@ import 'package:ewaste_opportunity/models/listing.dart';
 import 'package:ewaste_opportunity/providers/ai_providers.dart';
 import 'package:ewaste_opportunity/providers/core_providers.dart';
 import 'package:ewaste_opportunity/providers/listings_controller.dart';
+import 'package:ewaste_opportunity/providers/location_providers.dart';
 import 'package:ewaste_opportunity/providers/photo_providers.dart';
 import 'package:ewaste_opportunity/routes/route_paths.dart';
 import 'package:ewaste_opportunity/screens/devices/new_listing_screen.dart';
+import 'package:ewaste_opportunity/services/location_service.dart';
 import 'package:ewaste_opportunity/services/photo_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -22,7 +24,7 @@ const _good = PickedPhoto(path: '/none/front.jpg', name: 'front.jpg', mime: 'ima
 const _gif = PickedPhoto(path: '/none/fun.gif', name: 'fun.gif', mime: 'image/gif', bytes: 2000);
 const _huge = PickedPhoto(path: '/none/big.jpg', name: 'big.jpg', mime: 'image/jpeg', bytes: 6 * 1024 * 1024);
 
-Future<void> _pump(WidgetTester tester, FakeDeviceRepository repo, FakePhotoPicker picker, {FakeAiRepository? ai}) async {
+Future<void> _pump(WidgetTester tester, FakeDeviceRepository repo, FakePhotoPicker picker, {FakeAiRepository? ai, FakeLocationService? phone, FakeGeoRepository? geo}) async {
   tester.view.physicalSize = const Size(900, 2600);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -44,6 +46,8 @@ Future<void> _pump(WidgetTester tester, FakeDeviceRepository repo, FakePhotoPick
         deviceRepositoryProvider.overrideWithValue(repo),
         photoPickerProvider.overrideWithValue(picker),
         aiRepositoryProvider.overrideWithValue(ai ?? FakeAiRepository()),
+        geoRepositoryProvider.overrideWithValue(geo ?? FakeGeoRepository()),
+        if (phone != null) locationServiceProvider.overrideWithValue(phone),
       ],
       child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
     ),
@@ -305,5 +309,59 @@ void main() {
       await tester.enterText(find.widgetWithText(TextFormField, 'Device name'), 'Dell laptop');
       await ask(tester);
       expect(tester.takeException(), isNull);
+    });
+  });
+  group('the area and city from a spot', () {
+    Future<void> toLastStep(WidgetTester tester) async {
+      await _goToDeviceStep(tester);
+      await tester.enterText(find.widgetWithText(TextFormField, 'Device name'), 'Old router');
+      await _tap(tester, find.text('Laptops'));
+      await _tap(tester, find.text('Not working'));
+      await _tap(tester, find.widgetWithText(FilledButton, 'Next'));
+    }
+
+    Finder field(String label) => find.widgetWithText(TextFormField, label);
+    String text(WidgetTester tester, String label) => tester.widget<TextFormField>(field(label)).controller!.text;
+    Future<void> useMyLocation(WidgetTester tester) async {
+      await tester.ensureVisible(find.text('Use my location'));
+      await _tap(tester, find.text('Use my location'));
+      await tester.pump(const Duration(milliseconds: 200));
+    }
+
+    testWidgets('fills in the empty area and city from the position', (tester) async {
+      final geo = FakeGeoRepository();
+      await _pump(tester, _repo(), FakePhotoPicker(), phone: FakeLocationService.at(const GeoPoint(12.9716, 77.5946)), geo: geo);
+      await toLastStep(tester);
+      await useMyLocation(tester);
+      expect(geo.asked.single, (12.9716, 77.5946));
+      expect(text(tester, 'Area or neighbourhood (optional)'), 'Indiranagar');
+      expect(text(tester, 'City (optional)'), 'Bengaluru');
+    });
+
+    testWidgets('never replaces what the person typed', (tester) async {
+      await _pump(tester, _repo(), FakePhotoPicker(), phone: FakeLocationService.at(const GeoPoint(12.9716, 77.5946)));
+      await toLastStep(tester);
+      await tester.enterText(field('Area or neighbourhood (optional)'), 'My own area');
+      await useMyLocation(tester);
+      expect(text(tester, 'Area or neighbourhood (optional)'), 'My own area');
+      expect(text(tester, 'City (optional)'), 'Bengaluru');
+    });
+
+    testWidgets('carries on quietly when the address service cannot be reached, or knows nothing', (tester) async {
+      final geo = FakeGeoRepository()..error = const ApiException('Address search is unavailable', failure: ApiFailure.server, statusCode: 503);
+      await _pump(tester, _repo(), FakePhotoPicker(), phone: FakeLocationService.at(const GeoPoint(12.9716, 77.5946)), geo: geo);
+      await toLastStep(tester);
+      await useMyLocation(tester);
+      expect(text(tester, 'Area or neighbourhood (optional)'), isEmpty);
+      expect(text(tester, 'City (optional)'), isEmpty);
+      expect(tester.takeException(), isNull);
+      expect(find.text('Address search is unavailable'), findsNothing); // optional help says nothing when it fails
+    });
+
+    testWidgets('leaves the fields alone for a spot nothing is known about', (tester) async {
+      await _pump(tester, _repo(), FakePhotoPicker(), phone: FakeLocationService.at(const GeoPoint(0.001, 0.001)), geo: FakeGeoRepository(place: null));
+      await toLastStep(tester);
+      await useMyLocation(tester);
+      expect(text(tester, 'Area or neighbourhood (optional)'), isEmpty);
     });
   });}

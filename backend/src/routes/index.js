@@ -32,9 +32,7 @@ router.use('/chat', require('./chat.routes'));
 router.use('/analytics', require('./analytics.routes'));
 router.use('/ai', require('./ai.routes'));
 router.use('/education', require('./education.routes'));
+router.use('/geo', require('./geo.routes'));
 router.use('/admin', require('./admin.routes'));
-
-// Planned modules (501 until implemented) — keep LAST.
-router.use(require('./stubs'));
 
 module.exports = router;

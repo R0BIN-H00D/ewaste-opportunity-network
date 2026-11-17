@@ -125,6 +125,7 @@ The platform records payments made offline between people; it never processes mo
 The in-app notification centre (P8-05, in-app part). Every service request, quotation, handover and similar event writes one through `notificationService.notify()`. Each new notification is also pushed live over the socket (`notification:new`, see Chat below). Push (FCM) and email channels will be added later without changing these routes.
 - `GET /api/notifications?unread=true&page&limit` — newest first (limit ≤ 50, default 20). Each item: `{ _id, type, title, body?, data{ id, deepLink }, readAt|null, createdAt }`. `meta` carries `page, limit, total, pages` and `unread` (the total unread count, for a badge).
 - `GET /api/notifications/unread-count` → `{ unread }`.
+- `POST /api/notifications/devices` `{ token, platform? (android|web) }` — saves this phone's Firebase push address after sign-in. A token belongs to one person at a time: registering it again as someone else moves it. `DELETE /api/notifications/devices` `{ token }` removes the person's own token on sign-out (someone else's token is left alone, same answer). Push is sent after every in-app notification to people who have not switched push off; tokens Firebase reports as dead are deleted. With no `FIREBASE_SERVICE_ACCOUNT_PATH` push is off and everything else works.
 - `PUT /api/notifications/read-all` → `{ updated, unread: 0 }`.
 - `PUT /api/notifications/:id/read` — marks one read (reading twice keeps the first time). Someone else's id, an unknown id and a malformed id all return `404`.
 
@@ -278,8 +279,12 @@ Every state change is written to the audit log (`AdminLog`) with the admin, the 
 - The body is stored as written. Clients draw it with a renderer that builds elements itself and never inserts HTML (web `lib/markdown.jsx`, mobile `markdown_view.dart`); links must be http(s), mailto or a path on the site.
 - `npm run seed` adds the seven starting guides that are missing, published, and never overwrites an edited or deleted one. The website shows its built-in copies of these seven while the server cannot be reached.
 
-## Planned (currently `501 NOT_IMPLEMENTED`)
-`geo` (P8).
+## Address search (`/api/geo`, Bearer; not administrators)
+- `GET /api/geo/search?q` — 3 to 120 characters; up to five places in India: `{ label, lat, lng, area, city, state, postcode }` (`area` and `city` are what to fill into a form). Through OpenStreetMap's free Nominatim, one request a second at most, answers kept for a day, a real User-Agent. `503` `GEOCODER_UNAVAILABLE` with a message telling the person to type the area and city themselves. The search text is never logged. Forty a window per person (`429`).
+- `GET /api/geo/reverse?lat&lng` — the same shape for one point; `404` when nothing is known there. Points about 100 m apart share an answer.
+
+## Planned
+Nothing: no placeholder module (`501`) remains. An unknown API path answers `404`.
 
 ## CORS
 

@@ -6,6 +6,8 @@ import 'package:ewaste_opportunity/models/chat.dart';
 import 'package:ewaste_opportunity/models/impact.dart';
 import 'package:ewaste_opportunity/services/impact_repository.dart';
 import 'package:ewaste_opportunity/models/pickup.dart';
+import 'package:ewaste_opportunity/models/geo_place.dart';
+import 'package:ewaste_opportunity/services/geo_repository.dart';
 import 'package:ewaste_opportunity/models/ai_suggestion.dart';
 import 'package:ewaste_opportunity/models/article.dart';
 import 'package:ewaste_opportunity/services/article_repository.dart';
@@ -281,6 +283,23 @@ class FakeArticleRepository extends ArticleRepository {
     return Article.fromJson(j);
   }
 }
+/// An address service the test controls: [place] is what any point is said to be, [error] makes it fail.
+class FakeGeoRepository extends GeoRepository {
+  FakeGeoRepository({this.place = const GeoPlace(area: 'Indiranagar', city: 'Bengaluru')}) : super(ApiClient(store: MemoryKeyValueStore()));
+
+  GeoPlace? place;
+  ApiException? error;
+  final asked = <(double, double)>[];
+
+  @override
+  Future<GeoPlace?> reverse(double lat, double lng) async {
+    asked.add((lat, lng));
+    final e = error;
+    if (e != null) throw e;
+    return place;
+  }
+}
+
 class FakeImpactRepository extends ImpactRepository {
   FakeImpactRepository({Map<String, dynamic>? score, Map<String, dynamic>? summary, List<Map<String, dynamic>>? months, this.ledgerPages = 1})
       : score = GreenScore.fromJson(score ?? greenScoreJson()),

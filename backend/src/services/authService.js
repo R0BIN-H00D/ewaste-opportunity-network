@@ -12,6 +12,7 @@ const UserProfile = require('../models/UserProfile');
 const RefreshToken = require('../models/RefreshToken');
 const { ROLE_PROFILE_MODEL, createRoleProfile } = require('./profileModels');
 const mailer = require('./integrations/mailer');
+const { renderEmail } = require('./integrations/emailTemplates');
 
 const MAX_FAILED_LOGINS = 5;
 const LOCK_MS = 15 * 60 * 1000;
@@ -62,7 +63,13 @@ async function sendVerificationEmail(user) {
   await mailer.sendMail({
     to: user.email,
     subject: 'Verify your email - E-Waste Network',
-    text: `Hi ${user.name},\n\nConfirm your email address:\n${env.CLIENT_WEB_URL}/verify-email?token=${token}\n\nThis link is valid for 48 hours. If you did not create an account, ignore this email.`,
+    ...renderEmail({
+      title: 'Confirm your email address',
+      greeting: `Hi ${user.name},`,
+      paragraphs: ['Thanks for joining. Please confirm your email address so we can reach you about your devices and requests.'],
+      button: { label: 'Confirm my email', url: `${env.CLIENT_WEB_URL}/verify-email?token=${token}` },
+      footer: 'This link is valid for 48 hours. If you did not create an account, you can ignore this email.',
+    }),
   });
 }
 
@@ -195,7 +202,13 @@ async function forgotPassword(email) {
   await mailer.sendMail({
     to: user.email,
     subject: 'Reset your password - E-Waste Network',
-    text: `Hi ${user.name},\n\nReset your password:\n${env.CLIENT_WEB_URL}/reset-password?token=${token}\n\nThis link is valid for 1 hour and can be used once. If you did not ask for this, ignore this email.`,
+    ...renderEmail({
+      title: 'Reset your password',
+      greeting: `Hi ${user.name},`,
+      paragraphs: ['We received a request to reset the password for your account.'],
+      button: { label: 'Choose a new password', url: `${env.CLIENT_WEB_URL}/reset-password?token=${token}` },
+      footer: 'This link is valid for 1 hour and can be used once. If you did not ask for this, you can ignore this email.',
+    }),
   });
 }
 

@@ -22,8 +22,8 @@ function getTransport() {
   return transport;
 }
 
-async function sendMail({ to, subject, text, replyTo }) {
-  const message = { from: env.MAIL_FROM, to, subject, text, ...(replyTo ? { replyTo } : {}) };
+async function sendMail({ to, subject, text, html, replyTo }) {
+  const message = { from: env.MAIL_FROM, to, subject, text, ...(html ? { html } : {}), ...(replyTo ? { replyTo } : {}) };
   if (env.isTest) {
     outbox.push(message);
     return { delivered: 'outbox' };

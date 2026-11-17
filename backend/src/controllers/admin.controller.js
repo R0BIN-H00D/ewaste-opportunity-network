@@ -48,7 +48,7 @@ exports.verificationDocument = asyncHandler(async (req, res) => {
     'Cache-Control': 'private, no-store',
     'X-Content-Type-Options': 'nosniff',
   });
-  return res.sendFile(file.abs);
+  return file.buffer ? res.send(file.buffer) : res.sendFile(file.path);
 });
 
 // ---- overview and monitors ----

@@ -10,6 +10,7 @@ import '../../core/network/api_exception.dart';
 import '../../models/ai_suggestion.dart';
 import '../../models/listing_input.dart';
 import '../../providers/listings_controller.dart';
+import '../../providers/location_providers.dart';
 import '../../providers/photo_providers.dart';
 import '../../routes/route_paths.dart';
 import '../../services/location_service.dart';
@@ -300,6 +301,23 @@ class _NewListingScreenState extends ConsumerState<NewListingScreen> {
     );
   }
 
+  /// A spot was chosen (the phone's position or a map pin). The area and city are filled in from it, but only the ones that are
+  /// still empty: nothing the person typed is replaced, and if the address service is out of reach they simply type them.
+  Future<void> _onWhere(GeoPoint? point) async {
+    setState(() => _where = point);
+    if (point == null) return;
+    try {
+      final place = await ref.read(geoRepositoryProvider).reverse(point.lat, point.lng);
+      if (!mounted || place == null || !identical(_where, point)) return;
+      setState(() {
+        if (_area.text.trim().isEmpty && place.area.isNotEmpty) _area.text = place.area;
+        if (_city.text.trim().isEmpty && place.city.isNotEmpty) _city.text = place.city;
+      });
+    } on ApiException {
+      // Optional help: nothing to say.
+    }
+  }
+
   /// Fills in what the person accepted. Nothing they have already typed is overwritten.
   void _useSuggestion(AiSuggestion s) {
     setState(() {
@@ -390,7 +408,7 @@ class _NewListingScreenState extends ConsumerState<NewListingScreen> {
         const SizedBox(height: 12),
         const MessageBanner(tone: BannerTone.info, message: 'Only the area is shown to others. Your street address is never listed.'),
         const SizedBox(height: 16),
-        LocationField(value: _where, onChanged: (p) => setState(() => _where = p)),
+        LocationField(value: _where, onChanged: _onWhere),
       ],
     );
   }

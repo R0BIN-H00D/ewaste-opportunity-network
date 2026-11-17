@@ -44,3 +44,24 @@ Record current free-tier limits and the date checked.
 | Gemini API | | | |
 | SMTP provider | | | |
 | Nominatim / OSM tiles | | usage policy: identify app via User-Agent, ~1 request/second, no bulk/autocomplete | confirm current policy |
+
+## Optional services (all have a working fallback)
+
+Nothing below is needed to run the app. Each service is switched on by environment variables in `backend/.env`; with them empty the app logs a short notice and carries on. **Check each provider's current free-tier limits before relying on it** (task P1-21) and record the date here.
+
+| Service | Needs | Variables | Without it |
+|---|---|---|---|
+| Email (SMTP) | any SMTP account, e.g. a free Brevo or Gmail app password | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | Emails are printed in the server log in development (verification and reset links are visible there) |
+| Image and document storage | a free Cloudinary account | `STORAGE_DRIVER=cloudinary`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Files go to `backend/uploads` on this computer; in production a missing Cloudinary setup is refused rather than quietly using the disk |
+| Phone push | a free Firebase project, a service-account key file | `FIREBASE_SERVICE_ACCOUNT_PATH=C:/path/to/key.json` | Push is off; in-app notifications and live updates still work. The app also needs its own `google-services.json` (not committed) |
+| Address search | none (OpenStreetMap Nominatim) | `NOMINATIM_BASE_URL`, `NOMINATIM_USER_AGENT`, `NOMINATIM_CONTACT_EMAIL` | The search answers "unavailable" and people type the area and city themselves. Put a real contact address in the variables: the service's policy asks for one |
+| AI suggestions | a free Gemini API key | `GEMINI_ENABLED=true`, `GEMINI_API_KEY`, `GEMINI_DAILY_LIMIT`, `GEMINI_MODEL` | Suggestions come from the words typed (rule-based); a photo is never sent anywhere |
+
+How to check each one:
+- **Email:** register a new account; the message arrives (or appears in the log). Both an HTML and a plain-text version are sent.
+- **Cloudinary:** list a device with a photo; the photo address starts with `https://res.cloudinary.com/`. Upload a verification document as a provider: it is an *authenticated* upload with no public address, and an administrator can still open it.
+- **Push:** sign in on the phone; the token is saved (`POST /api/notifications/devices`). Trigger any notification (for example send a chat message from the web) with the app in the background.
+- **Address search:** `GET /api/geo/search?q=Indiranagar` with a signed-in token.
+- **AI:** open "List a device", add a photo and press "Suggest what this is"; the result says "From your photo" when Gemini answered.
+
+Limits to remember: Nominatim allows one request a second (the server queues and caches for you); a free Gemini key has a daily quota (`GEMINI_DAILY_LIMIT` keeps the app under it); push needs a Firebase project per app id.

@@ -176,9 +176,9 @@ async function decide(admin, userId, { type = 'provider', decision, reason }, ip
 async function openDocument(admin, docId, ip) {
   const doc = await VerificationDocument.findById(docId);
   if (!doc) throw ApiError.notFound('Document not found');
-  const abs = await storage.resolvePrivate(doc.file.publicId);
+  const opened = await storage.openPrivate(doc.file.publicId);
   await audit.record(admin, 'verification.document_viewed', { targetType: 'verification', targetId: doc.owner, after: { documentId: idOf(doc._id), docType: doc.docType }, ip });
-  return { abs, mime: doc.file.mime, name: doc.file.originalName || `${doc.docType}` };
+  return { ...opened, mime: doc.file.mime, name: doc.file.originalName || `${doc.docType}` };
 }
 
 module.exports = { listQueue, getSubmission, decide, openDocument };

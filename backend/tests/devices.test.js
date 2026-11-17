@@ -240,10 +240,10 @@ describe('categories, reports, stubs, auth edge cases', () => {
     expect((await request(app).post('/api/reports').set(authHeader(other)).send({ ...body, reason: 'x' })).status).toBe(422);
   });
 
-  it('answers 501 (not fake success) for modules not built yet', async () => {
-    const res = await request(app).get('/api/geo');
-    expect(res.status).toBe(501);
-    expect(res.body.code).toBe('NOT_IMPLEMENTED');
+  it('answers 404 in the usual shape for an API path that does not exist (no module is a placeholder any more)', async () => {
+    const res = await request(app).get('/api/nothing-here');
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
   });
 
   it('blocks suspended accounts', async () => {

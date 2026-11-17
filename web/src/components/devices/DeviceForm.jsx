@@ -8,6 +8,7 @@ import TextField from '../ui/TextField';
 import Alert from '../ui/Alert';
 import PhotoPicker from './PhotoPicker';
 import AiSuggestion from './AiSuggestion';
+import AddressSearch from './AddressSearch';
 import { toSavedSuggestion } from '../../lib/ai';
 import { useCategories } from '../../hooks/useCategories';
 import { deviceApi } from '../../services/deviceApi';
@@ -96,6 +97,14 @@ export default function DeviceForm({ mode = 'create', listing }) {
       () => setGeoMessage('Could not get your location. You can still list with the area and city.'),
       { timeout: 10000 },
     );
+  };
+
+  /** A place chosen from the address search: fills the area and city (without being asked twice) and keeps the point. */
+  const pickPlace = ({ area, city, lat, lng }) => {
+    if (area) setValue('addressArea', area, { shouldValidate: true });
+    if (city) setValue('city', city, { shouldValidate: true });
+    setCoords({ lat, lng });
+    setGeoMessage('Location saved from the address you chose. Others only ever see an approximate area.');
   };
 
   /** status: 'draft' | 'listed' | undefined (keep the current status when editing a live listing). */
@@ -218,6 +227,7 @@ export default function DeviceForm({ mode = 'create', listing }) {
                   {geoMessage || (coords ? 'Location saved.' : hadLocation ? 'A location is already saved for this listing.' : 'No exact location set (optional).')}
                 </p>
               </div>
+              <AddressSearch onPick={pickPlace} />
             </div>
           )}
 

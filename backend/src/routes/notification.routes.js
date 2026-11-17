@@ -12,6 +12,8 @@ router.use(authenticate);
 router.get('/', validate({ query: v.listQuery }), ctrl.list);
 router.get('/unread-count', ctrl.unreadCount);
 router.put('/read-all', ctrl.markAllRead); // keep before /:id routes
+router.post('/devices', validate({ body: v.deviceBody }), ctrl.registerDevice); // a phone's push address, after sign-in
+router.delete('/devices', validate({ body: v.deviceRemoveBody }), ctrl.unregisterDevice); // on sign-out
 router.put('/:id/read', validObjectIdParam(), ctrl.markRead);
 
 module.exports = router;

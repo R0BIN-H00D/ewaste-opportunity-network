@@ -16,6 +16,7 @@ import 'package:ewaste_opportunity/services/api_client.dart';
 import 'package:ewaste_opportunity/services/device_repository.dart';
 import 'package:ewaste_opportunity/services/donation_repository.dart';
 import 'package:ewaste_opportunity/services/learning_repository.dart';
+import 'package:ewaste_opportunity/services/location_service.dart';
 import 'package:ewaste_opportunity/services/marketplace_repository.dart';
 import 'package:ewaste_opportunity/services/refurbishment_repository.dart';
 import 'package:ewaste_opportunity/services/photo_picker.dart';
@@ -79,6 +80,30 @@ class FakeDeviceRepository extends DeviceRepository {
   Future<void> remove(String id) async {
     removed = id;
   }
+}
+
+/// A phone whose position, or reason for refusing, the test chooses. Counts how often it was asked and opened.
+class FakeLocationService implements LocationService {
+  FakeLocationService.at(GeoPoint this.point) : problem = null;
+  FakeLocationService.failing(LocationProblem this.problem) : point = null;
+
+  final GeoPoint? point;
+  final LocationProblem? problem;
+  int asked = 0;
+  int appSettingsOpened = 0;
+  int locationSettingsOpened = 0;
+
+  @override
+  Future<LocationResult> current() async {
+    asked++;
+    return point != null ? LocationResult.found(point!) : LocationResult.failed(problem!);
+  }
+
+  @override
+  Future<void> openAppSettings() async => appSettingsOpened++;
+
+  @override
+  Future<void> openLocationSettings() async => locationSettingsOpened++;
 }
 
 class FakePhotoPicker implements PhotoPicker {

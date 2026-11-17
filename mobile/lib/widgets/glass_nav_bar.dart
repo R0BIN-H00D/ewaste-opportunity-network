@@ -20,6 +20,17 @@ class GlassNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    // heightFactor 1 keeps the bar as tall as its content; a bare Center would stretch it over the screen.
+    return Center(
+      heightFactor: 1,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: _bar(context, scheme),
+      ),
+    );
+  }
+
+  Widget _bar(BuildContext context, ColorScheme scheme) {
     return SafeArea(
       minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: GlassContainer(

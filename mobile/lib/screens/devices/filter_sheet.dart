@@ -2,9 +2,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import '../../core/format.dart';
 import '../../providers/listings_controller.dart';
+import '../../providers/location_providers.dart';
 import '../../services/device_repository.dart';
+import '../../services/location_service.dart';
 import '../../widgets/app_chip.dart';
 import '../../widgets/app_text_field.dart';
+import '../../widgets/message_banner.dart';
 
 /// Category, condition, city and sort order for Browse. Nothing changes until "Show results".
 class FilterSheet extends ConsumerStatefulWidget {
@@ -32,6 +35,51 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
   late String _sort = widget.initial.sort;
   late final TextEditingController _city = TextEditingController(text: widget.initial.city);
 
+  // "Near me": a point and a distance. Switching it on asks the phone where it is; if that fails the chip stays off and says why.
+  late double? _lat = widget.initial.lat;
+  late double? _lng = widget.initial.lng;
+  late int? _radius = widget.initial.radiusKm;
+  bool _locating = false;
+  String? _nearNote;
+
+  static const _radii = [5, 10, 25, 50];
+
+  Future<void> _chooseRadius(int? km) async {
+    if (_locating) return;
+    if (km == null) {
+      setState(() {
+        _lat = _lng = _radius = null;
+        _nearNote = null;
+      });
+      return;
+    }
+    if (_lat != null && _lng != null) {
+      setState(() => _radius = km);
+      return;
+    }
+    setState(() {
+      _locating = true;
+      _nearNote = null;
+    });
+    final result = await ref.read(locationServiceProvider).current();
+    if (!mounted) return;
+    setState(() {
+      _locating = false;
+      if (result.point != null) {
+        _lat = result.point!.lat;
+        _lng = result.point!.lng;
+        _radius = km;
+      } else {
+        _nearNote = switch (result.problem) {
+          LocationProblem.deniedForever => 'Location is blocked for this app. Allow it in the phone settings, or type a city below.',
+          LocationProblem.serviceOff => 'Location is switched off on this phone. Turn it on, or type a city below.',
+          LocationProblem.denied => 'Location was not allowed. You can still type a city below.',
+          _ => 'The phone could not find where it is just now. Try again, or type a city below.',
+        };
+      }
+    });
+  }
+
   @override
   void dispose() {
     _city.dispose();
@@ -43,6 +91,8 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
         _condition = '';
         _sort = 'newest';
         _city.clear();
+        _lat = _lng = _radius = null;
+        _nearNote = null;
       });
 
   Widget _section(String title, List<Widget> chips) => Column(
@@ -85,6 +135,12 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
               AppChip(label: 'Any', selected: _condition.isEmpty, onTap: () => setState(() => _condition = '')),
               for (final (value, label) in conditions) AppChip(label: label, selected: _condition == value, onTap: () => setState(() => _condition = value)),
             ]),
+            _section('Near me', [
+              AppChip(label: 'Any distance', selected: _radius == null, onTap: () => _chooseRadius(null)),
+              for (final km in _radii) AppChip(label: '$km km', selected: _radius == km, onTap: () => _chooseRadius(km)),
+            ]),
+            if (_locating) const Padding(padding: EdgeInsets.only(top: 8), child: LinearProgressIndicator()),
+            if (_nearNote != null) Padding(padding: const EdgeInsets.only(top: 8), child: MessageBanner(tone: BannerTone.warning, message: _nearNote!)),
             _section('Sort by', [
               for (final (value, label) in sorts) AppChip(label: label, selected: _sort == value, onTap: () => setState(() => _sort = value)),
             ]),
@@ -92,7 +148,10 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
             AppTextField(controller: _city, label: 'City', icon: Icons.location_city_outlined, textInputAction: TextInputAction.done),
             const SizedBox(height: 20),
             FilledButton(
-              onPressed: () => Navigator.of(context).pop(widget.initial.copyWith(category: _category, condition: _condition, sort: _sort, city: _city.text)),
+              onPressed: () {
+                final base = widget.initial.copyWith(category: _category, condition: _condition, sort: _sort, city: _city.text, clearNearby: true);
+                Navigator.of(context).pop(_radius == null ? base : base.copyWith(lat: _lat, lng: _lng, radiusKm: _radius));
+              },
               child: const Text('Show results'),
             ),
           ],

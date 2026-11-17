@@ -17,6 +17,9 @@ abstract class Routes {
   static const browse = '/browse';
   static const myListings = '/my-listings';
   static const newListing = '/listings/new';
+
+  /// A full-screen map to drop a pin on. Pops with the chosen point; the current point may be passed as `extra`.
+  static const pickLocation = '/pick-location';
   static const listingPattern = '/devices/:id';
   static String listing(String id) => '/devices/$id';
   static const technicians = '/technicians';

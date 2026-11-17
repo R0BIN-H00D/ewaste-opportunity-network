@@ -10,6 +10,8 @@ import '../screens/account/profile_screen.dart';
 import '../screens/account/settings_screen.dart';
 import '../screens/account/verification_screen.dart';
 import '../screens/donations/donation_details_screen.dart';
+import '../screens/location/pin_picker_screen.dart';
+import '../services/location_service.dart';
 import '../screens/donations/donations_screen.dart';
 import '../screens/donations/offer_donation_screen.dart';
 import '../screens/donations/recipient_screen.dart';
@@ -106,6 +108,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: Routes.browse, builder: (_, __) => const BrowsePage()),
       GoRoute(path: Routes.myListings, builder: (_, __) => const MyListingsPage()),
       GoRoute(path: Routes.newListing, builder: (_, __) => const NewListingScreen()),
+      GoRoute(path: Routes.pickLocation, builder: (_, state) => PinPickerScreen(initial: state.extra is GeoPoint ? state.extra as GeoPoint : null)),
       GoRoute(path: Routes.listingPattern, builder: (_, state) => DeviceDetailsScreen(id: state.pathParameters['id']!)),
       GoRoute(path: Routes.technicians, builder: (_, state) => TechniciansPage(listingId: state.uri.queryParameters['listing'])),
       GoRoute(

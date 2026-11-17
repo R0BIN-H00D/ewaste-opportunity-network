@@ -22,6 +22,8 @@ import 'package:ewaste_opportunity/screens/refurbishment/product_form_screen.dar
 import 'package:ewaste_opportunity/screens/refurbishment/refurb_job_details_screen.dart';
 import 'package:ewaste_opportunity/screens/refurbishment/refurb_jobs_screen.dart';
 import 'package:ewaste_opportunity/screens/refurbishment/refurb_opportunities_screen.dart';
+import 'package:ewaste_opportunity/services/location_service.dart';
+import 'package:ewaste_opportunity/widgets/location_field.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -87,6 +89,7 @@ void main() {
     'the applicants': () => const ApplicantsScreen(opportunityId: 'o1'),
     'one application, for its supervisor': () => const ApplicationDetailsScreen(id: 'a1'),
     'the recycler report': () => const RecyclingReportScreen(),
+    'the location field': () => SingleChildScrollView(child: LocationField(value: const GeoPoint(12.9716, 77.5946), onChanged: (_) {})),
   };
 
   for (final scale in _scales) {

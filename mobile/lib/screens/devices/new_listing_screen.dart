@@ -10,6 +10,7 @@ import '../../models/listing_input.dart';
 import '../../providers/listings_controller.dart';
 import '../../providers/photo_providers.dart';
 import '../../routes/route_paths.dart';
+import '../../services/location_service.dart';
 import '../../services/photo_picker.dart';
 import '../../widgets/app_background.dart';
 import '../../widgets/glass_app_bar.dart';
@@ -17,6 +18,7 @@ import '../../widgets/app_chip.dart';
 import '../../widgets/app_text_field.dart';
 import '../../widgets/glass_container.dart';
 import '../../widgets/loading_button.dart';
+import '../../widgets/location_field.dart';
 import '../../widgets/message_banner.dart';
 
 /// List a device in three short steps: photos, the device, and what you want done with it.
@@ -41,6 +43,7 @@ class _NewListingScreenState extends ConsumerState<NewListingScreen> {
   final _area = TextEditingController();
 
   final List<PickedPhoto> _photos = [];
+  GeoPoint? _where;
   int _step = 0;
   String _category = '';
   String _condition = '';
@@ -159,6 +162,8 @@ class _NewListingScreenState extends ConsumerState<NewListingScreen> {
       pickupPreference: _pickup,
       addressArea: _area.text,
       city: _city.text,
+      lat: _where?.lat,
+      lng: _where?.lng,
       draft: draft,
     );
     try {
@@ -359,6 +364,8 @@ class _NewListingScreenState extends ConsumerState<NewListingScreen> {
         AppTextField(controller: _area, label: 'Area or neighbourhood (optional)', icon: Icons.place_outlined, validator: validateAreaOrCity, serverError: _serverErrors['addressArea'], textInputAction: TextInputAction.done),
         const SizedBox(height: 12),
         const MessageBanner(tone: BannerTone.info, message: 'Only the area is shown to others. Your street address is never listed.'),
+        const SizedBox(height: 16),
+        LocationField(value: _where, onChanged: (p) => setState(() => _where = p)),
       ],
     );
   }

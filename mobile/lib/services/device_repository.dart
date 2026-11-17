@@ -18,7 +18,17 @@ class ListingQuery {
     this.mine = false,
     this.page = 1,
     this.limit = 12,
+    this.lat,
+    this.lng,
+    this.radiusKm,
   });
+
+  /// Only devices within [radiusKm] of this point. All three are set together or not at all.
+  final double? lat;
+  final double? lng;
+  final int? radiusKm;
+
+  bool get hasNearby => lat != null && lng != null && radiusKm != null;
 
   final String q;
   final String category;
@@ -32,8 +42,9 @@ class ListingQuery {
   final int limit;
 
   /// How many filters are switched on (shown on the Filters button). Search text and sort order are not counted.
-  int get activeFilters => [category, condition, city].where((v) => v.isNotEmpty).length;
+  int get activeFilters => [category, condition, city].where((v) => v.isNotEmpty).length + (hasNearby ? 1 : 0);
 
+  /// [clearNearby] switches "near me" off, since passing null alone would keep the old values.
   ListingQuery copyWith({
     String? q,
     String? category,
@@ -43,8 +54,15 @@ class ListingQuery {
     String? sort,
     String? status,
     int? page,
+    double? lat,
+    double? lng,
+    int? radiusKm,
+    bool clearNearby = false,
   }) =>
       ListingQuery(
+        lat: clearNearby ? null : (lat ?? this.lat),
+        lng: clearNearby ? null : (lng ?? this.lng),
+        radiusKm: clearNearby ? null : (radiusKm ?? this.radiusKm),
         q: q ?? this.q,
         category: category ?? this.category,
         condition: condition ?? this.condition,
@@ -66,6 +84,7 @@ class ListingQuery {
         if (condition.isNotEmpty) 'condition': condition,
         if (service.isNotEmpty) 'service': service,
         if (city.trim().isNotEmpty) 'city': city.trim(),
+        if (hasNearby) ...{'lat': lat!.toStringAsFixed(5), 'lng': lng!.toStringAsFixed(5), 'radiusKm': radiusKm},
         if (mine) 'mine': 'true',
         if (mine && status.isNotEmpty) 'status': status,
       };

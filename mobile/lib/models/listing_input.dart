@@ -13,6 +13,8 @@ class ListingInput {
     this.pickupPreference = '',
     this.addressArea = '',
     this.city = '',
+    this.lat,
+    this.lng,
     this.draft = false,
   });
 
@@ -30,6 +32,10 @@ class ListingInput {
   final String pickupPreference;
   final String addressArea;
   final String city;
+
+  /// Where the device is, if the person shared it or placed a pin. Both or neither: the server refuses one alone.
+  final double? lat;
+  final double? lng;
 
   /// Save without publishing.
   final bool draft;
@@ -55,6 +61,10 @@ class ListingInput {
     add('pickupPreference', pickupPreference);
     add('addressArea', addressArea);
     add('city', city);
+    if (lat != null && lng != null) {
+      fields['lat'] = lat!.toStringAsFixed(5);
+      fields['lng'] = lng!.toStringAsFixed(5);
+    }
     return fields;
   }
 }

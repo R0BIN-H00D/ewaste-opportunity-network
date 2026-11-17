@@ -24,6 +24,7 @@ const schema = z.object({
   GEMINI_ENABLED: bool,
   GEMINI_API_KEY: z.string().optional().default(''),
   GEMINI_DAILY_LIMIT: z.coerce.number().int().nonnegative().default(50),
+  GEMINI_MODEL: z.string().default('gemini-2.0-flash'), // models are retired from time to time (A-10): change it here, not in code
   SMTP_HOST: z.string().optional().default(''),
   SMTP_PORT: z.coerce.number().int().default(587),
   SMTP_USER: z.string().optional().default(''),

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +7,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../core/format.dart';
 import '../../core/listing_validation.dart';
 import '../../core/network/api_exception.dart';
+import '../../models/ai_suggestion.dart';
 import '../../models/listing_input.dart';
 import '../../providers/listings_controller.dart';
 import '../../providers/photo_providers.dart';
@@ -20,6 +22,7 @@ import '../../widgets/glass_container.dart';
 import '../../widgets/loading_button.dart';
 import '../../widgets/location_field.dart';
 import '../../widgets/message_banner.dart';
+import 'ai_suggestion_panel.dart';
 
 /// List a device in three short steps: photos, the device, and what you want done with it.
 class NewListingScreen extends ConsumerStatefulWidget {
@@ -44,6 +47,7 @@ class _NewListingScreenState extends ConsumerState<NewListingScreen> {
 
   final List<PickedPhoto> _photos = [];
   GeoPoint? _where;
+  AiSuggestion? _accepted; // a suggestion the person chose to use (FR-AI-002)
   int _step = 0;
   String _category = '';
   String _condition = '';
@@ -165,6 +169,7 @@ class _NewListingScreenState extends ConsumerState<NewListingScreen> {
       lat: _where?.lat,
       lng: _where?.lng,
       draft: draft,
+      aiSuggestionJson: _accepted == null ? '' : jsonEncode(_accepted!.toSaved()),
     );
     try {
       final listing = await ref.read(deviceRepositoryProvider).create(input, _photos, onProgress: (p) {
@@ -295,12 +300,32 @@ class _NewListingScreenState extends ConsumerState<NewListingScreen> {
     );
   }
 
+  /// Fills in what the person accepted. Nothing they have already typed is overwritten.
+  void _useSuggestion(AiSuggestion s) {
+    setState(() {
+      _accepted = s;
+      if (s.categorySlug != null) {
+        _category = s.categorySlug!;
+        _choiceErrors.remove('category');
+      }
+      if (_brand.text.trim().isEmpty && (s.brand ?? '').isNotEmpty) _brand.text = s.brand!;
+      if (_description.text.trim().isEmpty && s.visibleDamage.isNotEmpty) _description.text = 'Looks like: ${s.visibleDamage.join(', ')}.';
+    });
+  }
+
   Widget _deviceStep() {
     final categories = ref.watch(categoriesProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         AppTextField(controller: _name, label: 'Device name', icon: Icons.devices_other_outlined, validator: validateDeviceName, serverError: _serverErrors['name'], textInputAction: TextInputAction.next),
+        const SizedBox(height: 16),
+        AiSuggestionPanel(
+          title: () => _name.text,
+          description: () => _description.text,
+          photo: () => _photos.isEmpty ? null : _photos.first,
+          onUse: _useSuggestion,
+        ),
         const SizedBox(height: 16),
         categories.when(
           data: (list) => _group('Category', 'category', [

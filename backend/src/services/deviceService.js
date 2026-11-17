@@ -54,6 +54,7 @@ async function createListing(user, input, files = []) {
       model: input.model,
       purchaseYear: input.purchaseYear,
       photos: stored.map(storage.toPhoto),
+      ...(input.aiSuggestion ? { aiSuggestion: { ...input.aiSuggestion, confirmedByUser: true } } : {}),
     });
     const listing = await DeviceListing.create({
       device: device._id,

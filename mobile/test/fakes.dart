@@ -6,6 +6,8 @@ import 'package:ewaste_opportunity/models/chat.dart';
 import 'package:ewaste_opportunity/models/impact.dart';
 import 'package:ewaste_opportunity/services/impact_repository.dart';
 import 'package:ewaste_opportunity/models/pickup.dart';
+import 'package:ewaste_opportunity/models/ai_suggestion.dart';
+import 'package:ewaste_opportunity/services/ai_repository.dart';
 import 'package:ewaste_opportunity/services/pickup_repository.dart';
 import 'package:ewaste_opportunity/models/account.dart';
 import 'package:ewaste_opportunity/services/chat_repository.dart';
@@ -204,6 +206,34 @@ class FakePickupRepository extends PickupRepository {
     if (e != null) throw e;
     final rows = [for (final j in (upcoming ? upcomingJson : pastJson)) PickupItem.fromJson(j)];
     return PageResult(items: rows, page: 1, pages: 1, total: rows.length);
+  }
+}
+Map<String, dynamic> aiJson({String source = 'rules', String? category = 'laptops', String? brand = 'Dell', List<String> damage = const ['Scratches'], List<String> repairs = const [], double confidence = 0.6, bool usedPhoto = false, String? reason = 'not_configured'}) => {
+      'source': source,
+      'category': category == null ? null : {'_id': 'c-$category', 'name': 'Laptops', 'slug': category},
+      'deviceType': category == null ? null : 'Laptop',
+      'brand': brand,
+      'visibleDamage': damage,
+      'possibleRepairs': repairs,
+      'confidence': confidence,
+      'usedPhoto': usedPhoto,
+      'fallbackReason': reason,
+      'disclaimer': 'This is only a suggestion. A photo cannot show damage inside.',
+    };
+
+class FakeAiRepository extends AiRepository {
+  FakeAiRepository({Map<String, dynamic>? answer}) : answer = AiSuggestion.fromJson(answer ?? aiJson()), super(ApiClient(store: MemoryKeyValueStore()));
+
+  AiSuggestion answer;
+  ApiException? error;
+  final asked = <({String title, String description, bool photo})>[];
+
+  @override
+  Future<AiSuggestion> classify({String title = '', String description = '', PickedPhoto? photo}) async {
+    asked.add((title: title, description: description, photo: photo != null));
+    final e = error;
+    if (e != null) throw e;
+    return answer;
   }
 }
 class FakeImpactRepository extends ImpactRepository {

@@ -15,13 +15,13 @@ const EXPECTED = [
   'MarketplaceProduct', 'Order', 'Transaction', 'PickupSchedule', 'Conversation', 'Message', 'Notification',
   'Review', 'RecyclingRecord', 'EnvironmentalImpact', 'Complaint', 'AdminLog', 'StudentApplication', 'LearningOpportunity',
   // added during design (requirements §8.2)
-  'Category', 'RefreshToken', 'Report', 'DeviceToken', 'GreenScoreLedger', 'Announcement', 'EducationArticle', 'Certificate', 'RefurbishmentJob',
+  'Category', 'RefreshToken', 'Report', 'DeviceToken', 'GreenScoreLedger', 'Announcement', 'EducationArticle', 'Certificate', 'RefurbishmentJob', 'AiUsage',
 ];
 
 describe('model registry', () => {
-  it('registers all 27 SRS collections plus 9 added ones', () => {
+  it('registers all 27 SRS collections plus 10 added ones', () => {
     expect(Object.keys(M).sort()).toEqual([...EXPECTED].sort());
-    expect(EXPECTED).toHaveLength(36);
+    expect(EXPECTED).toHaveLength(37);
   });
 });
 

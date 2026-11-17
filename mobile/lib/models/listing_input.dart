@@ -16,6 +16,7 @@ class ListingInput {
     this.lat,
     this.lng,
     this.draft = false,
+    this.aiSuggestionJson = '',
   });
 
   final String name;
@@ -40,6 +41,9 @@ class ListingInput {
   /// Save without publishing.
   final bool draft;
 
+  /// The AI suggestion the person accepted, as JSON, kept with the listing (FR-AI-002). Empty when none was used.
+  final String aiSuggestionJson;
+
   Map<String, String> toFields() {
     final fields = <String, String>{
       'name': name.trim(),
@@ -61,6 +65,7 @@ class ListingInput {
     add('pickupPreference', pickupPreference);
     add('addressArea', addressArea);
     add('city', city);
+    add('aiSuggestion', aiSuggestionJson);
     if (lat != null && lng != null) {
       fields['lat'] = lat!.toStringAsFixed(5);
       fields['lng'] = lng!.toStringAsFixed(5);

@@ -5,7 +5,7 @@ const router = require('express').Router();
 
 const PLANNED = {
   P8: ['geo'],
-  P9: ['ai', 'education'],
+  P9: ['education'],
 };
 
 for (const [phase, prefixes] of Object.entries(PLANNED)) {

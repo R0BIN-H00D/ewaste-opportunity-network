@@ -30,6 +30,7 @@ router.use('/announcements', require('./announcement.routes'));
 router.use('/notifications', require('./notification.routes'));
 router.use('/chat', require('./chat.routes'));
 router.use('/analytics', require('./analytics.routes'));
+router.use('/ai', require('./ai.routes'));
 router.use('/admin', require('./admin.routes'));
 
 // Planned modules (501 until implemented) — keep LAST.

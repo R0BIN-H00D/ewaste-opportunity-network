@@ -62,6 +62,13 @@ A listing = one `Device` (facts + photos) + one `DeviceListing` (service offer).
 Auth: `user | technician | refurbisher`. Fields: `name`*, `category`* (id or slug), `condition`* (`fully_working|minor_damage|major_damage|not_working|for_spare_parts`), `preferredService`* (`repair|reuse|donation|refurbishment|recycling`), `brand`, `model`, `purchaseYear`, `description`, `expectedPrice`, `pickupPreference` (`pickup|drop_off|either`), `addressArea`, `city`, `lat`+`lng` (together), `status` (`draft|listed`, default `listed`). Unknown fields → 422. A published (`listed`) listing needs ≥ 1 photo; drafts don't.
 → `201` listing (owner view incl. exact `location`).
 
+Optional `aiSuggestion` (create only): a JSON string `{ source: 'gemini'|'rules', category?, type?, brand?, visibleDamage[], possibleRepairs[], confidence? }` — what the person accepted from `/api/ai/classify`. It is stored on the device with `confirmedByUser: true` (the server sets that; a client-sent `confirmedByUser` is refused). Malformed → 422.
+
+### POST /api/ai/classify
+Auth: `user | technician | refurbisher`. Multipart: optional `photo` (one image, ≤ 5 MB, magic-byte checked), optional `title` (≤ 120), `description` (≤ 2000). Nothing is saved. Per-person limit of 20 a window (`429 RATE_LIMITED`).
+→ `200` `{ source: 'gemini'|'rules', category: { _id, name, slug }|null, deviceType, brand, visibleDamage[], possibleRepairs[], confidence (0..1), usedPhoto, fallbackReason: null|'not_configured'|'no_photo'|'quota'|'unavailable', disclaimer }`.
+Gemini reads the photo only when `GEMINI_ENABLED=true`, `GEMINI_API_KEY` is set, a photo was sent and today's `GEMINI_DAILY_LIMIT` is not used up (counted per UTC day in the database, safe across servers). In every other case, or if Gemini times out (8 s), is refused or answers badly, the rule-based classifier answers from the title and description (FR-AI-004): keyword → category, brand, damage the text mentions, what to look at; its confidence never exceeds 0.8. The key is sent in a header, never the URL. The photo leaves the platform only on this explicit request. `GEMINI_MODEL` (default `gemini-2.0-flash`) is configurable because models are retired (A-10). The disclaimer says a photo cannot show internal damage (FR-AI-003).
+
 ### GET /api/devices
 Public (auth optional). Query: `page, limit(≤100, default 12), q (text search), category, condition, service, city, minPrice, maxPrice, lat+lng+radiusKm (default 25), sort (newest|oldest|price_asc|price_desc|relevance), mine=true (auth), status (with mine or admin)`. Unknown/operator params → 422.
 → `200` `data: [listing]`, `meta: {page, limit, total, pages}`. Non-owners never receive exact `location`, `lockedBy`, `reportCount`; `owner` is `{_id, name, avatar}` only.

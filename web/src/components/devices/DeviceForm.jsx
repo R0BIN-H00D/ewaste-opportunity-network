@@ -7,6 +7,8 @@ import GlassCard from '../glass/GlassCard';
 import TextField from '../ui/TextField';
 import Alert from '../ui/Alert';
 import PhotoPicker from './PhotoPicker';
+import AiSuggestion from './AiSuggestion';
+import { toSavedSuggestion } from '../../lib/ai';
 import { useCategories } from '../../hooks/useCategories';
 import { deviceApi } from '../../services/deviceApi';
 import { applyFieldErrors, toApiError } from '../../utils/errors';
@@ -60,6 +62,15 @@ export default function DeviceForm({ mode = 'create', listing }) {
   const [submitError, setSubmitError] = useState('');
   const [progress, setProgress] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [accepted, setAccepted] = useState(null); // a suggestion the person chose to use (FR-AI-002)
+
+  /** Fills in what the person accepted. Nothing they have already typed is overwritten. */
+  const useSuggestion = (s) => {
+    setAccepted(s);
+    if (s.category?.slug) setValue('category', s.category.slug, { shouldValidate: true });
+    if (s.brand && !getValues('brand')?.trim()) setValue('brand', s.brand);
+    if (s.visibleDamage?.length && !getValues('description')?.trim()) setValue('description', `Looks like: ${s.visibleDamage.join(', ')}.`);
+  };
 
   const existing = editing ? listing.device?.photos || [] : [];
   const photoCount = existing.filter((p) => !removed.includes(p.publicId)).length + files.length;
@@ -107,6 +118,7 @@ export default function DeviceForm({ mode = 'create', listing }) {
     try {
       const payload = toDevicePayload(getValues(), { coords, status });
       if (editing && removed.length) payload.removePhotoIds = removed;
+      if (!editing && accepted) payload.aiSuggestion = JSON.stringify(toSavedSuggestion(accepted));
       const saved = editing
         ? await deviceApi.update(listing._id, payload, files, setProgress)
         : await deviceApi.create(payload, files, setProgress);
@@ -179,6 +191,7 @@ export default function DeviceForm({ mode = 'create', listing }) {
                 <PhotoPicker existing={existing} files={files} onFiles={setFiles} removed={removed} onRemoved={setRemoved} error={photoError} />
                 <p className="mt-2 text-xs text-ink-muted dark:text-[#9FB2A7]">At least one photo is needed to publish. Drafts can be saved without photos.</p>
               </div>
+              {!editing && <AiSuggestion getText={() => ({ title: getValues('name'), description: getValues('description') })} photo={files[0] || null} onUse={useSuggestion} />}
             </div>
           )}
 

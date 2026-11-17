@@ -241,7 +241,7 @@ describe('categories, reports, stubs, auth edge cases', () => {
   });
 
   it('answers 501 (not fake success) for modules not built yet', async () => {
-    const res = await request(app).get('/api/ai/classify');
+    const res = await request(app).get('/api/education');
     expect(res.status).toBe(501);
     expect(res.body.code).toBe('NOT_IMPLEMENTED');
   });

@@ -28,8 +28,25 @@ const fields = {
   ...latLng,
 };
 
+// What the person accepted from the AI suggestion, sent back as a JSON string in the multipart form (FR-AI-002). Stored as confirmed.
+const aiSuggestion = z.preprocess((v) => {
+  if (v === undefined || v === '') return undefined;
+  if (typeof v === 'string') {
+    try { return JSON.parse(v); } catch { return v; }
+  }
+  return v;
+}, z.object({
+  source: z.enum(['gemini', 'rules']),
+  category: z.string().trim().max(60).optional(),
+  type: z.string().trim().max(60).optional(),
+  brand: z.string().trim().max(60).optional(),
+  visibleDamage: z.array(z.string().trim().max(100)).max(6).default([]),
+  possibleRepairs: z.array(z.string().trim().max(100)).max(6).default([]),
+  confidence: z.number().min(0).max(1).optional(),
+}).strict().optional());
+
 const createBody = z
-  .object({ ...fields, status: z.preprocess(blankToUndefined, z.enum(['draft', 'listed']).default('listed')) })
+  .object({ ...fields, aiSuggestion, status: z.preprocess(blankToUndefined, z.enum(['draft', 'listed']).default('listed')) })
   .strict()
   .refine(bothOrNone, latLngMsg);
 

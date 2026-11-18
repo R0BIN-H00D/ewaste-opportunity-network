@@ -43,7 +43,6 @@ async function main() {
   // demo accounts
   const user = await upsertUser({ email: 'user@demo.local', name: 'Demo User', role: ROLES.USER }, DEMO_PASSWORD);
   const tech = await upsertUser({ email: 'tech@demo.local', name: 'Demo Technician', role: ROLES.TECHNICIAN }, DEMO_PASSWORD);
-  const student = await upsertUser({ email: 'student@demo.local', name: 'Demo Student', role: ROLES.STUDENT, status: ACCOUNT_STATUS.PENDING }, DEMO_PASSWORD);
   const refurb = await upsertUser({ email: 'refurb@demo.local', name: 'Demo Refurbisher', role: ROLES.REFURBISHER }, DEMO_PASSWORD);
   const recycler = await upsertUser({ email: 'recycler@demo.local', name: 'Demo Recycler', role: ROLES.RECYCLER }, DEMO_PASSWORD);
   // A verified recipient organisation (a general user with an organisation profile, A-02) so donations can be tried end to end.
@@ -60,22 +59,11 @@ async function main() {
     deviceCategories: [cats.laptop._id, cats.smartphone._id, cats.tablet._id], serviceLocation: makePoint(77.6, 12.97), city: 'Bengaluru',
     baseRate: 500, verification: APPROVED, ratingAvg: 4.6, ratingCount: 12,
   } }, { upsert: true });
-  await M.StudentProfile.updateOne({ user: student._id }, { $setOnInsert: { user: student._id, college: 'Demo Institute of Technology', course: 'B.E. Electronics', yearOfStudy: 3, verification: { status: 'pending' } } }, { upsert: true });
   await M.RefurbisherProfile.updateOne({ user: refurb._id }, { $setOnInsert: { user: refurb._id, businessName: 'ReNew Electronics', categories: [cats.laptop._id, cats.smartphone._id], city: 'Bengaluru', location: makePoint(77.58, 12.98), verification: APPROVED } }, { upsert: true });
   await M.RecyclingCenter.updateOne({ user: recycler._id }, { $setOnInsert: {
     user: recycler._id, name: 'GreenCycle Recyclers', authorizationNo: 'DEMO-0001', authorizingBody: 'Demo Authority (placeholder)',
     acceptedCategories: Object.values(cats).map((c) => c._id), city: 'Bengaluru', location: makePoint(77.62, 12.95), verification: APPROVED,
   } }, { upsert: true });
-
-  // A supervised practical task from the demo technician, for students to apply to (BR-07: never a hazardous device type).
-  const taskTitle = 'Diagnose a laptop that will not power on';
-  if (!(await M.LearningOpportunity.findOne({ postedBy: tech._id, title: taskTitle }))) {
-    await M.LearningOpportunity.create({
-      postedBy: tech._id, title: taskTitle, deviceType: cats.laptop._id, difficulty: 'beginner', requiredSkills: ['multimeter', 'basic troubleshooting'],
-      description: 'Work alongside the technician to test the charger, battery connector and power rail on a laptop that will not turn on. The technician handles every part that needs opening or soldering.',
-      locationArea: 'Indiranagar, Bengaluru', deadline: new Date(Date.now() + 45 * 24 * 3600 * 1000), seats: 2, expectedHours: 6,
-    });
-  }
 
   // sample listings (seed bypasses the photo requirement; real clients must upload photos to publish)
   if ((await M.DeviceListing.countDocuments({ owner: user._id })) === 0) {

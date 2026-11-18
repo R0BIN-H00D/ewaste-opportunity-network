@@ -2,8 +2,8 @@ import 'package:ewaste_opportunity/providers/auth_controller.dart';
 import 'package:ewaste_opportunity/routes/app_router.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-String? _go(String location, {bool booted = true, AuthStatus auth = AuthStatus.unauthenticated, bool seen = true}) =>
-    redirectFor(booted: booted, auth: auth, onboardingSeen: seen, location: location);
+String? _go(String location, {bool booted = true, AuthStatus auth = AuthStatus.unauthenticated, bool seen = true, bool welcome = false}) =>
+    redirectFor(booted: booted, auth: auth, onboardingSeen: seen, location: location, welcome: welcome);
 
 void main() {
   group('while starting up', () {
@@ -42,6 +42,14 @@ void main() {
       expect(_go(Routes.login, auth: AuthStatus.authenticated), Routes.home);
       expect(_go(Routes.register, auth: AuthStatus.authenticated), Routes.home);
       expect(_go(Routes.onboarding, auth: AuthStatus.authenticated), Routes.home);
+    });
+
+    test('a person who has just signed up lands on their profile first', () {
+      expect(_go(Routes.register, auth: AuthStatus.authenticated, welcome: true), Routes.profile);
+      expect(_go(Routes.splash, auth: AuthStatus.authenticated, welcome: true), Routes.profile);
+      // Once they are on their profile (or anywhere in the app) nothing moves them again.
+      expect(_go(Routes.profile, auth: AuthStatus.authenticated, welcome: true), isNull);
+      expect(_go(Routes.home, auth: AuthStatus.authenticated, welcome: true), isNull);
     });
 
     test('app screens stay where they are', () {

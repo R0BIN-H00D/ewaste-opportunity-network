@@ -1,10 +1,14 @@
+import 'package:ewaste_opportunity/core/network/api_exception.dart';
 import 'package:ewaste_opportunity/core/storage/key_value_store.dart';
 import 'package:ewaste_opportunity/core/theme/app_theme.dart';
 import 'package:ewaste_opportunity/models/account.dart';
 import 'package:ewaste_opportunity/providers/account_providers.dart';
 import 'package:ewaste_opportunity/providers/auth_controller.dart';
 import 'package:ewaste_opportunity/providers/core_providers.dart';
+import 'package:ewaste_opportunity/models/geo_place.dart';
+import 'package:ewaste_opportunity/providers/location_providers.dart';
 import 'package:ewaste_opportunity/providers/technicians_controller.dart';
+import 'package:ewaste_opportunity/services/location_service.dart';
 import 'package:ewaste_opportunity/screens/account/account_screen.dart';
 import 'package:ewaste_opportunity/screens/account/help_screen.dart';
 import 'package:ewaste_opportunity/screens/account/notifications_screen.dart';
@@ -19,7 +23,7 @@ import '../fakes.dart';
 import '../helpers.dart';
 
 /// Pumps [screen] for a signed-in member, with [account] answering every account call. Returns the store for theme checks.
-Future<MemoryKeyValueStore> _pump(WidgetTester tester, Widget screen, FakeAccountRepository account, {String? openedFrom}) async {
+Future<MemoryKeyValueStore> _pump(WidgetTester tester, Widget screen, FakeAccountRepository account, {String? openedFrom, FakeLocationService? phone, FakeGeoRepository? geo}) async {
   tester.view.physicalSize = const Size(900, 2400);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -40,6 +44,8 @@ Future<MemoryKeyValueStore> _pump(WidgetTester tester, Widget screen, FakeAccoun
         authRepositoryProvider.overrideWithValue(FakeAuthRepository()),
         accountRepositoryProvider.overrideWithValue(account),
         requestRepositoryProvider.overrideWithValue(FakeRequestRepository()),
+        if (phone != null) locationServiceProvider.overrideWithValue(phone),
+        if (geo != null) geoRepositoryProvider.overrideWithValue(geo),
       ],
       child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
     ),
@@ -138,6 +144,30 @@ void main() {
     await _tap(tester, find.text('Save profile'));
     expect(repo.calls, ['account:Asha Rao:+91 98765 43210', 'profile:Indiranagar:Bengaluru:::']);
     expect(find.text('start'), findsOneWidget); // back where it was opened from
+  });
+
+  testWidgets('profile: "Use my current location" fills in the area, city, state and pincode', (tester) async {
+    final repo = FakeAccountRepository(profileResult: const OwnProfile());
+    final geo = FakeGeoRepository(place: const GeoPlace(area: 'Indiranagar', city: 'Bengaluru', state: 'Karnataka', postcode: '560038'));
+    await _pump(tester, const ProfilePage(), repo, phone: FakeLocationService.at(const GeoPoint(12.9716, 77.5946)), geo: geo);
+
+    await _tap(tester, find.text('Use my location'));
+    String text(String label) => tester.widget<TextFormField>(find.widgetWithText(TextFormField, label)).controller!.text;
+    expect(geo.asked.single, (12.9716, 77.5946));
+    expect(text('Area or locality'), 'Indiranagar');
+    expect(text('City'), 'Bengaluru');
+    expect(text('State'), 'Karnataka');
+    expect(text('PIN code'), '560038');
+    expect(find.textContaining('Area, city, state and pincode are filled in'), findsOneWidget);
+  });
+
+  testWidgets('profile: when the address lookup fails it keeps the point and asks the person to type', (tester) async {
+    final repo = FakeAccountRepository(profileResult: const OwnProfile());
+    final geo = FakeGeoRepository()..error = const ApiException('Address search is unavailable', failure: ApiFailure.server, statusCode: 503);
+    await _pump(tester, const ProfilePage(), repo, phone: FakeLocationService.at(const GeoPoint(12.9716, 77.5946)), geo: geo);
+    await _tap(tester, find.text('Use my location'));
+    expect(find.textContaining('could not look up the address'), findsOneWidget);
+    expect(tester.widget<TextFormField>(find.widgetWithText(TextFormField, 'City')).controller!.text, isEmpty);
   });
 
   testWidgets('settings: the theme applies at once, is kept on the phone and copied to the profile', (tester) async {

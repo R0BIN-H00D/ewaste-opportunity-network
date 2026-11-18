@@ -6,6 +6,9 @@ export const CONDITIONS = [
   ['not_working', 'Not working'],
   ['for_spare_parts', 'For spare parts'],
 ];
+// What a person can choose for a new listing. SERVICES (below) still has every label, so older listings read correctly.
+export const LISTABLE_SERVICES = ['repair', 'refurbishment', 'recycling'];
+
 export const SERVICES = [
   ['repair', 'Repair'],
   ['reuse', 'Reuse'],

@@ -17,7 +17,6 @@ const EMAIL_TYPES = new Set([
   'refurbishment.offer', 'refurbishment.accepted', 'refurbishment.rejected', 'refurbishment.handover', 'refurbishment.cancelled',
   'recycling.pickup', 'recycling.collected', 'recycling.handover', 'recycling.cancelled',
   'order.placed', 'order.cancelled',
-  'learning.accepted', 'learning.rejected', 'learning.completed', 'learning.certificate',
   'pickup.scheduled', 'pickup.confirmed', 'pickup.reminder',
   'account.suspended', 'account.reactivated', 'listing.removed', 'product.removed', 'review.hidden', 'complaint.involved',
 ]);

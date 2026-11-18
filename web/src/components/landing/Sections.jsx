@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import {
-  ArrowRight, Battery, Box, Cable, Cpu, GraduationCap, HardDrive, Handshake, Heart, Keyboard, Laptop, Leaf, Monitor, MonitorSmartphone,
+  ArrowRight, Battery, Box, Cable, Cpu, HardDrive, Handshake, Heart, Keyboard, Laptop, Leaf, Monitor, MonitorSmartphone,
   Mouse, PackagePlus, Plug, Printer, Recycle, ShieldCheck, Smartphone, Tablet, Truck, Tv, Wrench,
 } from 'lucide-react';
 import GlassCard from '../glass/GlassCard';
@@ -16,7 +16,7 @@ const ICONS = {
   mouse: Mouse, printer: Printer, plug: Plug, battery: Battery, cable: Cable, cpu: Cpu, 'hard-drive': HardDrive, box: Box,
 };
 const STEP_ICONS = [PackagePlus, Handshake, Truck, Leaf];
-const AUDIENCE_ICONS = { repair: Wrench, students: GraduationCap, donate: Heart, refurbished: Laptop, recycle: Recycle };
+const AUDIENCE_ICONS = { repair: Wrench, donate: Heart, refurbished: Laptop, recycle: Recycle };
 
 export function Section({ id, title, intro, children, className = '' }) {
   return (

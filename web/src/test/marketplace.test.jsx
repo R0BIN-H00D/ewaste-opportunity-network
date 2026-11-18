@@ -141,6 +141,30 @@ describe('public marketplace', () => {
   });
 });
 
+describe('the marketplace inside the dashboard', () => {
+  const sidebar = () => screen.getByRole('complementary', { name: 'Dashboard navigation' });
+
+  it('keeps the side panel on the list and on a product, and links stay inside the dashboard', async () => {
+    marketApi.list.mockResolvedValue(page([product()]));
+    marketApi.get.mockResolvedValue(product());
+    renderApp('/dashboard/marketplace', signedIn(USER));
+    const card = await screen.findByRole('link', { name: 'View Refurbished ThinkPad T450' });
+    expect(sidebar()).toBeInTheDocument();
+    expect(card).toHaveAttribute('href', '/dashboard/marketplace/p1');
+    fireEvent.click(card);
+    await screen.findByRole('button', { name: 'Order this device' });
+    expect(sidebar()).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Marketplace/, current: false, hidden: false })).toBeTruthy();
+  });
+
+  it('still shows the plain public page, without the side panel, to visitors', async () => {
+    marketApi.list.mockResolvedValue(page([product()]));
+    renderApp('/marketplace', anonymous());
+    expect(await screen.findByRole('link', { name: 'View Refurbished ThinkPad T450' })).toHaveAttribute('href', '/marketplace/p1');
+    expect(screen.queryByRole('complementary', { name: 'Dashboard navigation' })).not.toBeInTheDocument();
+  });
+});
+
 describe('product page', () => {
   it('shows the label, condition, what was done, specifications and the seller', async () => {
     marketApi.get.mockResolvedValue(product());
@@ -177,9 +201,22 @@ describe('product page', () => {
     fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '2' } });
     expect(screen.getByText('Total: ₹30,000')).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('Pay the seller directly'));
-    fireEvent.change(screen.getByLabelText('Your area (optional)'), { target: { value: 'Indiranagar' } });
     fireEvent.click(screen.getByRole('button', { name: 'Place order' }));
-    await waitFor(() => expect(orderApi.place).toHaveBeenCalledWith({ productId: 'p1', quantity: 2, paymentMethod: 'offline', deliveryArea: 'Indiranagar' }));
+    expect(await screen.findByText('Enter the area or locality to deliver to.')).toBeInTheDocument();
+    expect(screen.getByText('Enter the city (letters only).')).toBeInTheDocument();
+    expect(screen.getByText('Enter a valid 6-digit pincode.')).toBeInTheDocument();
+    expect(orderApi.place).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText('Area or locality'), { target: { value: 'Indiranagar' } });
+    fireEvent.change(screen.getByLabelText('City'), { target: { value: 'Bengaluru' } });
+    fireEvent.change(screen.getByLabelText('Pincode'), { target: { value: '56003' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Place order' }));
+    expect(await screen.findByText('Enter a valid 6-digit pincode.')).toBeInTheDocument();
+    expect(orderApi.place).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText('Pincode'), { target: { value: '560038' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Place order' }));
+    await waitFor(() => expect(orderApi.place).toHaveBeenCalledWith({ productId: 'p1', quantity: 2, paymentMethod: 'offline', deliveryArea: 'Indiranagar', deliveryCity: 'Bengaluru', deliveryPincode: '560038' }));
     expect(await screen.findByText('Your order was placed. The seller will confirm it soon.')).toBeInTheDocument();
   });
 
@@ -188,6 +225,9 @@ describe('product page', () => {
     orderApi.place.mockRejectedValue(apiError('You already have an open order for this product', 'ALREADY_ORDERED'));
     renderApp('/marketplace/p1', signedIn(USER));
     fireEvent.click(await screen.findByRole('button', { name: 'Order this device' }));
+    fireEvent.change(screen.getByLabelText('Area or locality'), { target: { value: 'Indiranagar' } });
+    fireEvent.change(screen.getByLabelText('City'), { target: { value: 'Bengaluru' } });
+    fireEvent.change(screen.getByLabelText('Pincode'), { target: { value: '560038' } });
     fireEvent.click(screen.getByRole('button', { name: 'Place order' }));
     expect(await screen.findByText('You already have an open order for this product')).toBeInTheDocument();
   });
@@ -408,7 +448,7 @@ describe('order page', () => {
     expect(screen.getByText('Indiranagar')).toBeInTheDocument();
     expect(screen.getByText(/Cash on delivery \(not paid yet\)/)).toBeInTheDocument();
     expect(screen.getByText(/The platform only keeps a record/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Refurbished ThinkPad T450' })).toHaveAttribute('href', '/marketplace/p1');
+    expect(screen.getByRole('link', { name: 'Refurbished ThinkPad T450' })).toHaveAttribute('href', '/dashboard/marketplace/p1');
   });
 
   it('tells the seller the order is waiting for the buyer after handover', async () => {

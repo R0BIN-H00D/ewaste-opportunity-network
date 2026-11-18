@@ -1,4 +1,5 @@
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { ShieldAlert } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { homePathFor } from '../../store/authSlice';
@@ -39,7 +40,7 @@ export function RequireRole({ roles }) {
   return <Outlet />;
 }
 
-/** Provider features (technician, student, refurbisher, recycler) need admin-approved verification (BR-01). */
+/** Provider features (technician, refurbisher, recycler) need admin-approved verification (BR-01). */
 export function RequireVerified() {
   const { isProvider, verification } = useAuth();
   if (isProvider && verification?.status !== 'approved') {
@@ -58,8 +59,9 @@ export function RequireVerified() {
 /** Login/register pages: signed-in people are redirected away. */
 export function GuestOnly() {
   const { isChecking, isAuthenticated, user } = useAuth();
+  const justRegistered = useSelector((s) => s.auth.justRegistered);
   const location = useLocation();
   if (isChecking) return <PageLoader />;
-  if (isAuthenticated) return <Navigate to={location.state?.from || homePathFor(user.role)} replace />;
+  if (isAuthenticated) return <Navigate to={justRegistered ? homePathFor(user.role, true) : location.state?.from || homePathFor(user.role)} replace />;
   return <Outlet />;
 }

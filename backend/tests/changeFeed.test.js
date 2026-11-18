@@ -12,6 +12,8 @@ const DeviceListing = require('../src/models/DeviceListing');
 const Category = require('../src/models/Category');
 const AdminLog = require('../src/models/AdminLog');
 const EducationArticle = require('../src/models/EducationArticle');
+const WantedRequest = require('../src/models/WantedRequest');
+const WantedResponse = require('../src/models/WantedResponse');
 const { RESOURCE, userPaths } = require('../src/sockets/changeFeed');
 
 let server; let io; let url; let owner; let tech; let stranger; let admin; let cats;
@@ -126,6 +128,24 @@ describe('the change feed', () => {
     await wait();
     expect(heard(s, 'education')).toHaveLength(1);
     expect(heard(s, 'category')).toHaveLength(1);
+  });
+
+  it('tells everyone about an open wanted-device request, and its owner when someone accepts it', async () => {
+    const refurbisher = await makeUser('refurbisher');
+    const [r, s, o] = await Promise.all([client(refurbisher), client(stranger), client(owner)]);
+    await wait(50);
+    const wanted = await WantedRequest.create({ refurbisher: refurbisher.id, title: 'Any working laptop' });
+    await wait();
+    expect(heard(s, 'wanted')).toHaveLength(1); // the board of open requests updates for everyone
+    r.heard.length = 0;
+    await WantedResponse.create({ request: wanted._id, responder: owner.id, refurbisher: refurbisher.id });
+    await wait();
+    expect(heard(r, 'wanted')).toHaveLength(1); // the owner's list of who accepted updates
+    expect(heard(o, 'wanted').length).toBeGreaterThan(0);
+    s.heard.length = 0;
+    await WantedRequest.updateOne({ _id: wanted._id }, { $set: { status: 'closed' } });
+    await wait();
+    expect(heard(s, 'wanted')).toHaveLength(1); // and it drops off the board
   });
 
   it('does not announce records that are not meant to be (logs, tokens), and nothing when a write fails', async () => {

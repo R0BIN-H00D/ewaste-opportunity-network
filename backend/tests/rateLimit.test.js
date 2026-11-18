@@ -75,7 +75,7 @@ describe('the routes that need a limiter have one', () => {
   });
 
   it('uploads are limited', () => {
-    for (const key of ['POST /api/devices', 'POST /api/ai/classify', 'POST /api/marketplace']) expect(handlersOf(key)).toContain(limiters.uploadLimiter);
+    for (const key of ['POST /api/devices', 'POST /api/marketplace']) expect(handlersOf(key)).toContain(limiters.uploadLimiter);
   });
 
   it('every administrator route sits behind the admin limiter', () => {

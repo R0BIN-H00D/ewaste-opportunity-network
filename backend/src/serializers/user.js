@@ -18,7 +18,7 @@ const toUser = (u) => ({
 // Owner view (the person looking at their own profile): exact address/location included.
 const toOwnProfile = (p) =>
   p && pick(p.toObject ? p.toObject() : p, [
-    'bio', 'addressLine', 'addressArea', 'city', 'state', 'pincode', 'location', 'publicLocation', 'orgProfile', 'preferences', 'greenScore', 'badges',
+    'bio', 'addressLine', 'addressArea', 'city', 'state', 'pincode', 'location', 'publicLocation', 'orgProfile', 'preferences',
   ]);
 
 const toOwnRoleProfile = (p) => {

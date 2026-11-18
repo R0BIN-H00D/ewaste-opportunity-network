@@ -10,7 +10,6 @@ const TechnicianProfile = require('../models/TechnicianProfile');
 const RefurbisherProfile = require('../models/RefurbisherProfile');
 const RecyclingCenter = require('../models/RecyclingCenter');
 const RecyclingRecord = require('../models/RecyclingRecord');
-const LearningOpportunity = require('../models/LearningOpportunity');
 const ApiError = require('../utils/ApiError');
 const audit = require('./auditService');
 
@@ -25,10 +24,10 @@ const present = (c, usage = {}) => ({
 const groupBy = (Model, field, unwind) => Model.aggregate([...(unwind ? [{ $unwind: `$${field}` }] : []), { $match: { [field]: { $ne: null } } }, { $group: { _id: `$${field}`, n: { $sum: 1 } } }]);
 
 async function usageByCategory() {
-  const [listings, products, devices, tech, refurb, centres, records, learning] = await Promise.all([
+  const [listings, products, devices, tech, refurb, centres, records] = await Promise.all([
     groupBy(DeviceListing, 'category'), groupBy(MarketplaceProduct, 'category'), groupBy(Device, 'category'),
     groupBy(TechnicianProfile, 'deviceCategories', true), groupBy(RefurbisherProfile, 'categories', true),
-    groupBy(RecyclingCenter, 'acceptedCategories', true), groupBy(RecyclingRecord, 'categories', true), groupBy(LearningOpportunity, 'deviceType'),
+    groupBy(RecyclingCenter, 'acceptedCategories', true), groupBy(RecyclingRecord, 'categories', true),
   ]);
   const usage = new Map();
   const add = (rows, field) => rows.forEach((r) => {
@@ -38,7 +37,7 @@ async function usageByCategory() {
     u.references += r.n;
     usage.set(k, u);
   });
-  add(listings, 'listings'); add(products, 'products'); add(devices); add(tech); add(refurb); add(centres); add(records); add(learning);
+  add(listings, 'listings'); add(products, 'products'); add(devices); add(tech); add(refurb); add(centres); add(records);
   return usage;
 }
 

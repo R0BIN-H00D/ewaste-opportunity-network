@@ -3,6 +3,7 @@ import { ImageOff, Star, Store } from 'lucide-react';
 import Badge from '../ui/Badge';
 import Skeleton from '../ui/Skeleton';
 import { assetUrl } from '../../services/api';
+import { useMarketplaceBase } from '../../hooks/useMarketplaceBase';
 import { PRODUCT_CONDITIONS, PRODUCT_STATUS } from '../../lib/marketplace';
 import { formatMoney } from '../../lib/requests';
 import { labelOf } from '../../lib/devices';
@@ -41,7 +42,9 @@ export function SellerLine({ seller }) {
   );
 }
 
-export default function ProductCard({ product: p, to = `/marketplace/${p._id}`, footer }) {
+export default function ProductCard({ product: p, to, footer }) {
+  const base = useMarketplaceBase();
+  to = to || `${base}/${p._id}`;
   return (
     <article className="glass flex flex-col overflow-hidden transition hover:-translate-y-0.5 hover:shadow-e2">
       <Link to={to} aria-label={`View ${p.title}`}><ProductThumb product={p} className="aspect-[4/3]" /></Link>

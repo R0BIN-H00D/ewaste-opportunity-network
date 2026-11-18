@@ -75,7 +75,6 @@ export default function AdminOverview() {
         <Item label="Suspended" value={people.suspended} to={`${users}?status=suspended`} />
         <Item label="Members" value={people.byRole.user} to={`${users}?role=user`} />
         <Item label="Technicians" value={people.byRole.technician} to={`${users}?role=technician`} />
-        <Item label="Students" value={people.byRole.student} to={`${users}?role=student`} />
         <Item label="Refurbishers" value={people.byRole.refurbisher} to={`${users}?role=refurbisher`} />
         <Item label="Recycling centres" value={people.byRole.recycler} to={`${users}?role=recycler`} hint={`${centres.authorised} authorised`} />
       </Section>

@@ -138,7 +138,18 @@ class RefurbOpportunitiesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
         extendBodyBehindAppBar: true,
-        appBar: glassAppBar(context, 'Devices to refurbish'),
+        appBar: AppBar(
+          title: const Text('Requests'),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          actions: [
+            TextButton.icon(
+              onPressed: () => context.push(Routes.wanted),
+              icon: const Icon(Icons.add),
+              label: const Text('New request'),
+            ),
+          ],
+        ),
         body: const AppBackground(child: SafeArea(child: RefurbOpportunitiesScreen())),
       );
 }

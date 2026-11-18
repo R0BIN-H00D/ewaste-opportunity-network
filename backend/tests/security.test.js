@@ -44,10 +44,9 @@ const PUBLIC = new Set([
   'GET /api/donations', 'GET /api/donations/:id',
   'GET /api/marketplace', 'GET /api/marketplace/:id',
   'GET /api/reviews',
-  'GET /api/students/opportunities', 'GET /api/students/opportunities/:id', 'GET /api/students/certificates/verify/:certNo',
   'GET /api/education', 'GET /api/education/:slug',
   'GET /api/announcements', 'POST /api/contact',
-  'GET /api/analytics/platform-impact', 'GET /api/analytics/rules',
+  'GET /api/analytics/platform-impact',
   'GET /api/analytics/monthly', // the platform-wide months are public; `scope=me` needs a login (checked below)
   'GET /api/analytics/yearly', 'GET /api/analytics/by-category', // the same: platform-wide is public, `scope=me` needs a login
 ]);

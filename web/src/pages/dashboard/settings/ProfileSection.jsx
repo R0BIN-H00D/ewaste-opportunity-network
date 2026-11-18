@@ -7,6 +7,7 @@ import { MapPin } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useSave } from '../../../hooks/useSave';
 import { userApi } from '../../../services/authApi';
+import { geoApi } from '../../../services/geoApi';
 import { loadMe } from '../../../store/authSlice';
 import { applyFieldErrors } from '../../../utils/errors';
 import TextField from '../../../components/ui/TextField';
@@ -31,25 +32,47 @@ export default function ProfileSection() {
   const [loc, setLoc] = useState(initialLoc);
   const [locDirty, setLocDirty] = useState(false);
   const [geoError, setGeoError] = useState('');
+  const [geoNote, setGeoNote] = useState('');
+  const [locating, setLocating] = useState(false);
   const {
     register,
     handleSubmit,
     setError,
+    setValue,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
     defaultValues: Object.fromEntries(FIELDS.map((f) => [f, profile?.[f] || ''])),
   });
 
+  /** Finds where the person is, then fills in the area, city, state and pincode from that spot. */
   const useMyLocation = () => {
     setGeoError('');
-    if (!navigator.geolocation) return setGeoError('Your browser does not support location.');
+    setGeoNote('');
+    if (!navigator.geolocation) return setGeoError('Your browser does not support location. Please type your address.');
+    setLocating(true);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLoc({ lat: Number(pos.coords.latitude.toFixed(6)), lng: Number(pos.coords.longitude.toFixed(6)) });
+      async (pos) => {
+        const lat = Number(pos.coords.latitude.toFixed(6));
+        const lng = Number(pos.coords.longitude.toFixed(6));
+        setLoc({ lat, lng });
         setLocDirty(true);
+        try {
+          const place = await geoApi.reverse(lat, lng);
+          const fill = { addressArea: place.area, city: place.city, state: place.state, pincode: String(place.postcode || '').replace(/\s/g, '') };
+          for (const [name, value] of Object.entries(fill)) if (value) setValue(name, value, { shouldValidate: true, shouldDirty: true });
+          const missing = Object.entries(fill).filter(([, v]) => !v).map(([k]) => ({ addressArea: 'area', city: 'city', state: 'state', pincode: 'pincode' })[k]);
+          setGeoNote(missing.length ? `Location saved and filled in what we could find. Please type the ${missing.join(' and ')}.` : 'Location found. Area, city, state and pincode are filled in; check them, then save.');
+        } catch {
+          setGeoNote('Location saved, but we could not look up the address just now. Please type the area, city, state and pincode.');
+        } finally {
+          setLocating(false);
+        }
       },
-      () => setGeoError('Could not get your location. You can allow it in the browser or skip this.'),
+      (err) => {
+        setLocating(false);
+        setGeoError(err?.code === 1 ? 'Location is blocked. Allow it for this site in your browser, or type your address.' : 'Could not get your location. You can type your address instead.');
+      },
       { timeout: 10000 },
     );
   };
@@ -78,10 +101,11 @@ export default function ProfileSection() {
           <p className="text-sm font-medium text-ink dark:text-white">Location</p>
           <p className="text-sm text-ink-muted dark:text-[#9FB2A7]">{loc ? `Saved point: ${loc.lat}, ${loc.lng}` : 'No location set. It is used to find nearby technicians and centres.'}</p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="btn btn-glass" onClick={useMyLocation}><MapPin size={16} aria-hidden /> Use my current location</button>
+            <button type="button" className="btn btn-glass" onClick={useMyLocation} disabled={locating}><MapPin size={16} aria-hidden /> {locating ? 'Finding your location…' : 'Use my current location'}</button>
             {loc && <button type="button" className="btn btn-glass" onClick={() => { setLoc(null); setLocDirty(true); }}>Remove location</button>}
           </div>
           <Alert variant="error">{geoError}</Alert>
+          {geoNote && <p role="status" className="text-sm text-ink dark:text-[#E8F1EB]">{geoNote}</p>}
         </div>
 
         <div className="sm:col-span-2">

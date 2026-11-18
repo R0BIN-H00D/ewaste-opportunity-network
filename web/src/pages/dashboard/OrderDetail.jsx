@@ -135,7 +135,7 @@ export default function OrderDetail() {
           <div className="flex gap-4">
             {o.product?.photo ? <img src={assetUrl(o.product.photo.url)} alt={o.product.title} className="h-24 w-32 shrink-0 rounded-2xl object-cover" /> : <div className="h-24 w-32 shrink-0 rounded-2xl bg-primary/5" aria-hidden />}
             <div className="min-w-0 space-y-1">
-              <p className="font-bold text-ink dark:text-white"><Link to={`/marketplace/${o.product?._id}`} className="hover:underline">{o.product?.title}</Link></p>
+              <p className="font-bold text-ink dark:text-white"><Link to={`/dashboard/marketplace/${o.product?._id}`} className="hover:underline">{o.product?.title}</Link></p>
               {o.product?.condition && <ProductBadges product={o.product} />}
             </div>
           </div>
@@ -146,7 +146,7 @@ export default function OrderDetail() {
           </dl>
           <p className="text-xs text-ink-muted dark:text-[#9FB2A7]">Paid directly between the two people. The platform only keeps a record.</p>
           <p className="flex items-center gap-2 text-sm text-ink dark:text-[#E8F1EB]"><User size={16} aria-hidden />{seller ? `Buyer: ${o.buyer?.name}` : `Seller: ${o.seller?.businessName || o.seller?.name}`}</p>
-          {o.deliveryArea && <p className="flex items-center gap-2 text-sm text-ink dark:text-[#E8F1EB]"><MapPin size={16} aria-hidden /><span className="font-semibold">Delivery area:</span> <span>{o.deliveryArea}</span></p>}
+          {o.deliveryArea && <p className="flex items-center gap-2 text-sm text-ink dark:text-[#E8F1EB]"><MapPin size={16} aria-hidden /><span className="font-semibold">Deliver to:</span> <span>{[o.deliveryArea, o.deliveryCity, o.deliveryPincode].filter(Boolean).join(', ')}</span></p>}
           {o.notes && <p className="text-sm text-ink-muted dark:text-[#9FB2A7]">Note: “{o.notes}”</p>}
           {o.status === 'cancelled' && o.cancelReason && <Alert variant="info">Cancelled: {o.cancelReason}</Alert>}
           {o.reviewed && !seller && <Alert variant="success">You reviewed this seller. Thank you.</Alert>}

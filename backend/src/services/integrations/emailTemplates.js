@@ -9,7 +9,7 @@ const safeUrl = (u) => (/^https?:\/\//i.test(String(u || '')) ? String(u) : null
  * @param {{ title: string, greeting?: string, paragraphs?: string[], button?: { label: string, url: string }, footer?: string }} content
  * @returns {{ html: string, text: string }}
  */
-function renderEmail({ title, greeting, paragraphs = [], button, footer }) {
+function renderEmail({ title, greeting, paragraphs = [], code, button, footer }) {
   const url = button ? safeUrl(button.url) : null;
   const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title></head>
@@ -20,11 +20,12 @@ function renderEmail({ title, greeting, paragraphs = [], button, footer }) {
 <tr><td style="font-size:22px;font-weight:bold;padding:12px 0 8px;">${escapeHtml(title)}</td></tr>
 ${greeting ? `<tr><td style="font-size:16px;line-height:1.5;padding:4px 0;">${escapeHtml(greeting)}</td></tr>` : ''}
 ${paragraphs.map((p) => `<tr><td style="font-size:16px;line-height:1.5;padding:6px 0;">${escapeHtml(p)}</td></tr>`).join('\n')}
+${code ? `<tr><td style="padding:16px 0;"><div style="display:inline-block;background:#ecf6f0;border-radius:12px;padding:14px 26px;font-size:32px;font-weight:bold;letter-spacing:8px;color:#047857;font-family:'Courier New',monospace;">${escapeHtml(code)}</div></td></tr>` : ''}
 ${url ? `<tr><td style="padding:20px 0;"><a href="${escapeHtml(url)}" style="display:inline-block;background:#047857;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:10px;">${escapeHtml(button.label)}</a></td></tr>
 <tr><td style="font-size:13px;color:#52645a;line-height:1.4;">If the button does not work, copy this address into your browser:<br><span style="word-break:break-all;">${escapeHtml(url)}</span></td></tr>` : ''}
 ${footer ? `<tr><td style="font-size:13px;color:#52645a;line-height:1.4;padding-top:20px;">${escapeHtml(footer)}</td></tr>` : ''}
 </table></td></tr></table></body></html>`;
-  const text = [greeting, ...paragraphs, url ? `${button.label}:\n${url}` : null, footer].filter(Boolean).join('\n\n');
+  const text = [greeting, ...paragraphs, code ? `Your code: ${code}` : null, url ? `${button.label}:\n${url}` : null, footer].filter(Boolean).join('\n\n');
   return { html, text };
 }
 

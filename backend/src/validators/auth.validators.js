@@ -34,10 +34,11 @@ const refreshBody = z.object({ refreshToken: token.optional() }).strict();
 const forgotBody = z.object({ email }).strict();
 const resetBody = z.object({ token, password }).strict();
 const verifyEmailBody = z.object({ token }).strict();
+const verifyCodeBody = z.object({ code: z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code from your email') }).strict();
 const changePasswordBody = z.object({ currentPassword: z.string().min(1).max(200), newPassword: password }).strict();
 const deleteAccountBody = z.object({ password: z.string().min(1).max(200) }).strict();
 const sessionParam = z.object({ id: objectId }).strict();
 
 module.exports = {
-  registerBody, loginBody, refreshBody, forgotBody, resetBody, verifyEmailBody, changePasswordBody, deleteAccountBody, sessionParam, password,
+  registerBody, loginBody, refreshBody, forgotBody, resetBody, verifyEmailBody, verifyCodeBody, changePasswordBody, deleteAccountBody, sessionParam, password,
 };

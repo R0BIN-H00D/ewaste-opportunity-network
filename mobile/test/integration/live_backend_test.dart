@@ -16,7 +16,6 @@ import 'package:ewaste_opportunity/services/chat_repository.dart';
 import 'package:ewaste_opportunity/services/device_repository.dart';
 import 'package:ewaste_opportunity/services/donation_repository.dart';
 import 'package:ewaste_opportunity/services/impact_repository.dart';
-import 'package:ewaste_opportunity/services/learning_repository.dart';
 import 'package:ewaste_opportunity/services/marketplace_repository.dart';
 import 'package:ewaste_opportunity/services/pickup_repository.dart';
 import 'package:ewaste_opportunity/services/recycling_repository.dart';
@@ -25,26 +24,33 @@ import 'package:ewaste_opportunity/services/technician_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _api = String.fromEnvironment('LIVE_API');
-final _skip = _api.isEmpty ? 'Set --dart-define=LIVE_API=http://localhost:5000/api to run against a live backend' : null;
+final _skip = _api.isEmpty
+    ? 'Set --dart-define=LIVE_API=http://localhost:5000/api to run against a live backend'
+    : null;
 
 ApiClient _client() => ApiClient(store: MemoryKeyValueStore(), baseUrl: _api);
 
 Future<ApiClient> _signedIn() async {
   final client = _client();
-  await AuthRepository(client).login(email: 'user@demo.local', password: 'Demo@12345');
+  await AuthRepository(client)
+      .login(email: 'user@demo.local', password: 'Demo@12345');
   return client;
 }
 
 void main() {
   group('against the live backend', () {
-    test('signing in works, and a wrong password is refused in words', () async {
+    test('signing in works, and a wrong password is refused in words',
+        () async {
       final client = _client();
-      final me = await AuthRepository(client).login(email: 'user@demo.local', password: 'Demo@12345');
+      final me = await AuthRepository(client)
+          .login(email: 'user@demo.local', password: 'Demo@12345');
       expect(me.user.email, 'user@demo.local');
       expect(client.hasAccessToken, isTrue);
       await expectLater(
-        AuthRepository(_client()).login(email: 'user@demo.local', password: 'wrong-password'),
-        throwsA(isA<ApiException>().having((e) => e.message, 'message', isNotEmpty)),
+        AuthRepository(_client())
+            .login(email: 'user@demo.local', password: 'wrong-password'),
+        throwsA(isA<ApiException>()
+            .having((e) => e.message, 'message', isNotEmpty)),
       );
     }, skip: _skip);
 
@@ -59,18 +65,32 @@ void main() {
         final one = await devices.get(page.items.first.id);
         expect(one.title, isNotEmpty);
       }
-      expect((await TechnicianRepository(client).list(const TechnicianQuery())).items, isA<List<Object>>());
-      expect((await RecyclingRepository(client).centers(const CenterQuery())).items, isA<List<Object>>());
-      expect((await MarketplaceRepository(client).products(const ProductQuery())).items, isA<List<Object>>());
-      expect((await DonationRepository(client).donations(const DonationQuery())).items, isA<List<Object>>());
-      expect((await LearningRepository(client).opportunities(const OpportunityQuery())).items, isA<List<Object>>());
+      expect(
+          (await TechnicianRepository(client).list(const TechnicianQuery()))
+              .items,
+          isA<List<Object>>());
+      expect(
+          (await RecyclingRepository(client).centers(const CenterQuery()))
+              .items,
+          isA<List<Object>>());
+      expect(
+          (await MarketplaceRepository(client).products(const ProductQuery()))
+              .items,
+          isA<List<Object>>());
+      expect(
+          (await DonationRepository(client).donations(const DonationQuery()))
+              .items,
+          isA<List<Object>>());
     }, skip: _skip);
 
     test('a person\'s own work reads into the app models', () async {
       final client = await _signedIn();
-      expect((await RequestRepository(client).list()).items, isA<List<Object>>());
-      expect((await MarketplaceRepository(client).orders()).items, isA<List<Object>>());
-      expect((await RecyclingRepository(client).list()).items, isA<List<Object>>());
+      expect(
+          (await RequestRepository(client).list()).items, isA<List<Object>>());
+      expect((await MarketplaceRepository(client).orders()).items,
+          isA<List<Object>>());
+      expect((await RecyclingRepository(client).list()).items,
+          isA<List<Object>>());
       final pickups = PickupRepository(client);
       expect((await pickups.list()).items, isA<List<Object>>());
       expect((await pickups.list(upcoming: false)).items, isA<List<Object>>());
@@ -85,11 +105,10 @@ void main() {
       expect((await chat.conversations()).page.items, isA<List<Object>>());
     }, skip: _skip);
 
-    test('the Green Score and the impact views read into the app models and agree with each other', () async {
+    test('the impact views read into the app models and agree with each other',
+        () async {
       final client = await _signedIn();
       final impact = ImpactRepository(client);
-      final score = await impact.greenScore();
-      expect(score.score.level.name, isNotEmpty);
       final summary = await impact.summary();
       final years = await impact.yearly();
       final kinds = await impact.byCategory();
@@ -99,8 +118,8 @@ void main() {
       // Every device is counted once in each view of the same events (the last twelve months can only hold part of the years).
       final inKinds = kinds.fold<int>(0, (t, r) => t + r.devices);
       expect(inKinds, summary.devicesTotal);
-      expect(years.fold<int>(0, (t, r) => t + r.devices), lessThanOrEqualTo(summary.devicesTotal));
-      expect((await impact.rules()).rules, isNotEmpty);
+      expect(years.fold<int>(0, (t, r) => t + r.devices),
+          lessThanOrEqualTo(summary.devicesTotal));
     }, skip: _skip);
 
     test('the learning centre and the sign-in-free reads work', () async {
@@ -109,11 +128,18 @@ void main() {
       expect(list.items, isNotEmpty);
       final one = await articles.get(list.items.first.slug);
       expect(one.body, isNotEmpty);
-      await expectLater(articles.get('no-such-guide-here'), throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 404)));
+      await expectLater(
+          articles.get('no-such-guide-here'),
+          throwsA(isA<ApiException>()
+              .having((e) => e.statusCode, 'statusCode', 404)));
     }, skip: _skip);
 
-    test('a protected call without signing in is refused, not left hanging', () async {
-      await expectLater(PickupRepository(_client()).list(), throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 401)));
+    test('a protected call without signing in is refused, not left hanging',
+        () async {
+      await expectLater(
+          PickupRepository(_client()).list(),
+          throwsA(isA<ApiException>()
+              .having((e) => e.statusCode, 'statusCode', 401)));
     }, skip: _skip);
   });
 }

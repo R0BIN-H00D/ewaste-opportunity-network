@@ -1,56 +1,6 @@
 'use strict';
-// Green Score and environmental impact rules (design.md A.6, FR-IMP-*). Everything a person can earn, and every number
-// used to estimate material and CO2e figures, is written down here so the rules are transparent (FR-IMP-003) and can be
-// shown to people as they are. Change a number here and the score history keeps its old entries: points are recorded
-// as they were when earned.
-
-/** What earns points. `provider` rules reward the person who did the work, not the one who asked for it. */
-const POINT_RULES = {
-  repair_completed: { points: 50, label: 'A repair you asked for was completed', who: 'the person who asked' },
-  repair_provider: { points: 30, label: 'You completed a repair', who: 'the technician' },
-  donation_completed: { points: 40, label: 'You donated a device', who: 'the donor' },
-  reuse_completed: { points: 30, label: 'A device you passed on whole was received', who: 'the person who passed it on' },
-  refurbishment_sold: { points: 40, label: 'A device you refurbished was received by its buyer', who: 'the refurbisher' },
-  recycling_verified: { points: 30, label: 'A recycling centre confirmed it received and weighed your devices', who: 'the person who sent them' },
-  review_left: { points: 2, label: 'You reviewed a completed service', who: 'the reviewer, once per transaction' },
-};
-
-/** Which rule an impact event of each type earns for the person it is recorded against. */
-const RULE_FOR_TYPE = {
-  repair: 'repair_completed',
-  donation: 'donation_completed',
-  reuse: 'reuse_completed',
-  refurbishment: 'refurbishment_sold',
-  recycling: 'recycling_verified',
-};
-
-/** To stop points being farmed: only this many scored events a person can earn in one (UTC) day. Further ones are recorded at 0. */
-const DAILY_EVENT_CAP = 10;
-
-const LEVELS = [
-  { key: 'seed', name: 'Seed', min: 0 },
-  { key: 'sprout', name: 'Sprout', min: 100 },
-  { key: 'sapling', name: 'Sapling', min: 250 },
-  { key: 'tree', name: 'Tree', min: 500 },
-  { key: 'forest', name: 'Forest', min: 1000 },
-];
-
-/** Badges, each with the plain-words condition shown to people. `test(stats)` decides if it is earned. */
-const BADGES = [
-  { key: 'first_repair', name: 'First repair', description: 'Take part in one completed repair.', test: (s) => s.byType.repair >= 1, progress: (s) => [s.byType.repair, 1] },
-  { key: 'donor', name: 'Donor', description: 'Donate one device.', test: (s) => s.byType.donation >= 1, progress: (s) => [s.byType.donation, 1] },
-  { key: 'refurbisher', name: 'Refurbisher', description: 'Have one refurbished device received by its buyer.', test: (s) => s.byType.refurbishment >= 1, progress: (s) => [s.byType.refurbishment, 1] },
-  { key: 'recycler', name: 'Responsible recycler', description: 'Have devices received and weighed by a recycling centre.', test: (s) => s.byType.recycling >= 1, progress: (s) => [s.byType.recycling, 1] },
-  {
-    key: 'circular_champion',
-    name: 'Circular champion',
-    description: 'Complete at least 5 activities across at least 3 different kinds.',
-    test: (s) => s.total >= 5 && s.kinds >= 3,
-    progress: (s) => [Math.min(s.total, 5) + Math.min(s.kinds, 3), 8],
-  },
-  { key: 'material_saver', name: 'Material saver', description: 'Have 10 kg of materials measured on a scale at a recycling centre.', test: (s) => s.measuredKg >= 10, progress: (s) => [Math.min(s.measuredKg, 10), 10] },
-  { key: 'reviewer', name: 'Helpful reviewer', description: 'Review 3 completed services.', test: (s) => s.reviews >= 3, progress: (s) => [s.reviews, 3] },
-];
+// Environmental impact rules (design.md A.6, FR-IMP-*). Every number used to estimate material and CO2e figures is written
+// down here so the rules are transparent (FR-IMP-003).
 
 /**
  * PLACEHOLDER factors per category slug (A-11): kilograms of material in one device, and CO2e (kg) avoided by keeping one
@@ -80,4 +30,4 @@ const DEFAULT_FACTORS = { co2eKg: 10 };
 /** What the API says about its own numbers, so no client has to guess. */
 const METHOD_NOTE = 'Counts of devices and weights measured on a scale at a recycling centre are actual. Everything else (material weights without a measurement, and CO2e avoided) is an estimate from placeholder factors that have not been sourced yet.';
 
-module.exports = { POINT_RULES, RULE_FOR_TYPE, DAILY_EVENT_CAP, LEVELS, BADGES, PLACEHOLDER_FACTORS, DEFAULT_FACTORS, METHOD_NOTE };
+module.exports = { PLACEHOLDER_FACTORS, DEFAULT_FACTORS, METHOD_NOTE };

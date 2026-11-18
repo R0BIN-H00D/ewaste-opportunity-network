@@ -21,6 +21,9 @@ const schema = baseSchema({
   passwordResetExpires: { type: Date, select: false },
   emailVerifyTokenHash: { type: String, select: false },
   emailVerifyExpires: { type: Date, select: false },
+  emailVerifyCodeHash: { type: String, select: false }, // the 6-digit code that was emailed (hashed)
+  emailVerifyCodeExpires: { type: Date, select: false },
+  emailVerifyCodeAttempts: { type: Number, default: 0, select: false },
   suspension: new Schema({ reason: String, by: { type: ObjectId, ref: 'User' }, at: Date }, { _id: false }),
 });
 schema.index({ role: 1, status: 1 });

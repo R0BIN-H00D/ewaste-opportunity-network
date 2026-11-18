@@ -18,6 +18,8 @@ const MAX_FAILED_LOGINS = 5;
 const LOCK_MS = 15 * 60 * 1000;
 const RESET_TTL_MS = 60 * 60 * 1000;
 const VERIFY_TTL_MS = 48 * 60 * 60 * 1000;
+const CODE_TTL_MS = 15 * 60 * 1000;
+const MAX_CODE_ATTEMPTS = 5;
 const INVALID_LOGIN = 'Invalid email or password';
 
 // Compared against when the email is unknown so response time does not reveal which emails exist.
@@ -54,23 +56,38 @@ async function revokeEverything(userId) {
 
 /* ---------- email links ---------- */
 
+// The 6-digit code is stored hashed together with the user id, so a leaked database does not reveal live codes.
+const hashCode = (userId, code) => sha256(`${userId}:${code}`);
+
+/** Emails the person a 6-digit code (and a link that does the same). Returns how it was delivered: smtp, console or failed. */
 async function sendVerificationEmail(user) {
   const token = randomToken(32);
+  const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
   await User.updateOne(
     { _id: user._id },
-    { $set: { emailVerifyTokenHash: sha256(token), emailVerifyExpires: new Date(Date.now() + VERIFY_TTL_MS) } },
+    {
+      $set: {
+        emailVerifyTokenHash: sha256(token),
+        emailVerifyExpires: new Date(Date.now() + VERIFY_TTL_MS),
+        emailVerifyCodeHash: hashCode(user._id, code),
+        emailVerifyCodeExpires: new Date(Date.now() + CODE_TTL_MS),
+        emailVerifyCodeAttempts: 0,
+      },
+    },
   );
-  await mailer.sendMail({
+  const sent = await mailer.sendMail({
     to: user.email,
-    subject: 'Verify your email - E-Waste Network',
+    subject: `${code} is your E-Waste Network verification code`,
     ...renderEmail({
       title: 'Confirm your email address',
       greeting: `Hi ${user.name},`,
-      paragraphs: ['Thanks for joining. Please confirm your email address so we can reach you about your devices and requests.'],
-      button: { label: 'Confirm my email', url: `${env.CLIENT_WEB_URL}/verify-email?token=${token}` },
-      footer: 'This link is valid for 48 hours. If you did not create an account, you can ignore this email.',
+      paragraphs: ['Thanks for joining. Enter this 6-digit code on the verification page to confirm your email address:'],
+      code,
+      button: { label: 'Or confirm with one click', url: `${env.CLIENT_WEB_URL}/verify-email?token=${token}` },
+      footer: 'The code is valid for 15 minutes. If you did not create an account, you can ignore this email.',
     }),
   });
+  return sent.delivered;
 }
 
 /* ---------- register / login ---------- */
@@ -266,7 +283,33 @@ async function resendVerification(userId) {
   const user = await User.findById(userId);
   if (!user) throw ApiError.unauthorized();
   if (user.emailVerified) throw ApiError.conflict('Your email is already verified', 'ALREADY_VERIFIED');
-  await sendVerificationEmail(user);
+  const delivered = await sendVerificationEmail(user);
+  if (delivered === 'failed') throw new ApiError(502, 'We could not send the email. Check the address is right, or try again in a minute.', 'EMAIL_NOT_SENT');
+  return delivered;
+}
+
+/** The person types the 6-digit code from their email. Five wrong tries lock the code until a new one is sent. */
+async function verifyEmailCode(userId, code) {
+  const user = await User.findById(userId).select('+emailVerifyCodeHash +emailVerifyCodeExpires +emailVerifyCodeAttempts');
+  if (!user) throw ApiError.unauthorized();
+  if (user.emailVerified) return;
+  if (!user.emailVerifyCodeHash || !user.emailVerifyCodeExpires || user.emailVerifyCodeExpires < new Date()) {
+    throw ApiError.badRequest('That code has expired. Ask for a new one.', undefined);
+  }
+  if ((user.emailVerifyCodeAttempts || 0) >= MAX_CODE_ATTEMPTS) {
+    throw new ApiError(429, 'Too many wrong tries. Ask for a new code.', 'TOO_MANY_ATTEMPTS');
+  }
+  const given = Buffer.from(hashCode(user._id, code));
+  const real = Buffer.from(user.emailVerifyCodeHash);
+  if (given.length !== real.length || !crypto.timingSafeEqual(given, real)) {
+    await User.updateOne({ _id: user._id }, { $inc: { emailVerifyCodeAttempts: 1 } });
+    const left = MAX_CODE_ATTEMPTS - (user.emailVerifyCodeAttempts || 0) - 1;
+    throw ApiError.badRequest(left > 0 ? `That code is not right. ${left} ${left === 1 ? 'try' : 'tries'} left.` : 'That code is not right. Ask for a new code.');
+  }
+  await User.updateOne(
+    { _id: user._id },
+    { $set: { emailVerified: true }, $unset: { emailVerifyTokenHash: '', emailVerifyExpires: '', emailVerifyCodeHash: '', emailVerifyCodeExpires: '', emailVerifyCodeAttempts: '' } },
+  );
 }
 
 /* ---------- account deletion ---------- */
@@ -284,7 +327,7 @@ async function deleteAccount(userId, password) {
         email: `deleted+${user._id}@deleted.invalid`,
         passwordHash: await hashPassword(randomToken(24)),
       },
-      $unset: { phone: '', avatar: '', passwordResetTokenHash: '', emailVerifyTokenHash: '' },
+      $unset: { phone: '', avatar: '', passwordResetTokenHash: '', emailVerifyTokenHash: '', emailVerifyCodeHash: '' },
     },
   );
   await revokeEverything(user._id);
@@ -292,5 +335,5 @@ async function deleteAccount(userId, password) {
 
 module.exports = {
   register, login, refresh, logout, logoutAll, listSessions, revokeSession,
-  forgotPassword, resetPassword, changePassword, verifyEmail, resendVerification, deleteAccount, revokeEverything,
+  forgotPassword, resetPassword, changePassword, verifyEmail, verifyEmailCode, resendVerification, deleteAccount, revokeEverything,
 };

@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -6,10 +7,8 @@ import '../../features/home/role_actions.dart';
 import '../../models/user.dart';
 import '../../providers/auth_controller.dart';
 import '../../providers/core_providers.dart';
-import '../../providers/impact_providers.dart';
 import '../../routes/route_paths.dart';
 import '../../widgets/glass_container.dart';
-import '../../widgets/green_ring.dart';
 import '../../widgets/message_banner.dart';
 
 /// The home screen. It greets the person, says what still needs their attention (email, provider approval) and
@@ -23,17 +22,49 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _sending = false;
+  bool _checking = false;
+  final _code = TextEditingController();
+  String? _codeProblem;
+
+  @override
+  void dispose() {
+    _code.dispose();
+    super.dispose();
+  }
 
   Future<void> _resend() async {
     setState(() => _sending = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await ref.read(authRepositoryProvider).resendVerification();
-      messenger.showSnackBar(const SnackBar(content: Text('Verification email sent. Check your inbox.')));
+      final delivery = await ref.read(authRepositoryProvider).resendVerification();
+      messenger.showSnackBar(SnackBar(
+          content: Text(delivery == 'console'
+              ? 'The server has no email service set up, so no email was sent. Ask the administrator to set it up.'
+              : 'A new code was sent. It is valid for 15 minutes.')));
     } on ApiException catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _verify() async {
+    final code = _code.text.trim();
+    if (!RegExp(r'^\d{6}$').hasMatch(code)) {
+      setState(() => _codeProblem = 'Enter the 6-digit code from your email.');
+      return;
+    }
+    setState(() {
+      _checking = true;
+      _codeProblem = null;
+    });
+    try {
+      await ref.read(authRepositoryProvider).verifyEmailCode(code);
+      await ref.read(authControllerProvider.notifier).reload();
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _codeProblem = e.message);
+    } finally {
+      if (mounted) setState(() => _checking = false);
     }
   }
 
@@ -48,21 +79,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return RefreshIndicator(
       onRefresh: () async {
-        ref.invalidate(greenScoreProvider);
         await ref.read(authControllerProvider.notifier).reload();
       },
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 110), // room for the floating bar
+        padding: const EdgeInsets.fromLTRB(
+            20, 20, 20, 110), // room for the floating bar
         children: [
-          Semantics(header: true, child: Text('Hello, ${user.firstName}', style: theme.textTheme.headlineMedium)),
+          Semantics(
+              header: true,
+              child: Text('Hello, ${user.firstName}',
+                  style: theme.textTheme.headlineMedium)),
           const SizedBox(height: 4),
           Text(user.role.label, style: theme.textTheme.bodyMedium),
           const SizedBox(height: 16),
           if (!user.emailVerified) ...[
-            MessageBanner(
-              message: 'Please verify your email address. We sent you a link when you signed up.',
-              tone: BannerTone.warning,
-              action: TextButton(onPressed: _sending ? null : _resend, child: Text(_sending ? 'Sending…' : 'Resend')),
+            GlassContainer(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Verify your email address', style: theme.textTheme.titleLarge?.copyWith(fontSize: 16)),
+                  const SizedBox(height: 4),
+                  Text('We emailed a 6-digit code to ${user.email}. Enter it below to finish. Check your spam folder if you cannot see it.', style: theme.textTheme.bodyMedium),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _code,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: InputDecoration(labelText: 'Verification code', counterText: '', errorText: _codeProblem),
+                    onSubmitted: (_) => _verify(),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      FilledButton(onPressed: _checking ? null : _verify, child: Text(_checking ? 'Checking…' : 'Verify')),
+                      const SizedBox(width: 8),
+                      TextButton(onPressed: _sending ? null : _resend, child: Text(_sending ? 'Sending…' : 'Resend code')),
+                    ],
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 12),
           ],
@@ -70,65 +126,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             MessageBanner(
               message: notice,
               tone: BannerTone.info,
-              action: TextButton(onPressed: () => context.push(Routes.verification), child: const Text('Open')),
+              action: TextButton(
+                  onPressed: () => context.push(Routes.verification),
+                  child: const Text('Open')),
             ),
             const SizedBox(height: 12),
           ],
-          if (user.role != UserRole.admin) ...[const _GreenScoreCard(), const SizedBox(height: 20)],
-          Semantics(header: true, child: Text('What you can do', style: theme.textTheme.titleLarge)),
+          Semantics(
+              header: true,
+              child:
+                  Text('What you can do', style: theme.textTheme.titleLarge)),
           const SizedBox(height: 12),
-          for (final action in actions) ...[_ActionTile(action: action), const SizedBox(height: 12)],
-        ],
-      ),
-    );
-  }
-}
-
-/// The Green Score on Home: a ring through the current level, the level's name, and how far to the next. Opens the full page.
-/// If the score cannot be fetched it still opens the page, which says why, rather than showing a number that may be stale.
-class _GreenScoreCard extends ConsumerWidget {
-  const _GreenScoreCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final score = ref.watch(greenScoreProvider);
-
-    Widget content(Widget leading, String title, String subtitle) => Row(
-          children: [
-            leading,
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [Text(title, style: theme.textTheme.titleLarge), const SizedBox(height: 2), Text(subtitle, style: theme.textTheme.bodyMedium)],
-              ),
-            ),
-            const Icon(Icons.chevron_right),
+          for (final action in actions) ...[
+            _ActionTile(action: action),
+            const SizedBox(height: 12)
           ],
-        );
-
-    final body = score.when(
-      loading: () => content(const SizedBox(width: 72, height: 72, child: Center(child: CircularProgressIndicator(strokeWidth: 3))), 'Green Score', 'Loading...'),
-      error: (_, __) => content(Icon(Icons.eco_outlined, size: 48, color: theme.colorScheme.primary), 'Green Score', 'Tap to see your score.'),
-      data: (s) => content(
-        GreenRing(score: s.score, level: s.level),
-        'Green Score',
-        s.score == 0 && s.ledger.isEmpty
-            ? 'Complete an activity to start earning points.'
-            : (s.level.isTop ? '${s.level.name} · the highest level' : '${s.level.name} · ${s.level.pointsToNext(s.score)} points to ${s.level.nextName}'),
-      ),
-    );
-
-    return Semantics(
-      button: true,
-      child: GlassContainer(
-        padding: EdgeInsets.zero,
-        // A transparent Material so the ripple draws on the glass instead of under it.
-        child: Material(
-          type: MaterialType.transparency,
-          child: InkWell(onTap: () => context.push(Routes.impact), child: Padding(padding: const EdgeInsets.all(16), child: body)),
-        ),
+        ],
       ),
     );
   }
@@ -146,7 +159,9 @@ class _ActionTile extends StatelessWidget {
     final ready = route != null;
     return Semantics(
       button: ready,
-      label: ready ? '${action.title}. ${action.subtitle}.' : '${action.title}. ${action.subtitle}. Coming soon.',
+      label: ready
+          ? '${action.title}. ${action.subtitle}.'
+          : '${action.title}. ${action.subtitle}. Coming soon.',
       excludeSemantics: true,
       child: GlassContainer(
         padding: EdgeInsets.zero,
@@ -165,14 +180,20 @@ class _ActionTile extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(action.title, style: theme.textTheme.titleLarge?.copyWith(fontSize: 16)),
+                        Text(action.title,
+                            style: theme.textTheme.titleLarge
+                                ?.copyWith(fontSize: 16)),
                         const SizedBox(height: 2),
-                        Text(action.subtitle, style: theme.textTheme.bodyMedium),
+                        Text(action.subtitle,
+                            style: theme.textTheme.bodyMedium),
                       ],
                     ),
                   ),
                   const SizedBox(width: 8),
-                  if (ready) const Icon(Icons.chevron_right) else Text('Soon', style: theme.textTheme.labelSmall),
+                  if (ready)
+                    const Icon(Icons.chevron_right)
+                  else
+                    Text('Soon', style: theme.textTheme.labelSmall),
                 ],
               ),
             ),

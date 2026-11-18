@@ -32,10 +32,12 @@ class Listing {
     this.photos = const [],
     this.categoryName,
     this.categorySlug,
+    this.modelYear,
     this.purchaseYear,
     this.ageYears,
     this.ownerName,
     this.moderationReason,
+    this.createdAt,
   });
 
   final String id;
@@ -55,6 +57,9 @@ class Listing {
   final List<ListingPhoto> photos;
   final String? categoryName;
   final String? categorySlug;
+  /// When it was listed; lists show it, newest first.
+  final DateTime? createdAt;
+  final int? modelYear;
   final int? purchaseYear;
   final int? ageYears;
   final String? ownerName;
@@ -86,6 +91,7 @@ class Listing {
       preferredService: (json['preferredService'] as String?) ?? '',
       expectedPrice: (json['expectedPrice'] as num?)?.toDouble(),
       pickupPreference: json['pickupPreference'] as String?,
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
       addressArea: json['addressArea'] as String?,
       city: json['city'] as String?,
       status: (json['status'] as String?) ?? 'listed',
@@ -94,6 +100,7 @@ class Listing {
       photos: rawPhotos is List ? [for (final p in rawPhotos) if (p is Map) ListingPhoto.fromJson(p.cast<String, dynamic>())] : const [],
       categoryName: category['name'] as String?,
       categorySlug: category['slug'] as String?,
+      modelYear: (device['modelYear'] as num?)?.toInt(),
       purchaseYear: (device['purchaseYear'] as num?)?.toInt(),
       ageYears: (device['ageYears'] as num?)?.toInt(),
       ownerName: owner['name'] as String?,

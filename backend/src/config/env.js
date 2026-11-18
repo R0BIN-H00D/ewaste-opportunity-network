@@ -3,8 +3,6 @@ require('dotenv').config();
 const path = require('path');
 const { z } = require('zod');
 
-const bool = z.preprocess((v) => String(v ?? 'false').toLowerCase() === 'true', z.boolean());
-
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(5000),
@@ -23,10 +21,6 @@ const schema = z.object({
   CLOUDINARY_API_SECRET: z.string().optional().default(''),
   FIREBASE_SERVICE_ACCOUNT_PATH: z.string().optional().default(''),
   SCHEDULER_ENABLED: z.preprocess((v) => String(v ?? 'true').toLowerCase() !== 'false', z.boolean()), // on unless set to false
-  GEMINI_ENABLED: bool,
-  GEMINI_API_KEY: z.string().optional().default(''),
-  GEMINI_DAILY_LIMIT: z.coerce.number().int().nonnegative().default(50),
-  GEMINI_MODEL: z.string().default('gemini-2.0-flash'), // models are retired from time to time (A-10): change it here, not in code
   SMTP_HOST: z.string().optional().default(''),
   SMTP_PORT: z.coerce.number().int().default(587),
   SMTP_USER: z.string().optional().default(''),

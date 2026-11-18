@@ -18,6 +18,7 @@ const schema = baseSchema({
   pickupPreference: { type: String, enum: ['pickup', 'drop_off', 'either'], default: 'either' },
   location: point, // exact: owner/admin/accepted counterparty only
   publicLocation: point, // fuzzed
+  agentPhone: { type: String, maxlength: 15 }, // phone of whoever hands the device over / receives the delivery: owner and admin only
   addressArea: { type: String, maxlength: 100 },
   city: { type: String, maxlength: 80 },
   status: { type: String, enum: LISTING_STATUS, default: 'listed' },

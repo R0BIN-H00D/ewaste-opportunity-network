@@ -18,7 +18,7 @@ const geoLimiter = rateLimit({
   handler: (_req, res) => res.status(429).json({ success: false, message: 'Too many address searches just now. Please wait a moment or type the address yourself.', code: 'RATE_LIMITED' }),
 });
 
-const people = authorize(ROLES.USER, ROLES.TECHNICIAN, ROLES.STUDENT, ROLES.REFURBISHER, ROLES.RECYCLER);
+const people = authorize(ROLES.USER, ROLES.TECHNICIAN, ROLES.REFURBISHER, ROLES.RECYCLER);
 router.get('/search', authenticate, people, geoLimiter, validate({ query: v.searchQuery }), ctrl.search);
 router.get('/reverse', authenticate, people, geoLimiter, validate({ query: v.reverseQuery }), ctrl.reverse);
 

@@ -1,14 +1,19 @@
-/// The six roles of the platform. Names match the API's `role` values exactly.
-enum UserRole { user, technician, student, refurbisher, recycler, admin }
+/// The five roles of the platform. Names match the API's `role` values exactly.
+enum UserRole { user, technician, refurbisher, recycler, admin }
 
-UserRole roleFrom(String? value) => UserRole.values.firstWhere((r) => r.name == value, orElse: () => UserRole.user);
+UserRole roleFrom(String? value) => UserRole.values
+    .firstWhere((r) => r.name == value, orElse: () => UserRole.user);
 
 extension UserRoleX on UserRole {
   /// Provider roles must be approved by an administrator before they can offer services (BR-01).
-  bool get isProvider => this == UserRole.technician || this == UserRole.student || this == UserRole.refurbisher || this == UserRole.recycler;
+  bool get isProvider =>
+      this == UserRole.technician ||
+      this == UserRole.refurbisher ||
+      this == UserRole.recycler;
 
   /// Roles that give an organisation name when they register.
-  bool get needsOrganization => this == UserRole.refurbisher || this == UserRole.recycler;
+  bool get needsOrganization =>
+      this == UserRole.refurbisher || this == UserRole.recycler;
 
   String get label {
     switch (this) {
@@ -16,8 +21,6 @@ extension UserRoleX on UserRole {
         return 'Member';
       case UserRole.technician:
         return 'Technician';
-      case UserRole.student:
-        return 'Student';
       case UserRole.refurbisher:
         return 'Refurbisher';
       case UserRole.recycler:
@@ -34,8 +37,6 @@ extension UserRoleX on UserRole {
         return 'List old devices, get them repaired, donated, refurbished or recycled.';
       case UserRole.technician:
         return 'Offer repair and diagnosis services near you.';
-      case UserRole.student:
-        return 'Join supervised tasks and earn certificates.';
       case UserRole.refurbisher:
         return 'Restore devices and sell them with honest labels.';
       case UserRole.recycler:
@@ -47,7 +48,12 @@ extension UserRoleX on UserRole {
 }
 
 /// Roles a person can choose when registering (administrators are never self-registered).
-const registrationRoles = [UserRole.user, UserRole.technician, UserRole.student, UserRole.refurbisher, UserRole.recycler];
+const registrationRoles = [
+  UserRole.user,
+  UserRole.technician,
+  UserRole.refurbisher,
+  UserRole.recycler
+];
 
 class AppUser {
   const AppUser({
@@ -96,7 +102,11 @@ class AppUser {
 
 /// What a login, registration or refresh returns.
 class Session {
-  const Session({required this.user, required this.accessToken, required this.refreshToken, required this.expiresIn});
+  const Session(
+      {required this.user,
+      required this.accessToken,
+      required this.refreshToken,
+      required this.expiresIn});
 
   final AppUser user;
   final String accessToken;
@@ -105,7 +115,8 @@ class Session {
 
   factory Session.fromJson(Map<String, dynamic> json) {
     final refresh = json['refreshToken'];
-    if (refresh is! String) throw const FormatException('The session has no refresh token');
+    if (refresh is! String)
+      throw const FormatException('The session has no refresh token');
     return Session(
       user: AppUser.fromJson((json['user'] as Map).cast<String, dynamic>()),
       accessToken: json['accessToken'] as String,
@@ -117,25 +128,22 @@ class Session {
 
 /// Everything the app needs after signing in: `GET /api/auth/me`.
 class Me {
-  const Me({required this.user, this.greenScore, this.verificationStatus});
+  const Me({required this.user, this.verificationStatus});
 
   final AppUser user;
-
-  /// The member's Green Score, when the server has one (a later phase fills it in).
-  final int? greenScore;
 
   /// For provider roles: `not_submitted`, `pending`, `approved`, `rejected` or `resubmission_required`.
   final String? verificationStatus;
 
-  Me copyWith({AppUser? user}) => Me(user: user ?? this.user, greenScore: greenScore, verificationStatus: verificationStatus);
+  Me copyWith({AppUser? user}) =>
+      Me(user: user ?? this.user, verificationStatus: verificationStatus);
 
   factory Me.fromJson(Map<String, dynamic> json) {
-    final profile = json['profile'];
     final verification = json['verification'];
     return Me(
       user: AppUser.fromJson((json['user'] as Map).cast<String, dynamic>()),
-      greenScore: profile is Map ? (profile['greenScore'] as num?)?.toInt() : null,
-      verificationStatus: verification is Map ? verification['status'] as String? : null,
+      verificationStatus:
+          verification is Map ? verification['status'] as String? : null,
     );
   }
 }

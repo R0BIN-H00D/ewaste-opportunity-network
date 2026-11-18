@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { authApi, verificationApi } from '../services/authApi';
+import { geoApi } from '../services/geoApi';
 import { TECH, USER, renderApp, signedIn } from './helpers';
 
 vi.mock('../services/authApi', () => ({
@@ -7,6 +8,7 @@ vi.mock('../services/authApi', () => ({
   userApi: {},
   verificationApi: { status: vi.fn(), submit: vi.fn(), remove: vi.fn() },
 }));
+vi.mock('../services/geoApi', () => ({ geoApi: { reverse: vi.fn(), search: vi.fn() } }));
 vi.mock('../services/api', async (importOriginal) => ({
   ...(await importOriginal()),
   getHealth: () => Promise.resolve({ success: true, data: { db: 'connected' } }),
@@ -30,6 +32,13 @@ describe('Settings page', () => {
     expect(screen.getByRole('heading', { name: 'Delete account' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Verification' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Technician details' })).not.toBeInTheDocument();
+  });
+
+  it('does not show the profile and address box to an administrator', async () => {
+    renderApp('/dashboard/settings', signedIn({ ...USER, role: 'admin' }));
+    expect(await screen.findByRole('heading', { name: 'Account' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Profile and address' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Use my current location' })).not.toBeInTheDocument();
   });
 
   it('shows role details and verification for a technician', async () => {
@@ -96,5 +105,49 @@ describe('Delete account', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Delete my account/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Permanently delete' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Enter your password to confirm'); // (the label has the same words)
+  });
+});
+
+describe('Use my current location', () => {
+  const allowLocation = (coords = { latitude: 12.97389, longitude: 77.64077 }) => {
+    Object.defineProperty(global.navigator, 'geolocation', {
+      configurable: true,
+      value: { getCurrentPosition: (ok) => ok({ coords }) },
+    });
+  };
+
+  it('fills in the area, city, state and pincode from where the person is', async () => {
+    allowLocation();
+    geoApi.reverse.mockResolvedValue({ label: 'x', lat: 12.97389, lng: 77.64077, area: 'Indiranagar', city: 'Bengaluru', state: 'Karnataka', postcode: '560 038' });
+    renderApp('/dashboard/settings', signedIn());
+    fireEvent.click(await screen.findByRole('button', { name: 'Use my current location' }));
+    await waitFor(() => expect(geoApi.reverse).toHaveBeenCalledWith(12.97389, 77.64077));
+    await waitFor(() => expect(screen.getByLabelText('Area / locality')).toHaveValue('Indiranagar'));
+    expect(screen.getByLabelText('City')).toHaveValue('Bengaluru');
+    expect(screen.getByLabelText('State')).toHaveValue('Karnataka');
+    expect(screen.getByLabelText('Pincode')).toHaveValue('560038');
+    expect(await screen.findByText(/Area, city, state and pincode are filled in/)).toBeInTheDocument();
+    expect(screen.getByText(/Saved point: 12.97389, 77.64077/)).toBeInTheDocument();
+  });
+
+  it('keeps the point and asks the person to type the address when the lookup fails', async () => {
+    allowLocation();
+    geoApi.reverse.mockRejectedValue({ response: { status: 503, data: { message: 'down' } } });
+    renderApp('/dashboard/settings', signedIn());
+    fireEvent.click(await screen.findByRole('button', { name: 'Use my current location' }));
+    expect(await screen.findByText(/could not look up the address/)).toBeInTheDocument();
+    expect(screen.getByText(/Saved point/)).toBeInTheDocument();
+    expect(screen.getByLabelText('City')).toHaveValue('');
+  });
+
+  it('says so when location is blocked', async () => {
+    Object.defineProperty(global.navigator, 'geolocation', {
+      configurable: true,
+      value: { getCurrentPosition: (_ok, fail) => fail({ code: 1 }) },
+    });
+    renderApp('/dashboard/settings', signedIn());
+    fireEvent.click(await screen.findByRole('button', { name: 'Use my current location' }));
+    expect(await screen.findByText(/Location is blocked/)).toBeInTheDocument();
+    expect(geoApi.reverse).not.toHaveBeenCalled();
   });
 });

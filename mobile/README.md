@@ -35,7 +35,7 @@ flutter test
 - Every request sends `X-Client-Type: mobile`, so the server returns the refresh token in the JSON body (the web app uses a cookie instead).
 - The **refresh token** is kept in secure storage (Android keystore). The **access token** lives in memory only.
 - When a call gets `401`, one refresh is shared by all calls that failed at the same time, and the calls are replayed. If the server refuses the refresh token, the person is signed out.
-- Demo accounts (after `npm run seed` in the backend): `user@demo.local`, `tech@demo.local`, `student@demo.local`, `refurb@demo.local`, `recycler@demo.local`, password `Demo@12345`.
+- Demo accounts (after `npm run seed` in the backend): `user@demo.local`, `tech@demo.local`, `refurb@demo.local`, `recycler@demo.local`, password `Demo@12345`.
 
 ## Layout
 

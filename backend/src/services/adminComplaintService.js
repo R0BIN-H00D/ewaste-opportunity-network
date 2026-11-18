@@ -141,7 +141,7 @@ async function act(admin, id, { action, note, assignee }, ip) {
     ip,
   });
 
-  // An upheld complaint about a completed activity takes its Green Score points back, once (BR-05). It never fails the decision.
+  // An upheld complaint about a completed activity is taken out of the impact totals, once (BR-05). It never fails the decision.
   if (action === 'resolve' && complaint.refId && IMPACT_REF[complaint.refType]) {
     await impact.reverse({ refType: IMPACT_REF[complaint.refType], refId: complaint.refId }).catch((err) => logger.warn({ err: err.message }, 'impact not reversed'));
   }

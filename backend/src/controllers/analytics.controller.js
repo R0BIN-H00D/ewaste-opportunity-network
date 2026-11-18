@@ -12,11 +12,6 @@ exports.platformImpact = asyncHandler(async (_req, res) => {
   ok(res, await svc.platformImpact());
 });
 
-exports.rules = asyncHandler(async (_req, res) => {
-  publicCache(res);
-  ok(res, svc.rules());
-});
-
 exports.monthly = asyncHandler(async (req, res) => {
   const wantsMine = req.query.scope === 'me';
   if (wantsMine && !req.user) throw ApiError.unauthorized();
@@ -39,8 +34,3 @@ exports.byCategory = asyncHandler(async (req, res) => {
 });
 
 exports.userImpact = asyncHandler(async (req, res) => ok(res, await svc.userImpact(req.user)));
-
-exports.greenScore = asyncHandler(async (req, res) => {
-  const { data, meta } = await svc.greenScore(req.user, req.query);
-  ok(res, data, 'OK', meta);
-});

@@ -6,7 +6,7 @@ const schema = baseSchema({
   slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
   icon: { type: String, default: 'box' }, // Lucide icon name (same glyph set on web + Flutter)
   group: String,
-  hazardous: { type: Boolean, default: false }, // excludes student tasks (BR-07)
+  hazardous: { type: Boolean, default: false },
   // PLACEHOLDER estimates until sourced values are agreed (A-11): { copperKg, aluminiumKg, ironKg, plasticsKg, glassKg, otherKg, co2eKg }
   defaultMaterialFactors: { type: Schema.Types.Mixed, default: {} },
   active: { type: Boolean, default: true },

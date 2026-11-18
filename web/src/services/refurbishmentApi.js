@@ -22,5 +22,11 @@ export const refurbApi = {
     files.forEach((file) => form.append('photos', file));
     return data(api.post(`/refurbishment/jobs/${id}/photos`, form));
   },
+  wanted: (params, signal) => page(api.get('/wanted-requests', { params: clean(params), signal })),
+  addWanted: (body) => data(api.post('/wanted-requests', body)),
+  setWantedStatus: (id, status) => data(api.put(`/wanted-requests/${id}/status`, { status })),
+  respondWanted: (id, message) => data(api.post(`/wanted-requests/${id}/respond`, message ? { message } : {})),
+  wantedResponses: (id, signal) => data(api.get(`/wanted-requests/${id}/responses`, { signal })),
+  deleteWanted: (id) => data(api.delete(`/wanted-requests/${id}`)),
   cancel: (id, reason) => data(api.post(`/refurbishment/jobs/${id}/cancel`, reason ? { reason } : {})),
 };

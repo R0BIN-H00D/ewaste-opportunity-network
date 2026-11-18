@@ -111,6 +111,7 @@ class _BodyState extends ConsumerState<_Body> {
       if (l.categoryName != null) ('Category', l.categoryName!),
       if (l.brand != null && l.brand!.isNotEmpty) ('Brand', l.brand!),
       if (l.model != null && l.model!.isNotEmpty) ('Model', l.model!),
+      if (l.modelYear != null) ('Model year', '${l.modelYear}'),
       if (l.purchaseYear != null) ('Bought', '${l.purchaseYear}'),
       if (l.ageYears != null) ('Age', l.ageYears == 1 ? '1 year' : '${l.ageYears} years'),
       if (l.place.isNotEmpty) ('Area', l.place),

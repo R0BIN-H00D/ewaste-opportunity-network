@@ -10,7 +10,7 @@ const v = require('../validators/recycling.validators');
 const ctrl = require('../controllers/recycling.controller');
 
 // Everyone except admins can send devices for recycling; centres may act only while verified (checked in the service).
-const requesters = [authenticate, authorize(ROLES.USER, ROLES.TECHNICIAN, ROLES.STUDENT, ROLES.REFURBISHER, ROLES.RECYCLER)];
+const requesters = [authenticate, authorize(ROLES.USER, ROLES.TECHNICIAN, ROLES.REFURBISHER, ROLES.RECYCLER)];
 
 router.post('/', ...requesters, uploadLimiter, ...imageUpload('photos'), validate({ body: v.createBody }), ctrl.create);
 router.get('/', authenticate, validate({ query: v.listQuery }), ctrl.list);

@@ -81,6 +81,25 @@ void main() {
       expect(container.read(authControllerProvider).status, AuthStatus.authenticated);
     });
 
+    test('a new person is flagged to see their profile first, and only until they have', () async {
+      final container = _container(FakeAuthRepository());
+      final controller = container.read(authControllerProvider.notifier);
+      expect(container.read(authControllerProvider).justRegistered, isFalse);
+
+      await controller.register(name: 'Ravi', email: 'ravi@example.com', password: 'Demo@12345', role: UserRole.user);
+      expect(container.read(authControllerProvider).justRegistered, isTrue);
+
+      controller.welcomed();
+      expect(container.read(authControllerProvider).justRegistered, isFalse);
+      expect(container.read(authControllerProvider).status, AuthStatus.authenticated);
+    });
+
+    test('signing in again is not a new person', () async {
+      final container = _container(FakeAuthRepository(loginResult: sampleMe()));
+      await container.read(authControllerProvider.notifier).signIn(email: 'a@b.c', password: 'x');
+      expect(container.read(authControllerProvider).justRegistered, isFalse);
+    });
+
     test('signOut tells the repository and signs out', () async {
       final repo = FakeAuthRepository(loginResult: sampleMe());
       final container = _container(repo);

@@ -333,9 +333,6 @@ describe('confirming the handover (FR-DON-006)', () => {
     expect(impact).toHaveLength(1);
     expect(impact[0]).toMatchObject({ type: 'donation', refType: 'Donation' });
     expect(String(impact[0].user)).toBe(donor.id);
-    // The donor earns 40 points; the recipient, who only received, earns none.
-    const ledger = await require('../src/models/GreenScoreLedger').find().lean();
-    expect(ledger.map((l) => [String(l.user), l.points, l.rule])).toEqual([[donor.id, 40, 'donation_completed']]);
   });
   it('appears in both people\'s transaction history with a link', async () => {
     const d = await accepted();

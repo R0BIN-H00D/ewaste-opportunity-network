@@ -19,7 +19,7 @@ import { formatDate } from '../../lib/requests';
 import { friendlyMessage } from '../../utils/errors';
 
 const STATE = { current: ['Showing now', 'green'], scheduled: ['Scheduled', 'blue'], ended: ['Ended', 'neutral'] };
-const ROLE_CHOICES = ['user', 'technician', 'student', 'refurbisher', 'recycler', 'admin'];
+const ROLE_CHOICES = ['user', 'technician', 'refurbisher', 'recycler', 'admin'];
 const plural = (n, one) => `${n} ${one}${n === 1 ? '' : 's'}`;
 const audienceText = (list) => (list.includes('all') ? 'Everyone' : list.map((r) => ROLE_LABEL[r] || r).join(', '));
 

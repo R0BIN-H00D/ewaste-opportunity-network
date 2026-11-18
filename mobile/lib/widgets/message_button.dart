@@ -10,7 +10,7 @@ import '../routes/route_paths.dart';
 class MessageButton extends ConsumerStatefulWidget {
   const MessageButton({super.key, required this.contextType, required this.contextId, this.label = 'Message'});
 
-  /// One of `service`, `order`, `recycling`, `donation`, `offer`, `enquiry`.
+  /// One of `service`, `order`, `recycling`, `donation`, `offer`, `enquiry`, `wanted`.
   final String contextType;
   final String contextId;
   final String label;

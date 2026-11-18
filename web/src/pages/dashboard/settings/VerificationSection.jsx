@@ -13,7 +13,6 @@ import Section from './Section';
 const LABELS = {
   id_proof: 'ID proof',
   qualification: 'Qualification certificate',
-  student_id: 'Student ID card',
   business: 'Business registration',
   authorization: 'Authorisation certificate',
   other: 'Other document',

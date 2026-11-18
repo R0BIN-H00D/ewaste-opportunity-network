@@ -82,7 +82,15 @@ class AuthRepository {
         await _dio.post<dynamic>('/auth/reset-password', data: {'token': token.trim(), 'password': password});
       });
 
-  Future<void> resendVerification() => guard(() async {
-        await _dio.post<dynamic>('/auth/resend-verification');
+  /// Sends a new 6-digit code. Returns how it was delivered: `smtp`, or `console` when the server has no email service set up.
+  Future<String> resendVerification() => guard(() async {
+        final res = await _dio.post<dynamic>('/auth/resend-verification');
+        final data = (res.data is Map ? (res.data as Map)['data'] : null);
+        return data is Map ? (data['delivery'] as String? ?? 'smtp') : 'smtp';
+      });
+
+  /// The 6-digit code from the email. Throws an [ApiException] for a wrong, expired or locked code.
+  Future<void> verifyEmailCode(String code) => guard(() async {
+        await _dio.post<dynamic>('/auth/verify-email-code', data: {'code': code.trim()});
       });
 }

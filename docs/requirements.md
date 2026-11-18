@@ -19,13 +19,12 @@
 Define, in testable form, what the **E-Waste-to-Opportunity Network** must do. Every requirement has an ID so that design, tasks and tests can trace back to it.
 
 ### 1.2 Product vision
-A professional, startup-grade platform that turns unused, damaged or unwanted electronics into opportunities through **repair, reuse, refurbishment, donation and responsible recycling**. It connects device owners with technicians, students, refurbishers, donation recipients and authorised recycling centres.
+A professional, startup-grade platform that turns unused, damaged or unwanted electronics into opportunities through **repair, reuse, refurbishment, donation and responsible recycling**. It connects device owners with technicians, refurbishers, donation recipients and authorised recycling centres.
 
 ### 1.3 Objectives
 1. Reduce e-waste and divert devices from disposal.
 2. Encourage repair and reuse.
 3. Create employment for technicians and refurbishers.
-4. Give electronics/CS students supervised practical experience.
 5. Promote responsible recycling and recover valuable materials.
 6. Support a circular economy and raise environmental awareness.
 
@@ -40,7 +39,6 @@ A professional, startup-grade platform that turns unused, damaged or unwanted el
 | Listing | A device listing created by an owner (`DeviceListings`) |
 | Provider | Technician, Refurbisher, Recycling Center, or eligible donation recipient |
 | Verified | Provider whose documents an Admin approved |
-| Green Score | Per-user sustainability score computed from **verified** completed activities |
 | Actual vs Estimated | *Actual* = measured/recorded by a verified party. *Estimated* = derived from category factors. Never mixed in one number. |
 
 ---
@@ -92,7 +90,6 @@ Only free APIs, free tiers and open-source technology.
 |---|---|---|---|
 | 1 | General User (individual, household, business, institution owning devices) | Yes | No (donation recipients: yes — see A-02) |
 | 2 | Repair Technician | Yes | **Yes** |
-| 3 | Electronics Student | Yes | **Yes** (student ID) |
 | 4 | Refurbisher | Yes | **Yes** |
 | 5 | Recycling Center | Yes | **Yes** |
 | 6 | Administrator | **No** (seeded / created by an existing admin) | — |
@@ -100,24 +97,22 @@ Only free APIs, free tiers and open-source technology.
 ### 3.1 Permission matrix
 ✔ = allowed · ◐ = limited (own data / after verification) · — = no
 
-| Capability | User | Technician | Student | Refurbisher | Recycler | Admin |
-|---|:--:|:--:|:--:|:--:|:--:|:--:|
-| Browse public pages, marketplace, centres | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
-| Create/edit/delete own device listing | ✔ | ◐ | — | ◐ | — | ✔ (remove any) |
-| Request repair / donation / recycling / refurbishment | ✔ | — | — | — | — | — |
-| Submit repair quotation | — | ◐ verified | — | — | — | — |
-| Update repair progress | — | ◐ assigned | ◐ supervised notes | — | — | ✔ |
-| Browse nearby repair requests | — | ◐ verified | — | — | — | ✔ |
-| Apply to learning opportunities | — | — | ◐ verified | — | — | — |
-| Post learning opportunities | — | ◐ verified | — | — | — | ✔ |
-| Make purchase offers on reusable devices | — | — | — | ◐ verified | — | — |
-| List refurbished products | — | — | — | ◐ verified | — | ✔ (moderate) |
-| Place marketplace order / enquiry | ✔ | ✔ | ✔ | ✔ | ✔ | — |
-| Accept collections, record recovered materials | — | — | — | — | ◐ verified | ✔ (view) |
-| Request donations | ◐ verified org | — | — | — | — | ✔ |
-| Review a provider | ◐ completed txn | ◐ completed txn | — | ◐ completed txn | ◐ completed txn | — |
-| Approve/reject verification, suspend accounts | — | — | — | — | — | ✔ |
-| Manage categories, announcements, complaints, audit log | — | — | — | — | — | ✔ |
+| Capability | User | Technician | Refurbisher | Recycler | Admin |
+|---|:--:|:--:|:--:|:--:|:--:|
+| Browse public pages, marketplace, centres | ✔ | ✔ | ✔ | ✔ | ✔ |
+| Create/edit/delete own device listing | ✔ | ◐ | ◐ | — | ✔ (remove any) |
+| Request repair / donation / recycling / refurbishment | ✔ | — | — | — | — |
+| Submit repair quotation | — | ◐ verified | — | — | — |
+| Update repair progress | — | ◐ assigned | — | — | ✔ |
+| Browse nearby repair requests | — | ◐ verified | — | — | ✔ |
+| Make purchase offers on reusable devices | — | — | ◐ verified | — | — |
+| List refurbished products | — | — | ◐ verified | — | ✔ (moderate) |
+| Place marketplace order / enquiry | ✔ | ✔ | ✔ | ✔ | — |
+| Accept collections, record recovered materials | — | — | — | ◐ verified | ✔ (view) |
+| Request donations | ◐ verified org | — | — | — | ✔ |
+| Review a provider | ◐ completed txn | ◐ completed txn | ◐ completed txn | ◐ completed txn | — |
+| Approve/reject verification, suspend accounts | — | — | — | — | ✔ |
+| Manage categories, announcements, complaints, audit log | — | — | — | — | ✔ |
 
 Server-side enforcement is mandatory (NFR-SEC-03); hiding UI is not access control.
 
@@ -146,14 +141,14 @@ Server-side enforcement is mandatory (NFR-SEC-03); hiding UI is not access contr
 | FR-USER-001 | View/update own profile (name, phone, bio, address area, preferences). | M |
 | FR-USER-002 | Upload/replace profile photo (type/size validated). | M |
 | FR-USER-003 | View another user's **public** profile (never email, phone or exact address). | M |
-| FR-USER-004 | Role-specific profile data: Technician (qualifications, experience, specialisations, device categories, service location, availability, base rate); Student (college, course, year, student ID); Refurbisher (business info, categories); Recycling Center (facility, authorisation numbers, collection locations, accepted categories). | M |
+| FR-USER-004 | Role-specific profile data: Technician (qualifications, experience, specialisations, device categories, service location, availability, base rate); Refurbisher (business info, categories); Recycling Center (facility, authorisation numbers, collection locations, accepted categories). | M |
 | FR-USER-005 | Technician availability schedule/toggle affects matching. | M |
 | FR-USER-006 | Account deletion request (soft delete, retains legally required records). | S |
 
 ### 4.3 Verification — `VER` (Phase 3, 6)
 | ID | Requirement | Pri |
 |---|---|:--:|
-| FR-VER-001 | Technician, Student, Refurbisher, Recycling Center submit verification documents (`POST /api/technicians/verification` and equivalents). | M |
+| FR-VER-001 | Technician, Refurbisher, Recycling Center submit verification documents (`POST /api/technicians/verification` and equivalents). | M |
 | FR-VER-002 | Documents are stored **privately** (not publicly reachable); only the owner and Admin can view them via short-lived signed access. | M |
 | FR-VER-003 | Admin can list, filter, review, **approve** or **reject** (with mandatory reason) each application (`/api/admin/verifications`). | M |
 | FR-VER-004 | Verification statuses: `not_submitted`, `pending`, `approved`, `rejected`, `resubmission_required`. Applicant is notified of each change. | M |
@@ -200,10 +195,9 @@ Server-side enforcement is mandatory (NFR-SEC-03); hiding UI is not access contr
 | FR-SVC-005 | **12 statuses:** 1 Request Submitted · 2 Technician Assigned · 3 Device Collection Pending · 4 Device Collected · 5 Diagnosis in Progress · 6 Quotation Submitted · 7 Customer Approval Pending · 8 Repair in Progress · 9 Repair Completed · 10 Device Delivery Pending · 11 Device Delivered · 12 Service Completed. Plus terminal `rejected` and `cancelled`. | M |
 | FR-SVC-006 | Status changes via `PUT /api/service-requests/:id/status`; only permitted actors and legal transitions are accepted; every change is timestamped with actor and note. | M |
 | FR-SVC-007 | Technician adds repair notes and uploads progress and completion photos. | M |
-| FR-SVC-008 | Customer confirms completion; this unlocks reviews and impact/Green Score credit. | M |
+| FR-SVC-008 | Customer confirms completion; this unlocks reviews and impact credit. | M |
 | FR-SVC-009 | Service history list/detail for both parties. | M |
 | FR-SVC-010 | Request tracking page shows a timeline of all status events. | M |
-| FR-SVC-011 | Supervised student participation can be attached to a request (see FR-STU). | S |
 
 ### 4.7 Donations — `DON` (Phase 5)
 | ID | Requirement | Pri |
@@ -282,13 +276,11 @@ Server-side enforcement is mandatory (NFR-SEC-03); hiding UI is not access contr
 | FR-REV-004 | Reviews can be reported; Admin can hide/remove (`/api/admin` review management). | M |
 | FR-REV-005 | Provider aggregate rating (mean and count) updated atomically. | M |
 
-### 4.14 Environmental impact & Green Score — `IMP` (Phase 9)
+### 4.14 Environmental impact — `IMP` (Phase 9)
 | ID | Requirement | Pri |
 |---|---|:--:|
-| FR-IMP-001 | Public/platform stats: devices listed, repaired, reused, donated, refurbished, recycled, diverted from disposal; estimated recovered materials; active technicians; student participants; completed donations. | M |
+| FR-IMP-001 | Public/platform stats: devices listed, repaired, reused, donated, refurbished, recycled, diverted from disposal; estimated recovered materials; active technicians; completed donations. | M |
 | FR-IMP-002 | Analytics: monthly, yearly, per-category, device recovery, recycling, per-user and platform-wide impact; Recharts on web. | M |
-| FR-IMP-003 | **Green Score** computed from transparent, documented rules, using **completed and verified** activities only (repair, donation, reuse, refurbishment, authorised recycling). | M |
-| FR-IMP-004 | User sees score, achievements/badges and a contribution history (ledger). | M |
 | FR-IMP-005 | UI clearly distinguishes **actual measurements** from **estimates**. | M |
 | FR-IMP-006 | Impact figures are driven by recorded events, never hard-coded. | M |
 
@@ -299,16 +291,6 @@ Server-side enforcement is mandatory (NFR-SEC-03); hiding UI is not access contr
 | FR-AI-002 | User must confirm or correct suggestions before they are saved. | S |
 | FR-AI-003 | UI wording never claims internal hardware damage can be determined from a photo. | S |
 | FR-AI-004 | If Gemini is unavailable/quota-limited/not configured, fall back to manual selection and a rule-based classifier (keywords from name/description). | S |
-
-### 4.16 Student learning — `STU` (Phase 5, 9)
-| ID | Requirement | Pri |
-|---|---|:--:|
-| FR-STU-001 | Student registers with college, course, student ID upload; Admin verifies. | M |
-| FR-STU-002 | **Practical Learning Opportunities:** list shows task, device type, required skills, supervising technician, location, difficulty, application deadline, assignment status. | M |
-| FR-STU-003 | Verified technicians create opportunities; verified students apply (`POST /api/students/applications`); technician accepts/rejects. | M |
-| FR-STU-004 | Students only join **supervised** tasks; hazardous e-waste handling is excluded from student tasks and tagged accordingly. | M |
-| FR-STU-005 | Track assignments; completed ones feed experience history (`GET /api/students/experience`) and a skill portfolio. | M |
-| FR-STU-006 | Participation certificate issued on supervisor completion + Admin approval; downloadable with unique certificate ID. | S |
 
 ### 4.17 Pickup scheduling — `PICK` (Phase 9)
 | ID | Requirement | Pri |
@@ -328,7 +310,7 @@ Server-side enforcement is mandatory (NFR-SEC-03); hiding UI is not access contr
 | ID | Requirement | Pri |
 |---|---|:--:|
 | FR-ADM-001 | Separate admin login and dashboard (route-protected + server-side authorised). | M |
-| FR-ADM-002 | **Overview tiles:** total/active users; technicians; students; refurbishers; recycling centres; device listings; repair, donation, refurbishment and recycling counts; completed services; pending verifications. | M |
+| FR-ADM-002 | **Overview tiles:** total/active users; technicians; refurbishers; recycling centres; device listings; repair, donation, refurbishment and recycling counts; completed services; pending verifications. | M |
 | FR-ADM-003 | Users: list, search, filter by role, view profile, suspend, reactivate (reason required). | M |
 | FR-ADM-004 | Verification queue: review documents, approve, reject with reason, track status. | M |
 | FR-ADM-005 | Listings: view, search, review reported, remove inappropriate; manage device categories. | M |
@@ -359,9 +341,8 @@ Server-side enforcement is mandatory (NFR-SEC-03); hiding UI is not access contr
 | BR-02 | A paid repair cannot move to *Repair in Progress* without customer approval of a quotation. |
 | BR-03 | A listing with an active service/offer/request cannot be deleted and has restricted editing. |
 | BR-04 | Reviews require a completed transaction between the reviewer and the provider; one review per transaction. |
-| BR-05 | Green Score and impact counters change only on **completed and verified** events (e.g., customer-confirmed repair, recipient-confirmed donation, centre-confirmed recycling). |
+| BR-05 | Impact counters change only on **completed and verified** events (e.g., customer-confirmed repair, recipient-confirmed donation, centre-confirmed recycling). |
 | BR-06 | Actual and estimated quantities are stored and displayed separately. |
-| BR-07 | Students may only take part in supervised tasks; no independent hazardous-waste handling. |
 | BR-08 | Exact addresses are visible only to the counterparty of an accepted request, and only until completion. |
 | BR-09 | Suspended accounts cannot log in, transact, or appear in listings; their data is retained. |
 | BR-10 | Payments are recorded offline; the platform never processes money. |
@@ -455,14 +436,13 @@ Server-side enforcement is mandatory (NFR-SEC-03); hiding UI is not access contr
 | Devices | `POST /api/devices` · `GET /api/devices` · `GET /api/devices/:id` · `PUT /api/devices/:id` · `DELETE /api/devices/:id` |
 | Services | `POST /api/service-requests` · `GET /api/service-requests` · `GET /api/service-requests/:id` · `PUT /api/service-requests/:id/status` · `POST /api/service-requests/:id/quotation` |
 | Technicians | `GET /api/technicians` · `GET /api/technicians/nearby` · `GET /api/technicians/:id` · `POST /api/technicians/verification` |
-| Students | `GET /api/students/opportunities` · `POST /api/students/applications` · `GET /api/students/experience` |
 | Donations | `POST /api/donations` · `GET /api/donations` · `POST /api/donations/:id/request` · `PUT /api/donations/:id/status` |
 | Marketplace | `GET /api/marketplace` · `POST /api/marketplace` · `GET /api/marketplace/:id` · `POST /api/orders` |
 | Recycling | `GET /api/recycling-centers` · `POST /api/recycling-requests` · `GET /api/recycling-requests` · `PUT /api/recycling-requests/:id/status` |
 | Notifications | `GET /api/notifications` · `PUT /api/notifications/:id/read` |
 | Analytics | `GET /api/analytics/user-impact` · `GET /api/analytics/platform-impact` · `GET /api/analytics/monthly` |
 | Admin | `GET /api/admin/dashboard` · `GET /api/admin/users` · `GET /api/admin/verifications` · `PUT /api/admin/verifications/:id` · `GET /api/admin/analytics` |
-| Additional (required by SRS §11, paths defined in `design.md` §A.14) | Chat · Reviews · Pickup scheduling · Complaints · Transactions · Student applications · Learning opportunities · Refurbishment management |
+| Additional (required by SRS §11, paths defined in `design.md` §A.14) | Chat · Reviews · Pickup scheduling · Complaints · Transactions · Refurbishment management |
 
 Common API requirements: JSON envelope, pagination (`page`, `limit`), validation errors with field-level detail, 401/403/404/409/422/429 semantics, auth + authorisation per route.
 
@@ -471,14 +451,14 @@ Authenticated connection; events for message send/receive, typing, read receipts
 
 ### 7.3 Web pages (30)
 **Public (16):** Landing · About Us · How It Works · Browse Devices · List Your Device · Find Technicians · Recycling Centers · Donation Marketplace · Refurbished Marketplace · Environmental Impact · Environmental Education · Login · Registration · Privacy Policy · Terms and Conditions · Contact and Support.
-**Authenticated (14):** User Dashboard · Technician Dashboard · Student Dashboard · Refurbisher Dashboard · Recycling Center Dashboard · Admin Dashboard · Device Details · Service Details · Request Tracking · Chat · Notifications · Profile Settings · Transaction History · Help and Support.
+**Authenticated (14):** User Dashboard · Technician Dashboard · Refurbisher Dashboard · Recycling Center Dashboard · Admin Dashboard · Device Details · Service Details · Request Tracking · Chat · Notifications · Profile Settings · Transaction History · Help and Support.
 
 *Note:* "List Your Device" is reachable publicly but prompts login before submission.
 
-**Landing page:** nav (Logo, Home, How It Works, Browse Devices, Find Services, Marketplace, Environmental Impact, Login, Get Started); hero ("Give Your Electronics a Second Life.", CTAs "List Your E-Waste" and "Explore Opportunities"); sections: How It Works, Device Categories, Repair Services, Student Opportunities, Donation Marketplace, Refurbished Products, Recycling Partners, Environmental Impact Statistics, Featured Technicians, Testimonials, FAQ, Footer.
+**Landing page:** nav (Logo, Home, How It Works, Browse Devices, Find Services, Marketplace, Environmental Impact, Login, Get Started); hero ("Give Your Electronics a Second Life.", CTAs "List Your E-Waste" and "Browse the marketplace"); sections: How It Works, Device Categories, Repair Services, Donation Marketplace, Refurbished Products, Recycling Partners, Environmental Impact Statistics, Featured Technicians, Testimonials, FAQ, Footer.
 
 ### 7.4 Mobile screens (23)
-Splash · Onboarding · Login · Registration · Role Selection · Home Dashboard · Device Listing · Camera Upload · Device Details · Service Selection · Nearby Technicians · Recycling Centers · Donation Marketplace · Refurbished Marketplace · Student Opportunities · Request Tracking · Chat · Notifications · Environmental Impact · User Profile · Settings · Transaction History · Help and Support.
+Splash · Onboarding · Login · Registration · Role Selection · Home Dashboard · Device Listing · Camera Upload · Device Details · Service Selection · Nearby Technicians · Recycling Centers · Donation Marketplace · Refurbished Marketplace · Request Tracking · Chat · Notifications · Environmental Impact · User Profile · Settings · Transaction History · Help and Support.
 
 Mobile requirements: secure token storage, camera and gallery access, location permission, image upload, FCM, real-time chat, form validation, loading/error handling, offline-friendly cached data, floating glass bottom navigation. Mobile is **adapted**, not a shrunken website.
 
@@ -487,7 +467,7 @@ Mobile requirements: secure token storage, camera and gallery access, location p
 ## 8. Data requirements
 
 ### 8.1 Collections required by the SRS (27)
-Users · UserProfiles · Devices · DeviceListings · ServiceRequests · TechnicianProfiles · StudentProfiles · RefurbisherProfiles · RecyclingCenters · VerificationDocuments · Quotations · Donations · DonationRequests · MarketplaceProducts · Orders · Transactions · PickupSchedules · Conversations · Messages · Notifications · Reviews · RecyclingRecords · EnvironmentalImpact · Complaints · AdminLogs · StudentApplications · LearningOpportunities.
+Users · UserProfiles · Devices · DeviceListings · ServiceRequests · TechnicianProfiles · RefurbisherProfiles · RecyclingCenters · VerificationDocuments · Quotations · Donations · DonationRequests · MarketplaceProducts · Orders · Transactions · PickupSchedules · Conversations · Messages · Notifications · Reviews · RecyclingRecords · EnvironmentalImpact · Complaints · AdminLogs.
 
 ### 8.2 Additional collections identified during analysis
 These are not named in the SRS but are required to satisfy listed features. They are proposed in `design.md` §A.3.
@@ -498,10 +478,8 @@ These are not named in the SRS but are required to satisfy listed features. They
 | RefreshTokens (or sessions) | Refresh rotation/revocation (FR-AUTH-003/010) |
 | Reports | Reported listings/reviews (FR-DEV-010, FR-REV-004) |
 | DeviceTokens | FCM tokens (FR-NOTIF-003) |
-| GreenScoreLedger | Transparent Green Score history (FR-IMP-004) |
 | Announcements | Admin announcements (FR-ADM-011) |
 | EducationArticles | Education content (FR-EDU-002) |
-| Certificates | Student participation certificates (FR-STU-006) |
 | RefurbishmentJobs | Refurbishment progress and before/after photos (FR-MKT-003) |
 
 ### 8.3 Data-layer requirements
@@ -522,7 +500,7 @@ Mongoose schemas with validation; ObjectId references; indexes; timestamps; pagi
 8. The technician updates the status to completed.
 9. The user confirms service completion.
 10. The user submits a review.
-11. The environmental dashboard and Green Score update with the completed, verified activity.
+11. The environmental dashboard updates with the completed, verified activity.
 
 **Pass condition:** the same scenario succeeds when steps are split across web and Flutter (e.g., list on web, approve on mobile), with identical data visible on both.
 
@@ -532,7 +510,6 @@ Mongoose schemas with validation; ObjectId references; indexes; timestamps; pagi
 | Donation | Donor lists → verified org requests → donor accepts → handover scheduled → both confirm → confirmation document generated → history + impact updated |
 | Refurbishment | Owner lists reusable device → refurbisher offers → accepted → collected → refurbished with before/after photos → listed in marketplace → buyer orders (offline payment) → order completed |
 | Recycling | User requests verified centre → accepted → pickup scheduled → collected → centre confirms receipt → records actual + estimated materials → report generated → impact updated |
-| Student | Technician posts opportunity → student applies → accepted → supervised completion → experience/portfolio updated → certificate (when approved) |
 | Verification | Provider submits docs → Admin approves/rejects with reason → provider notified → provider appears/does not appear in discovery |
 | Moderation | User reports listing → Admin reviews → removes → owner notified → audit entry written |
 | Suspension | Admin suspends user → login blocked → listings hidden → reactivation restores access |
@@ -564,7 +541,7 @@ Implemented against real MongoDB data · validated inputs · authz enforced · l
 | A-08 | "Redux Toolkit or Context API", "Provider or Riverpod" — choice left open. | Chosen in `design.md`: **Redux Toolkit** (web) and **Riverpod** (Flutter). Revisit in Phase 1. |
 | A-09 | "Follow applicable Indian e-waste management and data protection requirements". | Design for India's E-Waste (Management) Rules and the Digital Personal Data Protection Act. Specific clauses (authorisation numbers, EPR, consent, retention) must be reviewed by a qualified legal/compliance professional before launch; the app records authorisation numbers and consent and supports deletion requests. |
 | A-10 | Free-tier terms change over time. | Phase 8 starts with a documented verification of current Cloudinary, Firebase, Gemini, Atlas and SMTP limits; numbers are recorded in `docs/SETUP_GUIDE.md` with the date checked. |
-| A-11 | Green Score and environmental estimates have no formula in the SRS. | Rule table and category conversion factors are defined as **configurable defaults** in `design.md` §A.6; factors must be sourced/cited before public claims are made. |
+| A-11 | Environmental estimates have no formula in the SRS. | Category conversion factors are defined as **configurable defaults** in `design.md` §A.6; factors must be sourced/cited before public claims are made. |
 | A-12 | Mobile permitted for 6 roles? SRS says mobile has "all major user-facing functionality". | Mobile supports all five non-admin roles; the Admin dashboard is web-only. |
 | A-13 | Documentation folder in SRS (`API_DOCUMENTATION.md`, etc.) vs requested `docs/` files. | The four planning files here sit alongside the four SRS docs inside `docs/`. |
 | A-14 | Refresh tokens "where implemented". | Implemented (FR-AUTH-003) because mobile sessions need them. |
@@ -583,7 +560,7 @@ Implemented against real MongoDB data · validated inputs · authz enforced · l
 | ADM, CMP, VER (review), analytics | P6 |
 | Flutter app | P7 |
 | Cloudinary, FCM, Maps, Socket.IO (CHAT, NOTIF), Gemini, SMTP | P8 |
-| IMP, Green Score, AI, material tracking, PICK, EDU | P9 |
+| IMP, AI, material tracking, PICK, EDU | P9 |
 | Testing, security checks, docs, deployment | P10 |
 
 ---

@@ -11,7 +11,6 @@ const SUBMITTABLE = ['not_submitted', 'rejected', 'resubmission_required'];
 // Which document types make sense for which provider role (BR-01).
 const ALLOWED_TYPES = {
   [ROLES.TECHNICIAN]: ['id_proof', 'qualification', 'other'],
-  [ROLES.STUDENT]: ['student_id', 'id_proof', 'other'],
   [ROLES.REFURBISHER]: ['business', 'id_proof', 'authorization', 'other'],
   [ROLES.RECYCLER]: ['authorization', 'business', 'id_proof', 'other'],
 };
@@ -79,7 +78,6 @@ async function submit(user, docType, files) {
   if (SUBMITTABLE.includes(profile.verification?.status || 'not_submitted')) {
     profile.verification = { status: 'pending' }; // clears any earlier rejection reason / reviewer
   }
-  if (user.role === ROLES.STUDENT && docType === 'student_id') profile.studentIdDoc = docs[0]._id;
   await profile.save();
 
   return { verificationStatus: profile.verification.status, documents: docs.map(toDoc) };

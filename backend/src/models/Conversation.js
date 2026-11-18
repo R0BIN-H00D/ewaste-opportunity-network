@@ -7,7 +7,7 @@ const schema = baseSchema({
     validate: { validator: (v) => v.length === 2 && String(v[0]) !== String(v[1]), message: 'A conversation has exactly two distinct participants' },
   },
   participantsKey: { type: String, required: true }, // sorted "idA:idB" for uniqueness
-  contextType: { type: String, enum: ['service', 'order', 'recycling', 'donation', 'offer', 'enquiry'], required: true },
+  contextType: { type: String, enum: ['service', 'order', 'recycling', 'donation', 'offer', 'enquiry', 'wanted'], required: true },
   contextId: { type: ObjectId, required: true },
   lastMessage: new Schema({ text: String, at: Date, sender: { type: ObjectId, ref: 'User' } }, { _id: false }),
   unread: { type: Map, of: Number, default: {} }, // userId -> count

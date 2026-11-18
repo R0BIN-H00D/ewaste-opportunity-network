@@ -45,7 +45,6 @@ const authorize = (...roles) => (req, _res, next) => {
 
 const PROFILE_MODEL = {
   [ROLES.TECHNICIAN]: ['TechnicianProfile', 'verification.status'],
-  [ROLES.STUDENT]: ['StudentProfile', 'verification.status'],
   [ROLES.REFURBISHER]: ['RefurbisherProfile', 'verification.status'],
   [ROLES.RECYCLER]: ['RecyclingCenter', 'verification.status'],
 };

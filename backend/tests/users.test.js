@@ -74,7 +74,7 @@ describe('profile', () => {
   it('rejects out-of-range coordinates and server-controlled fields', async () => {
     const u = await signup(app);
     expect((await api('patch', '/users/me/profile', u, { location: { lat: 123, lng: 0 } })).status).toBe(422);
-    expect((await api('patch', '/users/me/profile', u, { greenScore: 9999 })).status).toBe(422);
+    expect((await api('patch', '/users/me/profile', u, { role: 'admin' })).status).toBe(422);
     expect((await api('patch', '/users/me/profile', u, { orgProfile: { recipientVerification: { status: 'approved' } } })).status).toBe(422);
   });
 
@@ -180,12 +180,6 @@ describe('role profile', () => {
     expect((await api('patch', '/users/me/role-profile', u, { headline: 'technician field' })).status).toBe(422); // another role's field
   });
 
-  it('a student can set study details', async () => {
-    const u = await signup(app, { role: 'student' });
-    const res = await api('patch', '/users/me/role-profile', u, { college: 'RV College', course: 'ECE', yearOfStudy: 3, skills: ['soldering'] });
-    expect(res.status).toBe(200);
-    expect((await api('patch', '/users/me/role-profile', u, { yearOfStudy: 12 })).status).toBe(422);
-  });
 });
 
 describe('DELETE /users/me', () => {

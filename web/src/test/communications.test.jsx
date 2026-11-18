@@ -108,7 +108,7 @@ describe('menus and access', () => {
   it('shows a member the complaints link, not the administrators’ pages', async () => {
     renderApp('/dashboard/complaints', signedIn(USER));
     const menu = within(await screen.findByRole('complementary', { name: 'Dashboard navigation' }));
-    expect(menu.getByRole('link', { name: /Complaints/ })).toHaveAttribute('href', '/dashboard/complaints');
+    expect(menu.getByRole('link', { name: /Report a problem/ })).toHaveAttribute('href', '/dashboard/complaints');
     expect(menu.queryByRole('link', { name: /Audit log/ })).not.toBeInTheDocument();
   });
 
@@ -455,7 +455,7 @@ describe('announcements', () => {
   it('lists them with their state, who sees them, the window and who wrote them', async () => {
     adminAnnouncementApi.list.mockResolvedValue(page([
       announcement(),
-      announcement({ _id: 'n2', title: 'For technicians', audience: ['technician', 'student'], state: 'scheduled', endsAt: '2026-12-01T08:00:00.000Z' }),
+      announcement({ _id: 'n2', title: 'For technicians', audience: ['technician', 'refurbisher'], state: 'scheduled', endsAt: '2026-12-01T08:00:00.000Z' }),
       announcement({ _id: 'n3', title: 'Old notice', state: 'ended' }),
     ]));
     renderApp('/dashboard/admin/announcements', signedIn(ADMIN));
@@ -466,7 +466,7 @@ describe('announcements', () => {
     expect(now).toHaveTextContent('by Chief Admin');
     const later = screen.getByRole('heading', { name: 'For technicians' }).closest('article');
     expect(within(later).getByText('Scheduled')).toBeInTheDocument();
-    expect(later).toHaveTextContent('For Technician, Student');
+    expect(later).toHaveTextContent('For Technician, Refurbisher');
     expect(later).toHaveTextContent('until');
     expect(within(later).queryByRole('button', { name: /End .* now/ })).not.toBeInTheDocument();
     expect(within(screen.getByRole('heading', { name: 'Old notice' }).closest('article')).getByText('Ended')).toBeInTheDocument();
@@ -525,12 +525,12 @@ describe('announcements', () => {
     fireEvent.change(within(dialog).getByLabelText('Message'), { target: { value: 'Please update your documents.' } });
     fireEvent.click(within(dialog).getByLabelText(/Everyone/));
     fireEvent.click(within(dialog).getByLabelText('Technician'));
-    fireEvent.click(within(dialog).getByLabelText('Student'));
+    fireEvent.click(within(dialog).getByLabelText('Refurbisher'));
     fireEvent.change(within(dialog).getByLabelText('Starts (optional)'), { target: { value: '2099-01-01T09:00' } });
     fireEvent.change(within(dialog).getByLabelText('Ends (optional)'), { target: { value: '2099-01-05T09:00' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Publish' }));
     await waitFor(() => expect(adminAnnouncementApi.create).toHaveBeenCalledWith({
-      title: 'For providers', body: 'Please update your documents.', audience: ['technician', 'student'],
+      title: 'For providers', body: 'Please update your documents.', audience: ['technician', 'refurbisher'],
       startsAt: new Date('2099-01-01T09:00').toISOString(), endsAt: new Date('2099-01-05T09:00').toISOString(),
     }));
   });

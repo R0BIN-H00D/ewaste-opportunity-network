@@ -54,7 +54,7 @@ describe('the admin guard on complaint, announcement and audit routes', () => {
     expect((await as(method, url, null, body(method))).status).toBe(401);
   });
 
-  it.each(['user', 'technician', 'student', 'refurbisher', 'recycler'])('is closed to a %s on every route', async (role) => {
+  it.each(['user', 'technician', 'refurbisher', 'recycler'])('is closed to a %s on every route', async (role) => {
     const who = await makeUser(role);
     for (const [method, url] of ROUTES) {
       expect((await as(method, url, who, body(method))).status).toBe(403);
@@ -84,7 +84,7 @@ describe('filing a complaint', () => {
   it('is open to every role except administrators, and needs a login', async () => {
     expect((await file(null)).status).toBe(401);
     expect((await file(admin)).status).toBe(403);
-    for (const role of ['technician', 'student', 'refurbisher', 'recycler']) {
+    for (const role of ['technician', 'refurbisher', 'recycler']) {
       expect((await file(await makeUser(role))).status).toBe(201);
     }
   });
@@ -319,7 +319,7 @@ describe('announcements', () => {
 
   it('treats "everyone" plus a role as everyone, and keeps chosen roles', async () => {
     expect((await make({ audience: ['technician', 'all'] })).body.data.audience).toEqual(['all']);
-    expect((await make({ audience: ['technician', 'student', 'technician'] })).body.data.audience).toEqual(['technician', 'student']);
+    expect((await make({ audience: ['technician', 'refurbisher', 'technician'] })).body.data.audience).toEqual(['technician', 'refurbisher']);
   });
 
   it('checks the text, the audience and the dates (422)', async () => {
@@ -404,7 +404,7 @@ describe('announcements', () => {
     it('adds the ones for the signed-in person’s own role', async () => {
       await make({ title: 'For everyone' });
       await make({ title: 'For technicians', audience: ['technician'] });
-      await make({ title: 'For students', audience: ['student'] });
+      await make({ title: 'For refurbishers', audience: ['refurbisher'] });
       expect((await as('get', '/api/announcements', bob)).body.data.map((a) => a.title).sort()).toEqual(['For everyone', 'For technicians']);
       expect((await as('get', '/api/announcements', alice)).body.data.map((a) => a.title)).toEqual(['For everyone']);
     });

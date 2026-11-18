@@ -16,7 +16,7 @@ abstract class Routes {
   static const verification = '/account/verification';
   static const browse = '/browse';
 
-  /// The Green Score, badges, history and the person's impact.
+  /// The person's impact.
   static const impact = '/impact';
 
   /// The learning centre and one guide.
@@ -50,12 +50,18 @@ abstract class Routes {
   static const requestPattern = '/requests/:id';
 
   /// The technician directory. [listing] is the device the person wants repaired, carried along to the request form.
-  static String techniciansFor({String? listing}) => listing == null ? technicians : '$technicians?listing=$listing';
-  static String technician(String id, {String? listing}) => listing == null ? '$technicians/$id' : '$technicians/$id?listing=$listing';
+  static String techniciansFor({String? listing}) =>
+      listing == null ? technicians : '$technicians?listing=$listing';
+  static String technician(String id, {String? listing}) => listing == null
+      ? '$technicians/$id'
+      : '$technicians/$id?listing=$listing';
 
   /// The request form. [technician] asks one technician; leave it out for an open request any suitable technician can take.
   static String requestRepair({String? listing, String? technician}) {
-    final params = [if (listing != null) 'listing=$listing', if (technician != null) 'technician=$technician'];
+    final params = [
+      if (listing != null) 'listing=$listing',
+      if (technician != null) 'technician=$technician'
+    ];
     return params.isEmpty ? newRequest : '$newRequest?${params.join('&')}';
   }
 
@@ -70,32 +76,19 @@ abstract class Routes {
   static String ordersWith(String status) => '$orders?status=$status';
   static String order(String id) => '$orders/$id';
 
-  /// Student learning tasks: the open tasks, one task, the student's applications, one application, and experience with certificates.
-  static const opportunities = '/learning';
-  static const opportunityPattern = '/learning/:id';
-  static String opportunity(String id) => '$opportunities/$id';
-  static const myTasks = '/learning/mine';
-  static const newTask = '/learning/new';
-  static const taskEditPattern = '/learning/:id/edit';
-  static String taskEdit(String id) => '$opportunities/$id/edit';
-  static const applicantsPattern = '/learning/:id/applicants';
-  static String applicants(String id) => '$opportunities/$id/applicants';
-  static const applications = '/applications';
-  static const applicationPattern = '/applications/:id';
-  static String application(String id) => '$applications/$id';
-  static const experience = '/experience';
-
   /// Donations: the marketplace and the person's own lists, one donation, offering a device, and registering an organisation to receive.
   static const donations = '/donations';
   static const donationPattern = '/donations/:id';
   static String donation(String id) => '$donations/$id';
   static const newDonation = '/donations/new';
-  static String offerDonation(String listing) => '$newDonation?listing=$listing';
+  static String offerDonation(String listing) =>
+      '$newDonation?listing=$listing';
   static String donationsWith(String scope) => '$donations?as=$scope';
   static const myDonations = '/donations?as=donor';
   static const recipient = '/account/recipient';
 
   /// Refurbishment: the feed of devices to refurbish, the jobs, and the refurbisher's own products.
+  static const wanted = '/wanted';
   static const refurbOpportunities = '/refurbish';
   static const refurbJobs = '/refurbish/jobs';
   static const refurbJobPattern = '/refurbish/jobs/:id';
@@ -116,14 +109,26 @@ abstract class Routes {
   static const recyclingRequestPattern = '/recycling/requests/:id';
 
   /// The directory. [listing] is the device the person wants to recycle, carried along to the request form.
-  static String centersFor({String? listing}) => listing == null ? recycling : '$recycling?listing=$listing';
-  static String center(String id, {String? listing}) => listing == null ? '$recycling/$id' : '$recycling/$id?listing=$listing';
-  static String recycle({required String center, String? listing}) => listing == null ? '$newRecycling?center=$center' : '$newRecycling?center=$center&listing=$listing';
+  static String centersFor({String? listing}) =>
+      listing == null ? recycling : '$recycling?listing=$listing';
+  static String center(String id, {String? listing}) =>
+      listing == null ? '$recycling/$id' : '$recycling/$id?listing=$listing';
+  static String recycle({required String center, String? listing}) =>
+      listing == null
+          ? '$newRecycling?center=$center'
+          : '$newRecycling?center=$center&listing=$listing';
 
   /// The recycling requests, optionally opened on one status (`requested`, `pickup_scheduled`, ...).
-  static String recyclingRequestsWith(String status) => '$recyclingRequests?status=$status';
+  static String recyclingRequestsWith(String status) =>
+      '$recyclingRequests?status=$status';
   static String recyclingRequest(String id) => '$recyclingRequests/$id';
 }
 
 /// Screens a signed-out person can open. Everything else needs a signed-in session.
-const publicRoutes = {Routes.onboarding, Routes.login, Routes.register, Routes.forgotPassword, Routes.resetPassword};
+const publicRoutes = {
+  Routes.onboarding,
+  Routes.login,
+  Routes.register,
+  Routes.forgotPassword,
+  Routes.resetPassword
+};

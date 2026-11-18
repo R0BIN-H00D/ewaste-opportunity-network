@@ -64,7 +64,7 @@ function CategoryForm({ initial, onClose, onSaved }) {
         <TextField label="Group" value={form.group} onChange={change('group')} error={shown.group} maxLength={40} hint="Optional, for example Computers." />
         <label className="flex items-start gap-2 text-sm text-ink dark:text-[#E8F1EB]">
           <input type="checkbox" className="mt-1" checked={form.hazardous} onChange={change('hazardous')} />
-          <span><span className="font-medium">Hazardous</span><br />Students cannot be given tasks on devices of this kind.</span>
+          <span><span className="font-medium">Hazardous</span><br />Marks devices of this kind as needing careful handling.</span>
         </label>
         {initial && <p className="text-xs text-ink-muted dark:text-[#9FB2A7]">Its link name stays “{initial.slug}” so existing links keep working.</p>}
         <Alert variant="error">{serverError}</Alert>

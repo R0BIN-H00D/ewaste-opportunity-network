@@ -128,6 +128,7 @@ export default function DeviceDetails() {
           <dl className="glass mt-5 px-5 py-2">
             <Row label="Brand">{listing.brand}</Row>
             <Row label="Model">{listing.model}</Row>
+            <Row label="Model year">{listing.device?.modelYear}</Row>
             <Row label="Purchase year">{listing.device?.purchaseYear}</Row>
             <Row label="Age">{listing.device?.ageYears != null ? `${listing.device.ageYears} years` : ''}</Row>
             <Row label="Handover">{listing.pickupPreference ? labelOf(PICKUPS, listing.pickupPreference) : ''}</Row>

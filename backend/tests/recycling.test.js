@@ -510,9 +510,6 @@ describe('processing and completing', () => {
     expect(String(impact[0].verifiedBy)).toBe(centerUser.id);
     expect(impact[0].materials.actual).toEqual({ copper: 1.5 });
     expect(impact[0].materials.estimated).toEqual({ copper: 2, plastics: 3 });
-    // The person who sent the devices earns 30 points once the centre has confirmed and weighed them; the centre earns none.
-    const ledger = await require('../src/models/GreenScoreLedger').find().lean();
-    expect(ledger.map((l) => [String(l.user), l.points, l.rule])).toEqual([[owner.id, 30, 'recycling_verified']]);
 
     const c = await RecyclingCenter.findById(center.doc._id);
     expect(c.totals.actualKg).toBe(1.5);
@@ -525,7 +522,6 @@ describe('processing and completing', () => {
     const r = await make();
     await toCompleted(r._id, [{ type: 'plastics', estimatedKg: 3 }]);
     expect(await EnvironmentalImpact.countDocuments({ refId: r._id })).toBe(0);
-    expect(await require('../src/models/GreenScoreLedger').countDocuments()).toBe(0); // nothing verified, no points
     expect((await RecyclingCenter.findById(center.doc._id)).totals.estimatedKg).toBe(3);
   });
 

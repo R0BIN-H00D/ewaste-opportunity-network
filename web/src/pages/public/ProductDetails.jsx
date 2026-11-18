@@ -14,6 +14,7 @@ import { useSave } from '../../hooks/useSave';
 import { useAuth } from '../../hooks/useAuth';
 import { assetUrl } from '../../services/api';
 import { marketApi, orderApi } from '../../services/marketplaceApi';
+import { useMarketplaceBase } from '../../hooks/useMarketplaceBase';
 import { PAYMENT_METHODS } from '../../lib/marketplace';
 import { formatMoney } from '../../lib/requests';
 import { applyFieldErrors, friendlyMessage } from '../../utils/errors';
@@ -40,22 +41,44 @@ function Gallery({ photos = [], title }) {
   );
 }
 
+/** Same rules as the server, so people are told straight away what to fix. */
+export function validateDelivery({ deliveryArea, deliveryCity, deliveryPincode }) {
+  const errors = {};
+  const area = deliveryArea.trim();
+  const city = deliveryCity.trim();
+  if (area.length < 3 || !/[A-Za-z]/.test(area)) errors.deliveryArea = 'Enter the area or locality to deliver to.';
+  if (city.length < 2 || !/^[A-Za-z][A-Za-z .'-]*$/.test(city)) errors.deliveryCity = 'Enter the city (letters only).';
+  if (!/^[1-9][0-9]{5}$/.test(deliveryPincode.trim())) errors.deliveryPincode = 'Enter a valid 6-digit pincode.';
+  return errors;
+}
+
 function OrderDialog({ product, onClose, onDone }) {
   const save = useSave();
   const [quantity, setQuantity] = useState('1');
   const [paymentMethod, setPaymentMethod] = useState('cod');
-  const [deliveryArea, setDeliveryArea] = useState('');
+  const [place, setPlace] = useState({ deliveryArea: '', deliveryCity: '', deliveryPincode: '' });
+  const [placeErrors, setPlaceErrors] = useState({});
   const [notes, setNotes] = useState('');
   const [problem, setProblem] = useState('');
   const qty = Number(quantity);
+  const setPlaceField = (name) => (e) => {
+    setPlace((p) => ({ ...p, [name]: e.target.value }));
+    setPlaceErrors((er) => ({ ...er, [name]: undefined }));
+  };
 
   const submit = async () => {
     if (!Number.isInteger(qty) || qty < 1 || qty > product.stock) return setProblem(product.stock === 1 ? 'Only 1 is available, so the quantity must be 1.' : `Choose a quantity between 1 and ${product.stock}.`);
+    const found = validateDelivery(place);
+    setPlaceErrors(found);
+    if (Object.keys(found).length) return setProblem('');
     setProblem('');
-    const body = { productId: product._id, quantity: qty, paymentMethod, ...(deliveryArea.trim() ? { deliveryArea: deliveryArea.trim() } : {}), ...(notes.trim() ? { notes: notes.trim() } : {}) };
+    const body = { productId: product._id, quantity: qty, paymentMethod, deliveryArea: place.deliveryArea.trim(), deliveryCity: place.deliveryCity.trim(), deliveryPincode: place.deliveryPincode.trim(), ...(notes.trim() ? { notes: notes.trim() } : {}) };
     const res = await save.run(() => orderApi.place(body), 'Order placed');
     if (res.ok) onDone(res.result);
-    else applyFieldErrors(res.error, (name, { message }) => { if (name === 'quantity') setProblem(message); }, ['quantity']);
+    else applyFieldErrors(res.error, (name, { message }) => {
+      if (name === 'quantity') setProblem(message);
+      else setPlaceErrors((e) => ({ ...e, [name]: message }));
+    }, ['quantity', 'deliveryArea', 'deliveryCity', 'deliveryPincode']);
     return res;
   };
 
@@ -83,7 +106,14 @@ function OrderDialog({ product, onClose, onDone }) {
             ))}
           </div>
         </fieldset>
-        <TextField label="Your area (optional)" value={deliveryArea} onChange={(e) => setDeliveryArea(e.target.value)} maxLength={150} hint="Area or locality only. Share your exact address with the seller yourself, once they confirm." />
+        <fieldset className="space-y-3">
+          <legend className="mb-1 text-sm font-medium text-ink dark:text-white">Where should it be delivered?</legend>
+          <TextField label="Area or locality" value={place.deliveryArea} onChange={setPlaceField('deliveryArea')} error={placeErrors.deliveryArea} maxLength={150} autoComplete="address-level3" hint="Area only. Share your exact address with the seller yourself, once they confirm." />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <TextField label="City" value={place.deliveryCity} onChange={setPlaceField('deliveryCity')} error={placeErrors.deliveryCity} maxLength={80} autoComplete="address-level2" />
+            <TextField label="Pincode" inputMode="numeric" value={place.deliveryPincode} onChange={setPlaceField('deliveryPincode')} error={placeErrors.deliveryPincode} maxLength={6} autoComplete="postal-code" />
+          </div>
+        </fieldset>
         <TextField as="textarea" rows={2} label="Note for the seller (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} />
         <Alert variant="error">{save.status === 'error' && !problem ? friendlyMessage(save.error) : ''}</Alert>
       </div>
@@ -118,6 +148,7 @@ export default function ProductDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const marketBase = useMarketplaceBase();
   const { user, isAuthenticated } = useAuth();
   const { data: p, error, loading, reload } = useFetch((signal) => marketApi.get(id, signal), [id, user?._id]);
   const [ordering, setOrdering] = useState(false);
@@ -128,7 +159,7 @@ export default function ProductDetails() {
     return (
       <div className="mx-auto max-w-6xl space-y-5 px-4 py-10">
         <ErrorState error={missing ? { message: 'This product does not exist or is no longer on sale.' } : error} title={missing ? 'Product not found' : 'Could not load this product'} onRetry={missing ? undefined : reload} />
-        <p className="text-center"><Link to="/marketplace" className="font-semibold text-primary underline dark:text-primary-tint">Back to the marketplace</Link></p>
+        <p className="text-center"><Link to={marketBase} className="font-semibold text-primary underline dark:text-primary-tint">Back to the marketplace</Link></p>
       </div>
     );
   }
@@ -140,7 +171,7 @@ export default function ProductDetails() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-5 px-4 py-10">
-      <Link to="/marketplace" className="inline-flex items-center gap-1 text-sm font-medium text-primary dark:text-primary-tint"><ArrowLeft size={16} aria-hidden /> Marketplace</Link>
+      <Link to={marketBase} className="inline-flex items-center gap-1 text-sm font-medium text-primary dark:text-primary-tint"><ArrowLeft size={16} aria-hidden /> Marketplace</Link>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Gallery photos={p.photos} title={p.title} />

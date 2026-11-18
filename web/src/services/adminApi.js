@@ -76,11 +76,6 @@ export const adminExportApi = {
   ),
 };
 
-export const adminCertificateApi = {
-  list: (params, signal) => api.get('/admin/certificates', { params: clean(params), signal }).then(page),
-  issue: (applicationId) => api.post('/admin/certificates', { applicationId }).then(one),
-};
-
 export const adminUserApi = {
   list: (params, signal) => api.get('/admin/users', { params: clean(params), signal }).then(page),
   get: (id, signal) => api.get(`/admin/users/${id}`, { signal }).then(one),

@@ -25,7 +25,7 @@ const verificationListQuery = z
     ...pageQuery,
     type: z.preprocess(blankToUndefined, z.enum(['provider', 'recipient']).optional()),
     status: z.preprocess(blankToUndefined, z.enum([...VERIFICATION_STATUS.filter((s) => s !== 'not_submitted'), 'all']).optional()),
-    role: z.preprocess(blankToUndefined, z.enum(['technician', 'student', 'refurbisher', 'recycler']).optional()),
+    role: z.preprocess(blankToUndefined, z.enum(['technician', 'refurbisher', 'recycler']).optional()),
   })
   .strict();
 
@@ -186,7 +186,7 @@ const auditListQuery = z
   })
   .strict();
 
-// ---- analytics, exports, certificates ----
+// ---- analytics, exports ----
 const analyticsQuery = z.object({ months: z.preprocess(blankToUndefined, z.coerce.number().int().min(3, 'Choose 3 to 24 months').max(24, 'Choose 3 to 24 months').optional()) }).strict();
 
 // One shape for every export; which filters a given export accepts is checked by the service, which refuses the rest.
@@ -200,11 +200,8 @@ const exportQuery = z
   })
   .strict();
 
-const certificateListQuery = z.object({ ...pageQuery, state: optEnum(['waiting', 'issued', 'all']) }).strict();
-const certificateIssueBody = z.object({ applicationId: objectId }).strict();
-
 module.exports = {
-  analyticsQuery, exportQuery, certificateListQuery, certificateIssueBody,
+  analyticsQuery, exportQuery,
   listingListQuery, listingModerationBody, reviewListQuery, reviewStatusBody, reportListQuery, reportDecisionBody,
   categoryCreateBody, categoryUpdateBody, categoryOrderBody, articleCreateBody, articleUpdateBody, articleListQuery,
   complaintListQuery, complaintActionBody, announcementCreateBody, announcementUpdateBody, announcementListQuery, auditListQuery,

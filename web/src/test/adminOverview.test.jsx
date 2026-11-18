@@ -30,7 +30,7 @@ const ADMIN = { ...USER, _id: 'a1', name: 'Chief Admin', role: 'admin' };
 const flow = (total, open, completed, stopped = 0) => ({ total, open, completed, stopped });
 const overview = (over = {}) => ({
   generatedAt: '2026-11-15T10:00:00.000Z',
-  people: { total: 42, active: 36, suspended: 2, waitingForVerification: 4, newThisMonth: 7, byRole: { user: 20, technician: 9, student: 6, refurbisher: 4, recycler: 3 } },
+  people: { total: 42, active: 36, suspended: 2, waitingForVerification: 4, newThisMonth: 7, byRole: { user: 20, technician: 9, refurbisher: 4, recycler: 3 } },
   centres: { total: 3, authorised: 2 },
   listings: { total: 31, listed: 20, inService: 5, byStatus: { listed: 20, in_service: 5, withdrawn: 6 } },
   services: { repairs: flow(12, 5, 6, 1), donations: flow(8, 3, 5), refurbishment: flow(4, 2, 2), recycling: flow(6, 1, 4, 1), completed: 17 },

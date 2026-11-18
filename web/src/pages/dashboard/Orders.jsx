@@ -49,7 +49,7 @@ export default function Orders() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-ink dark:text-white">Orders</h1>
-        <Link to="/marketplace" className="btn btn-glass">Browse the marketplace</Link>
+        <Link to="/dashboard/marketplace" className="btn btn-glass">Browse the marketplace</Link>
       </div>
 
       {isSeller && (
@@ -71,7 +71,7 @@ export default function Orders() {
         as === 'seller' ? (
           <EmptyState icon={ShoppingBag} art="devices" title="No orders yet" action={<Link to="/dashboard/products" className="btn btn-primary">See my products</Link>}>Orders from buyers appear here as soon as someone orders one of your products.</EmptyState>
         ) : (
-          <EmptyState icon={ShoppingBag} art="devices" title="You have not ordered anything yet" action={<Link to="/marketplace" className="btn btn-primary">Browse refurbished devices</Link>}>Orders you place on the marketplace appear here.</EmptyState>
+          <EmptyState icon={ShoppingBag} art="devices" title="You have not ordered anything yet" action={<Link to="/dashboard/marketplace" className="btn btn-primary">Browse refurbished devices</Link>}>Orders you place on the marketplace appear here.</EmptyState>
         )
       ) : (
         <ul className={`space-y-3 ${loading ? 'opacity-60' : ''}`}>{items.map((o) => <li key={o._id}><OrderCard order={o} /></li>)}</ul>

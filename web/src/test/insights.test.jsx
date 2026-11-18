@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { setAccessToken } from '../services/api';
 import { deviceApi } from '../services/deviceApi';
 import { announcementApi } from '../services/announcementApi';
-import { adminAnalyticsApi, adminCertificateApi, adminDashboardApi, adminExportApi } from '../services/adminApi';
+import { adminAnalyticsApi, adminDashboardApi, adminExportApi } from '../services/adminApi';
 import { saveBlob } from '../lib/download';
 import { actionLabel, auditTargetLabel, auditTargetLink } from '../lib/admin';
 import { kg, monthLabel, number, percent } from '../lib/analytics';
@@ -18,7 +18,6 @@ vi.mock('../services/adminApi', () => ({
   adminDashboardApi: { get: vi.fn() },
   adminAnalyticsApi: { get: vi.fn() },
   adminExportApi: { download: vi.fn() },
-  adminCertificateApi: { list: vi.fn(), issue: vi.fn() },
 }));
 vi.mock('../lib/download', () => ({ saveBlob: vi.fn() }));
 vi.mock('../services/api', async (importOriginal) => ({
@@ -32,7 +31,6 @@ vi.mock('recharts', () => {
 });
 
 const ADMIN = { ...USER, _id: 'a1', name: 'Chief Admin', role: 'admin' };
-const page = (items, meta = {}) => ({ items, meta: { total: items.length, page: 1, pages: 1, limit: 10, ...meta } });
 const apiError = (message, status = 409, code) => Object.assign(new Error(message), { response: { status, data: { message, code } } });
 
 const analytics = (o = {}) => ({
@@ -51,9 +49,6 @@ const analytics = (o = {}) => ({
   generatedAt: '2026-11-15T08:00:00.000Z',
   ...o,
 });
-const cert = (o = {}) => ({
-  _id: 'ap1', student: { _id: 's1', name: 'Sana Student' }, task: 'Laptop triage', hours: 6, completedAt: '2026-11-10T08:00:00.000Z', certificate: null, canIssue: true, ...o,
-});
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -63,16 +58,12 @@ beforeEach(() => {
   adminDashboardApi.get.mockReturnValue(new Promise(() => {}));
   announcementApi.list.mockResolvedValue([]);
   adminAnalyticsApi.get.mockResolvedValue(analytics());
-  adminCertificateApi.list.mockResolvedValue(page([cert()], { counts: { waiting: 1, issued: 4 } }));
 });
 
 describe('words and numbers', () => {
-  it('labels the new audit entries and links certificates to their page', () => {
+  it('labels the new audit entries', () => {
     expect(actionLabel('export.downloaded')).toBe('Downloaded a data file');
-    expect(actionLabel('certificate.issued')).toBe('Issued a certificate');
     expect(auditTargetLabel('Export')).toBe('Data file');
-    expect(auditTargetLabel('Certificate')).toBe('Certificate');
-    expect(auditTargetLink('Certificate', 'c1')).toBe('/dashboard/admin/certificates');
     expect(auditTargetLink('Export', 'x')).toBe('');
   });
 
@@ -87,18 +78,16 @@ describe('words and numbers', () => {
 });
 
 describe('access', () => {
-  it('adds Analytics and Certificates to the administrator menu', async () => {
+  it('adds Analytics to the administrator menu', async () => {
     renderApp('/dashboard/admin/analytics', signedIn(ADMIN));
     const menu = within(await screen.findByRole('complementary', { name: 'Dashboard navigation' }));
     expect(menu.getByRole('link', { name: /Analytics/ })).toHaveAttribute('href', '/dashboard/admin/analytics');
-    expect(menu.getByRole('link', { name: /Certificates/ })).toHaveAttribute('href', '/dashboard/admin/certificates');
   });
 
-  it.each(['analytics', 'certificates'])('keeps everyone else out of /dashboard/admin/%s', async (path) => {
+  it.each(['analytics'])('keeps everyone else out of /dashboard/admin/%s', async (path) => {
     renderApp(`/dashboard/admin/${path}`, signedIn(USER));
     expect(await screen.findByRole('heading', { name: 'This area is not available for your account' })).toBeInTheDocument();
     expect(adminAnalyticsApi.get).not.toHaveBeenCalled();
-    expect(adminCertificateApi.list).not.toHaveBeenCalled();
   });
 });
 
@@ -194,7 +183,7 @@ describe('data downloads', () => {
   it('does not send filters the chosen file does not take', async () => {
     adminExportApi.download.mockResolvedValue({ blob, filename: 'recycling-2026-11-15.csv', rows: 1, truncated: false });
     const panel = within(await open());
-    fireEvent.change(panel.getByLabelText('Role'), { target: { value: 'student' } });
+    fireEvent.change(panel.getByLabelText('Role'), { target: { value: 'refurbisher' } });
     fireEvent.change(panel.getByLabelText('What to download'), { target: { value: 'recycling' } });
     fireEvent.click(panel.getByRole('button', { name: /Download CSV/ }));
     expect(await panel.findByText(/Downloaded recycling-2026-11-15\.csv with 1 row\./)).toBeInTheDocument();
@@ -224,49 +213,5 @@ describe('data downloads', () => {
     fireEvent.click(panel.getByRole('button', { name: /Download CSV/ }));
     expect(await panel.findByText(/does not use that filter/)).toBeInTheDocument();
     expect(saveBlob).not.toHaveBeenCalled();
-  });
-});
-
-describe('certificates page', () => {
-  it('lists the students waiting, with the counts', async () => {
-    renderApp('/dashboard/admin/certificates', signedIn(ADMIN));
-    expect(await screen.findByRole('heading', { name: 'Sana Student' })).toBeInTheDocument();
-    expect(screen.getByText(/Laptop triage · 6 hours/)).toBeInTheDocument();
-    expect(screen.getByText('1 waiting · 4 issued')).toBeInTheDocument();
-    expect(adminCertificateApi.list.mock.calls[0][0]).toEqual({ state: 'waiting', page: 1, limit: 10 });
-  });
-
-  it('issues a certificate after a confirmation and says so', async () => {
-    adminCertificateApi.issue.mockResolvedValue({ _id: 'c1', certNo: 'EW-2026-0001', issuedAt: '2026-11-15T09:00:00.000Z', application: 'ap1' });
-    renderApp('/dashboard/admin/certificates', signedIn(ADMIN));
-    fireEvent.click(await screen.findByRole('button', { name: 'Issue certificate to Sana Student for Laptop triage' }));
-    expect(adminCertificateApi.issue).not.toHaveBeenCalled();
-    const dialog = within(await screen.findByRole('dialog'));
-    fireEvent.click(dialog.getByRole('button', { name: 'Issue certificate' }));
-    expect(await screen.findByText(/Certificate EW-2026-0001 issued to Sana Student/)).toBeInTheDocument();
-    expect(adminCertificateApi.issue).toHaveBeenCalledWith('ap1');
-    expect(adminCertificateApi.list.mock.calls.length).toBeGreaterThan(1); // the list was reloaded
-  });
-
-  it('shows the reason when a certificate was already issued', async () => {
-    adminCertificateApi.issue.mockRejectedValue(apiError('A certificate was already issued for this task', 409, 'ALREADY_ISSUED'));
-    renderApp('/dashboard/admin/certificates', signedIn(ADMIN));
-    fireEvent.click(await screen.findByRole('button', { name: /Issue certificate to Sana Student/ }));
-    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Issue certificate' }));
-    expect(await screen.findByText(/already issued/)).toBeInTheDocument();
-  });
-
-  it('shows the number on issued rows instead of a button', async () => {
-    adminCertificateApi.list.mockResolvedValue(page([cert({ certificate: { certNo: 'EW-2026-0009', issuedAt: '2026-11-12T08:00:00.000Z' }, canIssue: false })], { counts: { waiting: 0, issued: 1 } }));
-    renderApp('/dashboard/admin/certificates?state=issued', signedIn(ADMIN));
-    expect(await screen.findByText('EW-2026-0009')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Issue certificate to/ })).not.toBeInTheDocument();
-    expect(adminCertificateApi.list.mock.calls[0][0].state).toBe('issued');
-  });
-
-  it('says when no certificate is waiting', async () => {
-    adminCertificateApi.list.mockResolvedValue(page([], { counts: { waiting: 0, issued: 0 } }));
-    renderApp('/dashboard/admin/certificates', signedIn(ADMIN));
-    expect(await screen.findByRole('heading', { name: 'No certificates are waiting' })).toBeInTheDocument();
   });
 });

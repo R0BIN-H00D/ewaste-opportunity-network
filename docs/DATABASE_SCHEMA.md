@@ -11,7 +11,6 @@ Conventions: `timestamps` on all; `versionKey` off; sensitive fields (`passwordH
 | Users | User.js | `email` unique; `role+status` |
 | UserProfiles | UserProfile.js | `user` unique; `location` 2dsphere; derives fuzzed `publicLocation`; holds org profile for donation recipients (A-02) |
 | TechnicianProfiles | TechnicianProfile.js | `user` unique; `serviceLocation` 2dsphere; `verification.status+deviceCategories`; `ratingAvg` |
-| StudentProfiles | StudentProfile.js | `user` unique; `verification.status` |
 | RefurbisherProfiles | RefurbisherProfile.js | `user` unique; 2dsphere; `verification.status+categories` |
 | RecyclingCenters | RecyclingCenter.js | `user` unique; 2dsphere; `verification.status+acceptedCategories` |
 | VerificationDocuments | VerificationDocument.js | `owner`; `status+submittedAt`; private file reference only (no public URL) |
@@ -31,16 +30,12 @@ Conventions: `timestamps` on all; `versionKey` off; sensitive fields (`passwordH
 | Orders | Order.js | `buyer+createdAt`; `seller+status` |
 | Transactions | Transaction.js | `payer`, `payee`, `(refType,refId)`; records only (BR-10) |
 | RecyclingRecords | RecyclingRecord.js | `center+status`; `refNo` unique sparse (`REC-YYYY-XXXXXX`); `actualKg` and `estimatedKg` separate (BR-06). `pickupAddress` (private), `preferredDate`, `notes`, `checklistAcknowledgedAt`, `completedAt`, `cancelReason` and `history[{status,at,by,note}]` added in 5F |
-| LearningOpportunities | LearningOpportunity.js | `status+deadline`; 2dsphere; `hazardousExcluded` must be true (BR-07); soft delete. `expectedHours` (1–200) added in 5G; the service also refuses hazardous device categories. `linkedServiceRequest` is not used yet (FR-SVC-011) |
-| StudentApplications | StudentApplication.js | unique `(opportunity, student)`. `startedAt` and `history[{status,at,by,note}]` added in 5G; `hours` is what the supervisor recorded and is added to `StudentProfile.hoursCompleted` once |
-| Certificates *(added)* | Certificate.js | `certNo` unique (`CERT-YYYY-XXXXXX`); `application` unique. Issued by the service call `issueCertificate` (completed applications only); the admin list and issue route (`/api/admin/certificates`, audited as `certificate.issued`) arrived in Phase 6E |
 | Conversations | Conversation.js | unique `(contextType, contextId, participantsKey)`; exactly 2 distinct participants |
 | Messages | Message.js | `conversation+createdAt`; needs text or attachment |
 | Notifications | Notification.js | `user+readAt+createdAt` |
 | Reviews | Review.js | unique `(reviewer, contextType, contextId)`; integer 1–5 |
 | Complaints | Complaint.js | `status+createdAt`; `assignedTo+status` |
 | EnvironmentalImpact | EnvironmentalImpact.js | unique `(type, refType, refId)` — idempotent; `year+month+type` |
-| GreenScoreLedger *(added)* | GreenScoreLedger.js | unique `(user, eventRef)` — idempotent |
 | AdminLogs | AdminLog.js | insert-only (update/delete blocked); `createdAt`. Written by `auditService.record` (user status changes, verification decisions, document views from Phase 6A; complaints, announcements and certificates from 6D and 6E; CSV downloads as `export.downloaded` with `targetType: Export` and no `targetId`) |
 | Announcements *(added)* | Announcement.js | `startsAt+endsAt` |
 | EducationArticles *(added)* | EducationArticle.js | `slug` unique; `status+topic`; soft delete |

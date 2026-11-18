@@ -23,7 +23,7 @@ beforeEach(async () => {
 function create(user, fields = {}, { photo = true } = {}) {
   let r = request(app).post('/api/devices');
   if (user) r = r.set(authHeader(user));
-  const body = { name: 'HP Pavilion laptop', category: 'laptop', condition: 'minor_damage', preferredService: 'repair', lat: 12.97, lng: 77.59, city: 'Bengaluru', ...fields };
+  const body = { name: 'HP Pavilion laptop', category: 'laptop', brand: 'HP', model: 'Pavilion 15', modelYear: 2018, purchaseYear: 2019, description: 'Screen flickers, works otherwise.', condition: 'minor_damage', preferredService: 'repair', pickupPreference: 'pickup', addressArea: 'Indiranagar', agentPhone: '9876543210', lat: 12.97, lng: 77.59, city: 'Bengaluru', ...fields };
   for (const [k, v] of Object.entries(body)) if (v !== undefined) r = r.field(k, String(v));
   if (photo) r = r.attach('photos', PNG, { filename: 'a.png', contentType: 'image/png' });
   return r;
@@ -34,9 +34,9 @@ describe('POST /api/devices', () => {
     expect((await create(null)).status).toBe(401);
   });
 
-  it('rejects roles that cannot list devices (student)', async () => {
-    const student = await makeUser('student');
-    expect((await create(student)).status).toBe(403);
+  it('rejects roles that cannot list devices (admin)', async () => {
+    const admin = await makeUser('admin');
+    expect((await create(admin)).status).toBe(403);
   });
 
   it('creates a listing with photo, category and exact location visible to the owner', async () => {
@@ -72,9 +72,49 @@ describe('POST /api/devices', () => {
     expect(draft.body.data.status).toBe('draft');
   });
 
+  it('checks the details, condition, photo and place before a listing goes live', async () => {
+    // Several faults per request, so the upload rate limit is not used up.
+    const year = new Date().getFullYear();
+    const rounds = [
+      [{ name: 'ab', brand: 'H', model: '###', modelYear: String(year + 1), purchaseYear: String(year + 1), condition: 'shiny' }, ['name', 'brand', 'model', 'modelYear', 'purchaseYear', 'condition']],
+      [{ modelYear: '2020', purchaseYear: '2018' }, ['purchaseYear']], // bought before the model came out
+      [{ name: '1234', preferredService: undefined, expectedPrice: '-5', addressArea: '12', city: '560038' }, ['name', 'preferredService', 'expectedPrice', 'addressArea', 'city']],
+      [{ purchaseYear: '1985', expectedPrice: '12.345' }, ['purchaseYear', 'expectedPrice']],
+      [{ expectedPrice: '99999999', addressArea: '#### ', agentPhone: '12345' }, ['expectedPrice', 'addressArea', 'agentPhone']],
+      // Missing (not wrong) details are reported once everything typed is valid.
+      [{ brand: undefined, model: undefined, modelYear: undefined, purchaseYear: undefined, pickupPreference: undefined, addressArea: undefined, agentPhone: undefined, city: undefined }, ['brand', 'model', 'modelYear', 'purchaseYear', 'pickupPreference', 'addressArea', 'agentPhone', 'city']],
+    ];
+    for (const [override, fieldsWrong] of rounds) {
+      const res = await create(owner, override);
+      expect(res.status).toBe(422);
+      const text = JSON.stringify(res.body);
+      fieldsWrong.forEach((f) => expect([f, text.includes(f)]).toEqual([f, true]));
+    }
+    expect((await create(owner, { expectedPrice: '1500.50', description: 'x', modelYear: '2019', purchaseYear: '2019' })).status).toBe(201); // the same year is fine // a description has no minimum
+  });
+
+  it('accepts a delivery agent phone in the usual Indian forms, keeps it private, and rejects bad ones', async () => {
+    const forms = ['98765 43210', '+91 98765-43210'];
+    const res = await create(owner, { agentPhone: forms[0] });
+    expect(res.status).toBe(201);
+    expect(res.body.data.agentPhone).toBe('9876543210'); // the owner sees it, stored as 10 digits
+    const listingId = res.body.data._id;
+    const publicView = await request(app).get(`/api/devices/${listingId}`);
+    expect(publicView.body.data).not.toHaveProperty('agentPhone');
+    expect((await request(app).get(`/api/devices/${listingId}`).set(authHeader(other))).body.data).not.toHaveProperty('agentPhone');
+    expect((await request(app).get(`/api/devices/${listingId}`).set(authHeader(owner))).body.data.agentPhone).toBe('9876543210');
+    expect((await create(owner, { agentPhone: forms[1] })).body.data.agentPhone).toBe('9876543210');
+    expect((await create(owner, { agentPhone: '5876543210' })).status).toBe(422); // must start 6-9
+  });
+
+  it('lets an unfinished draft through but still checks what was typed', async () => {
+    const draft = await create(owner, { status: 'draft', brand: undefined, model: undefined, modelYear: undefined, purchaseYear: undefined, description: undefined, pickupPreference: undefined, addressArea: undefined, agentPhone: undefined, city: undefined }, { photo: false });
+    expect(draft.status).toBe(201);
+  });
+
   it('rejects a file whose bytes are not really an image', async () => {
     const res = await request(app).post('/api/devices').set(authHeader(owner))
-      .field('name', 'Fake').field('category', 'laptop').field('condition', 'minor_damage').field('preferredService', 'repair')
+      .field('name', 'Fake').field('category', 'laptop').field('brand', 'HP').field('model', 'Pavilion').field('modelYear', '2018').field('purchaseYear', '2019').field('description', 'Not a real image file.').field('pickupPreference', 'pickup').field('addressArea', 'Indiranagar').field('agentPhone', '9876543210').field('city', 'Bengaluru').field('condition', 'minor_damage').field('preferredService', 'repair')
       .attach('photos', Buffer.from('this is plain text, not an image'), { filename: 'x.png', contentType: 'image/png' });
     expect(res.status).toBe(422);
   });

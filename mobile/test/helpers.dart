@@ -8,7 +8,12 @@ import 'package:ewaste_opportunity/services/api_client.dart';
 import 'package:ewaste_opportunity/services/auth_repository.dart';
 
 /// A user as the server sends it.
-Map<String, dynamic> userJson({String role = 'user', bool emailVerified = true, String name = 'Asha Rao', String status = 'active'}) => {
+Map<String, dynamic> userJson(
+        {String role = 'user',
+        bool emailVerified = true,
+        String name = 'Asha Rao',
+        String status = 'active'}) =>
+    {
       '_id': 'u1',
       'name': name,
       'email': 'asha@example.com',
@@ -17,7 +22,11 @@ Map<String, dynamic> userJson({String role = 'user', bool emailVerified = true, 
       'emailVerified': emailVerified,
     };
 
-Me sampleMe({UserRole role = UserRole.user, bool emailVerified = true, int? greenScore, String? verificationStatus}) => Me(
+Me sampleMe(
+        {UserRole role = UserRole.user,
+        bool emailVerified = true,
+        String? verificationStatus}) =>
+    Me(
       user: AppUser(
         id: 'u1',
         name: 'Asha Rao',
@@ -26,13 +35,16 @@ Me sampleMe({UserRole role = UserRole.user, bool emailVerified = true, int? gree
         status: 'active',
         emailVerified: emailVerified,
       ),
-      greenScore: greenScore,
       verificationStatus: verificationStatus,
     );
 
 /// An [AccountRepository] that never touches the network and records what was asked of it.
 class FakeAccountRepository extends AccountRepository {
-  FakeAccountRepository({this.profileResult = const OwnProfile(), this.notes = const [], this.paymentList = const [], this.summary = const PaymentSummary()})
+  FakeAccountRepository(
+      {this.profileResult = const OwnProfile(),
+      this.notes = const [],
+      this.paymentList = const [],
+      this.summary = const PaymentSummary()})
       : super(ApiClient(store: MemoryKeyValueStore()));
 
   OwnProfile profileResult;
@@ -54,25 +66,47 @@ class FakeAccountRepository extends AccountRepository {
   Future<AppUser> updateAccount({required String name, String? phone}) async {
     _fail();
     calls.add('account:$name:${phone ?? ''}');
-    return AppUser(id: 'u1', name: name.trim(), email: 'asha@example.com', role: UserRole.user, status: 'active', emailVerified: true, phone: phone);
+    return AppUser(
+        id: 'u1',
+        name: name.trim(),
+        email: 'asha@example.com',
+        role: UserRole.user,
+        status: 'active',
+        emailVerified: true,
+        phone: phone);
   }
 
   @override
-  Future<OwnProfile> updateProfile({String? bio, String? addressArea, String? city, String? state, String? pincode}) async {
+  Future<OwnProfile> updateProfile(
+      {String? bio,
+      String? addressArea,
+      String? city,
+      String? state,
+      String? pincode,
+      double? lat,
+      double? lng}) async {
     _fail();
     calls.add('profile:$addressArea:$city:$state:$pincode:$bio');
     return profileResult;
   }
 
   @override
-  Future<OwnProfile> updatePreferences({bool? emailNotifications, bool? pushNotifications, String? theme}) async {
-    calls.add('prefs:${emailNotifications ?? '-'}:${pushNotifications ?? '-'}:${theme ?? '-'}');
+  Future<OwnProfile> updatePreferences(
+      {bool? emailNotifications,
+      bool? pushNotifications,
+      String? theme}) async {
+    calls.add(
+        'prefs:${emailNotifications ?? '-'}:${pushNotifications ?? '-'}:${theme ?? '-'}');
     return profileResult;
   }
 
   @override
-  Future<({PageResult<NotificationItem> page, int unread})> notifications({int page = 1, bool unreadOnly = false}) async =>
-      (page: PageResult(items: notes, page: 1, pages: 1, total: notes.length), unread: notes.where((n) => !n.isRead).length);
+  Future<({PageResult<NotificationItem> page, int unread})> notifications(
+          {int page = 1, bool unreadOnly = false}) async =>
+      (
+        page: PageResult(items: notes, page: 1, pages: 1, total: notes.length),
+        unread: notes.where((n) => !n.isRead).length
+      );
 
   @override
   Future<int> unreadCount() async => notes.where((n) => !n.isRead).length;
@@ -90,13 +124,19 @@ class FakeAccountRepository extends AccountRepository {
   }
 
   @override
-  Future<PageResult<PaymentRecord>> payments({int page = 1}) async => PageResult(items: paymentList, page: 1, pages: 1, total: paymentList.length);
+  Future<PageResult<PaymentRecord>> payments({int page = 1}) async =>
+      PageResult(
+          items: paymentList, page: 1, pages: 1, total: paymentList.length);
 
   @override
   Future<PaymentSummary> paymentSummary() async => summary;
 
   @override
-  Future<void> contact({required String name, required String email, required String subject, required String message}) async {
+  Future<void> contact(
+      {required String name,
+      required String email,
+      required String subject,
+      required String message}) async {
     _fail();
     calls.add('contact:$name:$email:$subject:$message');
   }
@@ -104,7 +144,11 @@ class FakeAccountRepository extends AccountRepository {
 
 /// An [AuthRepository] that never touches the network.
 class FakeAuthRepository extends AuthRepository {
-  FakeAuthRepository({this.loginResult, this.loginError, this.restoreResult, this.restoreError})
+  FakeAuthRepository(
+      {this.loginResult,
+      this.loginError,
+      this.restoreResult,
+      this.restoreError})
       : super(ApiClient(store: MemoryKeyValueStore()));
 
   Me? loginResult;
@@ -114,6 +158,29 @@ class FakeAuthRepository extends AuthRepository {
 
   final loginEmails = <String>[];
   bool loggedOut = false;
+
+  /// The email-code step: the codes typed, whether the server refuses them, and how a resend is delivered.
+  final codes = <String>[];
+  ApiException? codeError;
+  String delivery = 'smtp';
+  int resends = 0;
+  Me? meResult;
+
+  @override
+  Future<void> verifyEmailCode(String code) async {
+    codes.add(code);
+    final e = codeError;
+    if (e != null) throw e;
+  }
+
+  @override
+  Future<String> resendVerification() async {
+    resends++;
+    return delivery;
+  }
+
+  @override
+  Future<Me> me() async => meResult ?? sampleMe();
   Map<String, Object?>? lastRegistration;
 
   @override
@@ -133,7 +200,13 @@ class FakeAuthRepository extends AuthRepository {
     String? phone,
     String? organizationName,
   }) async {
-    lastRegistration = {'name': name, 'email': email, 'role': role, 'phone': phone, 'organizationName': organizationName};
+    lastRegistration = {
+      'name': name,
+      'email': email,
+      'role': role,
+      'phone': phone,
+      'organizationName': organizationName
+    };
     return sampleMe(role: role);
   }
 

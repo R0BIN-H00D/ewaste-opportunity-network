@@ -69,7 +69,7 @@ describe('opening a conversation', () => {
       seller: seller.id, title: 'Refurbished ThinkPad', category: cats.laptop._id, condition: 'good',
       refurbishmentInfo: 'New battery and SSD, fully tested.', price: 15000, stock: 1, photos: [{ url: '/uploads/p.png', publicId: 'p' }],
     });
-    const placed = await request(app).post('/api/orders').set(authHeader(buyer)).send({ productId: String(product._id) });
+    const placed = await request(app).post('/api/orders').set(authHeader(buyer)).send({ productId: String(product._id), deliveryArea: 'Indiranagar', deliveryCity: 'Bengaluru', deliveryPincode: '560038' });
     expect(placed.status).toBe(201);
     const orderId = placed.body.data._id;
 

@@ -106,22 +106,7 @@ function Gift() {
   );
 }
 
-/** A graduation cap on an open book: learning and opportunities for students. */
-function Learn() {
-  return (
-    <svg {...SIZE}>
-      <Ground />
-      <path d="M24 80c18-8 38-8 56 2 18-10 38-10 56-2v18c-18-8-38-8-56 2-18-10-38-10-56-2z" fill="currentColor" opacity=".12" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />
-      <path d="M80 82v18" stroke="currentColor" strokeWidth="2.5" />
-      <path d="M80 18l44 18-44 18-44-18z" fill="currentColor" opacity=".85" />
-      <path d="M56 48v14c8 8 40 8 48 0V48" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" opacity=".6" />
-      <path d="M124 36v22" stroke="#A3E635" strokeWidth="3.5" strokeLinecap="round" />
-      <circle cx="124" cy="62" r="4" fill="#A3E635" />
-    </svg>
-  );
-}
-
-const ART = { devices: Devices, search: Search, recycle: Recycle, inbox: Inbox, map: MapPin, tools: Tools, gift: Gift, learn: Learn };
+const ART = { devices: Devices, search: Search, recycle: Recycle, inbox: Inbox, map: MapPin, tools: Tools, gift: Gift };
 export const ART_NAMES = Object.keys(ART);
 
 /** One illustration by name, or nothing for a name that does not exist. Size it with `className`. */

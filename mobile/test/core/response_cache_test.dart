@@ -17,12 +17,6 @@ void main() {
         '/technicians/t1',
         '/recycling-centers',
         '/recycling-centers/c1',
-        '/students/opportunities',
-        '/students/opportunities/o1',
-        '/students/opportunities/mine',
-        '/students/applications',
-        '/students/certificates',
-        '/students/experience',
         '/notifications',
         '/categories',
         '/refurbishment/jobs',
@@ -37,7 +31,9 @@ void main() {
       }
     });
 
-    test('anything about a request in progress, sign-in or money is never saved', () {
+    test(
+        'anything about a request in progress, sign-in or money is never saved',
+        () {
       for (final path in [
         '/service-requests',
         '/service-requests/r1',
@@ -46,7 +42,6 @@ void main() {
         '/donations/d1/confirmation',
         '/orders/o1',
         '/refurbishment/jobs/j1',
-        '/students/applications/a1',
         '/auth/me',
         '/auth/refresh',
         '/notifications/unread-count',
@@ -60,20 +55,37 @@ void main() {
 
   group('keys', () {
     test('the same filters in any order give the same key', () {
-      final a = ResponseCache.keyFor(owner: 'u1', path: '/devices', query: {'page': 1, 'status': 'active'});
-      final b = ResponseCache.keyFor(owner: 'u1', path: 'devices', query: {'status': 'active', 'page': 1});
+      final a = ResponseCache.keyFor(
+          owner: 'u1',
+          path: '/devices',
+          query: {'page': 1, 'status': 'active'});
+      final b = ResponseCache.keyFor(
+          owner: 'u1', path: 'devices', query: {'status': 'active', 'page': 1});
       expect(a, b);
     });
 
     test('another person, path or filter gives another key', () {
-      final base = ResponseCache.keyFor(owner: 'u1', path: '/devices', query: {'page': 1});
-      expect(ResponseCache.keyFor(owner: 'u2', path: '/devices', query: {'page': 1}), isNot(base));
-      expect(ResponseCache.keyFor(owner: 'u1', path: '/technicians', query: {'page': 1}), isNot(base));
-      expect(ResponseCache.keyFor(owner: 'u1', path: '/devices', query: {'page': 2}), isNot(base));
+      final base = ResponseCache.keyFor(
+          owner: 'u1', path: '/devices', query: {'page': 1});
+      expect(
+          ResponseCache.keyFor(
+              owner: 'u2', path: '/devices', query: {'page': 1}),
+          isNot(base));
+      expect(
+          ResponseCache.keyFor(
+              owner: 'u1', path: '/technicians', query: {'page': 1}),
+          isNot(base));
+      expect(
+          ResponseCache.keyFor(
+              owner: 'u1', path: '/devices', query: {'page': 2}),
+          isNot(base));
     });
 
     test('empty filters are left out', () {
-      expect(ResponseCache.keyFor(owner: 'u1', path: '/devices', query: {'q': null}), ResponseCache.keyFor(owner: 'u1', path: '/devices'));
+      expect(
+          ResponseCache.keyFor(
+              owner: 'u1', path: '/devices', query: {'q': null}),
+          ResponseCache.keyFor(owner: 'u1', path: '/devices'));
     });
   });
 
@@ -85,11 +97,17 @@ void main() {
 
     test('what was saved comes back with the time it was saved', () async {
       final cache = ResponseCache(store, clock: () => t0);
-      await cache.write('k1', {'success': true, 'data': [1, 2, 3]});
+      await cache.write('k1', {
+        'success': true,
+        'data': [1, 2, 3]
+      });
       final got = await cache.read('k1');
       expect(got, isNotNull);
       expect(got!.at, t0);
-      expect(got.body, {'success': true, 'data': [1, 2, 3]});
+      expect(got.body, {
+        'success': true,
+        'data': [1, 2, 3]
+      });
     });
 
     test('nothing saved means null', () async {
@@ -132,7 +150,9 @@ void main() {
 
     test('writes that arrive together do not lose each other', () async {
       final cache = ResponseCache(store);
-      await Future.wait([for (var i = 0; i < 10; i++) cache.write('k$i', {'i': i})]);
+      await Future.wait([
+        for (var i = 0; i < 10; i++) cache.write('k$i', {'i': i})
+      ]);
       for (var i = 0; i < 10; i++) {
         expect((await cache.read('k$i'))!.body, {'i': i});
       }
@@ -151,7 +171,8 @@ void main() {
     test('a damaged entry reads as nothing instead of failing', () async {
       final cache = ResponseCache(store);
       await cache.write('a', {'x': 1});
-      await store.write('cache_${base64Url.encode(utf8.encode('a'))}', '{broken');
+      await store.write(
+          'cache_${base64Url.encode(utf8.encode('a'))}', '{broken');
       expect(await cache.read('a'), isNull);
     });
   });
@@ -162,11 +183,13 @@ void main() {
     test('today shows only the time', () {
       expect(formatSavedAt(DateTime(2026, 11, 16, 15, 5), now: now), '3:05 PM');
       expect(formatSavedAt(DateTime(2026, 11, 16, 0, 7), now: now), '12:07 AM');
-      expect(formatSavedAt(DateTime(2026, 11, 16, 12, 0), now: now), '12:00 PM');
+      expect(
+          formatSavedAt(DateTime(2026, 11, 16, 12, 0), now: now), '12:00 PM');
     });
 
     test('another day shows the date and the time', () {
-      expect(formatSavedAt(DateTime(2026, 11, 15, 15, 5), now: now), '15 Nov 2026, 3:05 PM');
+      expect(formatSavedAt(DateTime(2026, 11, 15, 15, 5), now: now),
+          '15 Nov 2026, 3:05 PM');
     });
   });
 }

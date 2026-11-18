@@ -32,6 +32,7 @@ import Donations from '../pages/public/Donations';
 import DonationDetail from '../pages/public/DonationDetail';
 import MyDonations from '../pages/dashboard/MyDonations';
 import Opportunities from '../pages/dashboard/Opportunities';
+import WantedBoard from '../pages/dashboard/WantedBoard';
 import RefurbJobs from '../pages/dashboard/RefurbJobs';
 import RefurbJobDetail from '../pages/dashboard/RefurbJobDetail';
 import MyProducts from '../pages/dashboard/MyProducts';
@@ -43,12 +44,6 @@ import RecyclingRequests from '../pages/dashboard/RecyclingRequests';
 import RecyclingNew from '../pages/dashboard/RecyclingNew';
 import RecyclingDetail from '../pages/dashboard/RecyclingDetail';
 import RecyclingReport from '../pages/dashboard/RecyclingReport';
-import { OpportunityDetail, OpportunityDirectory } from '../pages/public/Opportunities';
-import StudentLearning from '../pages/dashboard/StudentLearning';
-import ApplicationDetail from '../pages/dashboard/ApplicationDetail';
-import LearningTasks from '../pages/dashboard/LearningTasks';
-import LearningTaskForm from '../pages/dashboard/LearningTaskForm';
-import LearningTaskDetail from '../pages/dashboard/LearningTaskDetail';
 import Pickups from '../pages/dashboard/Pickups';
 import AdminUsers from '../pages/admin/Users';
 import AdminUserDetail from '../pages/admin/UserDetail';
@@ -65,7 +60,6 @@ import AdminAnnouncements from '../pages/admin/Announcements';
 import AdminEducation from '../pages/admin/Education';
 import AdminAuditLog from '../pages/admin/AuditLog';
 import AdminAnalytics from '../pages/admin/Analytics';
-import AdminCertificates from '../pages/admin/Certificates';
 import Complaints from '../pages/dashboard/Complaints';
 import ComplaintNew from '../pages/dashboard/ComplaintNew';
 import ComplaintDetail from '../pages/dashboard/ComplaintDetail';
@@ -103,8 +97,6 @@ export const routeConfig = [
       { path: 'recycling-centers', element: <RecyclingCenterDirectory /> },
       { path: 'recycling-centers/compare', element: <RecyclingCenterCompare /> },
       { path: 'recycling-centers/:id', element: <RecyclingCenterDetail /> },
-      { path: 'opportunities', element: <OpportunityDirectory /> },
-      { path: 'opportunities/:id', element: <OpportunityDetail /> },
       { path: 'donations', element: <Donations /> },
       { path: 'donations/:id', element: <DonationDetail /> },
       { path: 'impact', element: <ImpactPage /> },
@@ -143,10 +135,12 @@ export const routeConfig = [
           { path: 'dashboard/refurbishment', element: <RefurbJobs /> },
           { path: 'dashboard/refurbishment/:id', element: <RefurbJobDetail /> },
           { path: 'dashboard/pickups', element: <Pickups /> },
+          { path: 'dashboard/marketplace', element: <Marketplace /> },
+          { path: 'dashboard/marketplace/:id', element: <ProductDetails /> },
           { path: 'dashboard/orders', element: <Orders /> },
           { path: 'dashboard/orders/:id', element: <OrderDetail /> },
           {
-            element: <RequireRole roles={['user', 'technician', 'student', 'refurbisher', 'recycler']} />,
+            element: <RequireRole roles={['user', 'technician', 'refurbisher', 'recycler']} />,
             children: [
               { path: 'dashboard/recycling', element: <RecyclingRequests /> },
               { path: 'dashboard/recycling/new', element: <RecyclingNew /> },
@@ -175,21 +169,9 @@ export const routeConfig = [
               { path: 'dashboard/admin/education', element: <AdminEducation /> },
               { path: 'dashboard/admin/audit', element: <AdminAuditLog /> },
               { path: 'dashboard/admin/analytics', element: <AdminAnalytics /> },
-              { path: 'dashboard/admin/certificates', element: <AdminCertificates /> },
             ],
           },
           { element: <RequireRole roles={['recycler']} />, children: [{ path: 'dashboard/recycling/report', element: <RecyclingReport /> }] },
-          { element: <RequireRole roles={['student']} />, children: [{ path: 'dashboard/learning', element: <StudentLearning /> }] },
-          { element: <RequireRole roles={['student', 'technician']} />, children: [{ path: 'dashboard/applications/:id', element: <ApplicationDetail /> }] },
-          {
-            element: <RequireRole roles={['technician']} />,
-            children: [
-              { path: 'dashboard/learning-tasks', element: <LearningTasks /> },
-              { path: 'dashboard/learning-tasks/new', element: <LearningTaskForm /> },
-              { path: 'dashboard/learning-tasks/:id', element: <LearningTaskDetail /> },
-              { path: 'dashboard/learning-tasks/:id/edit', element: <LearningTaskForm /> },
-            ],
-          },
           {
             element: <RequireRole roles={['refurbisher']} />,
             children: [
@@ -199,6 +181,7 @@ export const routeConfig = [
             ],
           },
           { element: <RequireRole roles={['user']} />, children: [{ path: 'dashboard/recipient', element: <RecipientOrg /> }] },
+          { element: <RequireRole roles={['user', 'technician']} />, children: [{ path: 'dashboard/wanted', element: <WantedBoard /> }] },
           { element: <RequireRole roles={['refurbisher']} />, children: [{ path: 'dashboard/opportunities', element: <Opportunities /> }] },
           {
             element: <RequireRole roles={LISTER_ROLES} />,

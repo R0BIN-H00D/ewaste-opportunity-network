@@ -12,43 +12,61 @@ const latLng = {
 const bothOrNone = (o) => (o.lat === undefined) === (o.lng === undefined);
 const latLngMsg = { message: 'lat and lng must be provided together', path: ['lat'] };
 
+const LETTER = /[A-Za-z]/;
+const PLACE = /^[A-Za-z][A-Za-z0-9 .,'()/&-]*$/; // area or locality: starts with a letter, no odd symbols
+const CITY = /^[A-Za-z][A-Za-z .'-]*$/;
+const MAX_PRICE = 10000000;
+
+// An Indian mobile number: 10 digits starting 6-9. Spaces, dashes, brackets, +91, 91 and a leading 0 are accepted and dropped.
+const phoneNumber = z.preprocess((v) => {
+  if (typeof v !== 'string') return v;
+  let d = v.replace(/[\s\-().]/g, '');
+  if (d === '') return undefined;
+  if (/^\+91\d{10}$/.test(d)) d = d.slice(3);
+  else if (/^91\d{10}$/.test(d)) d = d.slice(2);
+  else if (/^0\d{10}$/.test(d)) d = d.slice(1);
+  return d;
+}, z.string().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit mobile number').optional());
+
 const fields = {
-  name: z.string().trim().min(2).max(120),
+  name: z.string().trim().min(3, 'Give the device a name (at least 3 characters)').max(120).regex(LETTER, 'The name must contain letters'),
   category: z.string().trim().min(1).max(60), // ObjectId or slug
-  brand: optStr(60),
-  model: optStr(60),
-  purchaseYear: optNum(z.coerce.number().int().min(1990).max(thisYear + 1)),
+  brand: z.preprocess(blankToUndefined, z.string().trim().min(2, 'Enter the brand (at least 2 characters)').max(60).optional()),
+  model: z.preprocess(blankToUndefined, z.string().trim().min(1, 'Enter the model').max(60).regex(/[A-Za-z0-9]/, 'The model must contain letters or numbers').optional()),
+  modelYear: optNum(z.coerce.number().int().min(1990, 'Enter a year from 1990').max(thisYear, `The year cannot be after ${thisYear}`)),
+  purchaseYear: optNum(z.coerce.number().int().min(1990, 'Enter a year from 1990').max(thisYear, `The year cannot be after ${thisYear}`)),
   condition: z.enum(CONDITIONS),
   description: optStr(2000),
   preferredService: z.enum(SERVICES),
-  expectedPrice: optNum(z.coerce.number().min(0)),
+  expectedPrice: optNum(z.coerce.number().min(0, 'The price cannot be negative').max(MAX_PRICE, 'That price is too high').refine((n) => Math.round(n * 100) === n * 100 || Math.abs(Math.round(n * 100) - n * 100) < 1e-6, 'Use at most 2 decimal places')),
   pickupPreference: z.preprocess(blankToUndefined, z.enum(PICKUP).optional()),
-  addressArea: optStr(100),
-  city: optStr(80),
+  addressArea: z.preprocess(blankToUndefined, z.string().trim().min(3, 'Enter the area or locality (at least 3 characters)').max(100).regex(PLACE, 'The area must start with a letter and use normal characters').optional()),
+  agentPhone: phoneNumber,
+  city: z.preprocess(blankToUndefined, z.string().trim().min(2, 'Enter the city').max(80).regex(CITY, 'The city can only have letters').optional()),
   ...latLng,
 };
 
-// What the person accepted from the AI suggestion, sent back as a JSON string in the multipart form (FR-AI-002). Stored as confirmed.
-const aiSuggestion = z.preprocess((v) => {
-  if (v === undefined || v === '') return undefined;
-  if (typeof v === 'string') {
-    try { return JSON.parse(v); } catch { return v; }
+// A draft may be unfinished; anything that goes live needs the details people use to find and judge it.
+const MISSING = { brand: 'Enter the brand', model: 'Enter the model', modelYear: 'Enter the model year', purchaseYear: 'Enter the year it was bought', pickupPreference: 'Choose a handover option', addressArea: 'Enter the area or locality', city: 'Enter the city', agentPhone: 'Enter your phone number' };
+// The device cannot have been bought before its model came out.
+const yearOrder = (o, ctx) => {
+  if (o.modelYear !== undefined && o.purchaseYear !== undefined && o.purchaseYear < o.modelYear) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['purchaseYear'], message: `The purchase year cannot be earlier than the model year (${o.modelYear})` });
   }
-  return v;
-}, z.object({
-  source: z.enum(['gemini', 'rules']),
-  category: z.string().trim().max(60).optional(),
-  type: z.string().trim().max(60).optional(),
-  brand: z.string().trim().max(60).optional(),
-  visibleDamage: z.array(z.string().trim().max(100)).max(6).default([]),
-  possibleRepairs: z.array(z.string().trim().max(100)).max(6).default([]),
-  confidence: z.number().min(0).max(1).optional(),
-}).strict().optional());
+};
+const completeToList = (o, ctx) => {
+  yearOrder(o, ctx);
+  if (o.status === 'draft') return;
+  for (const [field, message] of Object.entries(MISSING)) {
+    if (o[field] === undefined) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [field], message });
+  }
+};
 
 const createBody = z
-  .object({ ...fields, aiSuggestion, status: z.preprocess(blankToUndefined, z.enum(['draft', 'listed']).default('listed')) })
+  .object({ ...fields, status: z.preprocess(blankToUndefined, z.enum(['draft', 'listed']).default('listed')) })
   .strict()
-  .refine(bothOrNone, latLngMsg);
+  .refine(bothOrNone, latLngMsg)
+  .superRefine(completeToList);
 
 // JSON array string ('["a","b"]'), a single id string, or repeated fields -> string[]
 const idList = z.preprocess((v) => {
@@ -67,7 +85,8 @@ const updateBody = z
     removePhotoIds: idList,
   })
   .strict()
-  .refine(bothOrNone, latLngMsg);
+  .refine(bothOrNone, latLngMsg)
+  .superRefine(yearOrder);
 
 const listQuery = z
   .object({

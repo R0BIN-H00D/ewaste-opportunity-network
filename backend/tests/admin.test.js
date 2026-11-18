@@ -52,7 +52,7 @@ describe('the admin guard', () => {
     expect((await as(method, url, null, method === 'put' ? {} : undefined)).status).toBe(401);
   });
 
-  it.each(['user', 'technician', 'student', 'refurbisher', 'recycler'])('is closed to a %s on every admin route', async (role) => {
+  it.each(['user', 'technician', 'refurbisher', 'recycler'])('is closed to a %s on every admin route', async (role) => {
     const u = await makeUser(role);
     for (const [method, url] of ROUTES) {
       const res = await as(method, url, u, method === 'put' ? {} : undefined);
@@ -193,7 +193,7 @@ describe('verification queue', () => {
     await upload(first, 'qualification');
     const second = await signup(app, { role: 'recycler', name: 'Second In', organizationName: 'GreenLoop Recyclers' });
     await upload(second, 'authorization');
-    await signup(app, { role: 'student', name: 'Never Submitted' });
+    await signup(app, { role: 'refurbisher', name: 'Never Submitted', organizationName: 'Never Ltd' });
 
     const res = await as('get', '/api/admin/verifications', admin);
     expect(res.status).toBe(200);
@@ -320,11 +320,11 @@ describe('verification queue', () => {
     });
 
     it('can ask for new documents instead of refusing', async () => {
-      const student = await signup(app, { role: 'student' });
-      await upload(student, 'student_id');
-      const res = await as('put', `/api/admin/verifications/${student.id}`, admin, { decision: 'resubmission_required', reason: 'Please send the front and back' });
+      const provider = await signup(app, { role: 'refurbisher', organizationName: 'ReNew Electronics' });
+      await upload(provider, 'business');
+      const res = await as('put', `/api/admin/verifications/${provider.id}`, admin, { decision: 'resubmission_required', reason: 'Please send the front and back' });
       expect(res.body.data.status).toBe('resubmission_required');
-      expect((await Notification.findOne({ user: student.id, type: 'verification.resubmission_required' })).title).toBe('We need new documents from you');
+      expect((await Notification.findOne({ user: provider.id, type: 'verification.resubmission_required' })).title).toBe('We need new documents from you');
       expect(await logs('verification.resubmission_required')).toHaveLength(1);
     });
 

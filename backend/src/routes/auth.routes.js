@@ -18,6 +18,7 @@ router.post('/logout', validate({ body: v.refreshBody }), ctrl.logout);
 
 router.get('/me', authenticate, ctrl.me);
 router.post('/logout-all', authenticate, ctrl.logoutAll);
+router.post('/verify-email-code', authenticate, authLimiter, validate({ body: v.verifyCodeBody }), ctrl.verifyEmailCode);
 router.post('/resend-verification', authenticate, authLimiter, ctrl.resendVerification);
 router.post('/change-password', authenticate, authLimiter, validate({ body: v.changePasswordBody }), ctrl.changePassword);
 router.get('/sessions', authenticate, ctrl.sessions);

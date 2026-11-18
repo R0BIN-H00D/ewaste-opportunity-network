@@ -1,8 +1,9 @@
-import { screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { authApi } from '../services/authApi';
 import { RequireAuth, RequireRole, RequireVerified } from '../components/auth/guards';
 import { TECH, USER, anonymous, renderApp, renderRoutes, signedIn } from './helpers';
 
-vi.mock('../services/authApi', () => ({ authApi: { me: vi.fn(), resendVerification: vi.fn() }, userApi: {}, verificationApi: {} }));
+vi.mock('../services/authApi', () => ({ authApi: { me: vi.fn(), resendVerification: vi.fn(), verifyEmailCode: vi.fn() }, userApi: {}, verificationApi: {} }));
 vi.mock('../services/api', async (importOriginal) => ({
   ...(await importOriginal()),
   getHealth: () => Promise.resolve({ success: true, data: { db: 'connected' } }),
@@ -30,6 +31,34 @@ describe('route guards in the real app', () => {
   it('reminds unverified people to confirm their email', async () => {
     renderApp('/dashboard', signedIn({ ...USER, emailVerified: false }));
     expect(await screen.findByText('Verify your email address')).toBeInTheDocument();
+  });
+
+  it('lets an unverified person enter the 6-digit code from their email', async () => {
+    authApi.verifyEmailCode.mockResolvedValue(null);
+    authApi.me.mockResolvedValue({ ...USER, emailVerified: true });
+    renderApp('/dashboard', signedIn({ ...USER, emailVerified: false }));
+    const input = await screen.findByLabelText('Verification code');
+    fireEvent.change(input, { target: { value: '12ab' } }); // letters are dropped as they are typed
+    expect(input).toHaveValue('12');
+    fireEvent.click(screen.getByRole('button', { name: 'Verify' }));
+    expect(await screen.findByText('Enter the 6-digit code from your email.')).toBeInTheDocument();
+    expect(authApi.verifyEmailCode).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: '482913' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Verify' }));
+    await waitFor(() => expect(authApi.verifyEmailCode).toHaveBeenCalledWith('482913'));
+  });
+
+  it('says so when the server has no email service, and when a code is wrong', async () => {
+    authApi.resendVerification.mockResolvedValue({ delivery: 'console' });
+    authApi.verifyEmailCode.mockRejectedValue({ response: { status: 400, data: { message: 'That code is not right. 4 tries left.' } } });
+    renderApp('/dashboard', signedIn({ ...USER, emailVerified: false }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Resend verification email' }));
+    expect(await screen.findByText(/no email service set up/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '000000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Verify' }));
+    expect(await screen.findByText('That code is not right. 4 tries left.')).toBeInTheDocument();
   });
 
   it('keeps the settings page behind login', async () => {

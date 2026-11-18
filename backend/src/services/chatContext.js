@@ -10,8 +10,10 @@ const Donation = require('../models/Donation');
 const DonationRequest = require('../models/DonationRequest');
 const RefurbishmentJob = require('../models/RefurbishmentJob');
 const DeviceListing = require('../models/DeviceListing');
+const WantedResponse = require('../models/WantedResponse');
+const WantedRequest = require('../models/WantedRequest');
 
-const CONTEXT_TYPES = ['service', 'order', 'recycling', 'donation', 'offer', 'enquiry'];
+const CONTEXT_TYPES = ['service', 'order', 'recycling', 'donation', 'offer', 'enquiry', 'wanted'];
 
 /** Each resolver returns the two people involved as [idA, idB], or null when the record does not exist or has no second person yet. */
 const RESOLVERS = {
@@ -40,6 +42,13 @@ const RESOLVERS = {
   offer: async (id) => {
     const j = await RefurbishmentJob.findById(id).select('owner refurbisher').lean();
     return j ? [j.owner, j.refurbisher] : null;
+  },
+  // Someone who accepted a refurbisher's wanted-device request, and that refurbisher.
+  wanted: async (id) => {
+    const r = await WantedResponse.findById(id).select('request responder').lean();
+    if (!r) return null;
+    const req = await WantedRequest.findById(r.request).select('refurbisher').lean();
+    return req ? [req.refurbisher, r.responder] : null;
   },
   // A question about a listing: the asker and the owner. The asker is whoever opens it, so it needs the caller.
   enquiry: async (id, callerId) => {

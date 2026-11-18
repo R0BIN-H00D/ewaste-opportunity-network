@@ -35,13 +35,14 @@ class AccountRepository {
         return AppUser.fromJson(_data(res));
       });
 
-  Future<OwnProfile> updateProfile({String? bio, String? addressArea, String? city, String? state, String? pincode}) => guard(() async {
+  Future<OwnProfile> updateProfile({String? bio, String? addressArea, String? city, String? state, String? pincode, double? lat, double? lng}) => guard(() async {
         final res = await _dio.patch<dynamic>('/users/me/profile', data: {
           if (bio != null) 'bio': bio.trim(),
           if (addressArea != null) 'addressArea': addressArea.trim(),
           if (city != null) 'city': city.trim(),
           if (state != null) 'state': state.trim(),
           if (pincode != null) 'pincode': pincode.trim(),
+          if (lat != null && lng != null) 'location': {'lat': lat, 'lng': lng},
         });
         return OwnProfile.fromJson(_data(res));
       });

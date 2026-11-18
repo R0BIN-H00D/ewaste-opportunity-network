@@ -13,16 +13,18 @@ void main() {
     });
 
     test('provider roles are the four that need approval', () {
-      expect(UserRole.values.where((r) => r.isProvider), [UserRole.technician, UserRole.student, UserRole.refurbisher, UserRole.recycler]);
+      expect(UserRole.values.where((r) => r.isProvider),
+          [UserRole.technician, UserRole.refurbisher, UserRole.recycler]);
     });
 
     test('only refurbishers and recyclers give an organisation name', () {
-      expect(UserRole.values.where((r) => r.needsOrganization), [UserRole.refurbisher, UserRole.recycler]);
+      expect(UserRole.values.where((r) => r.needsOrganization),
+          [UserRole.refurbisher, UserRole.recycler]);
     });
 
     test('administrators cannot register in the app', () {
       expect(registrationRoles, isNot(contains(UserRole.admin)));
-      expect(registrationRoles, hasLength(5));
+      expect(registrationRoles, hasLength(4));
     });
 
     test('every role has a label and a blurb', () {
@@ -35,7 +37,11 @@ void main() {
 
   group('AppUser', () {
     test('reads the server shape', () {
-      final user = AppUser.fromJson({...userJson(role: 'technician'), 'phone': '+911234567890', 'avatar': {'url': 'https://img/a.png'}});
+      final user = AppUser.fromJson({
+        ...userJson(role: 'technician'),
+        'phone': '+911234567890',
+        'avatar': {'url': 'https://img/a.png'}
+      });
       expect(user.id, 'u1');
       expect(user.role, UserRole.technician);
       expect(user.phone, '+911234567890');
@@ -53,21 +59,31 @@ void main() {
     });
 
     test('firstName and pending status', () {
-      expect(AppUser.fromJson(userJson(name: '  Asha   Rao ')).firstName, 'Asha');
-      expect(AppUser.fromJson(userJson(status: 'pending_verification')).isPendingVerification, isTrue);
+      expect(
+          AppUser.fromJson(userJson(name: '  Asha   Rao ')).firstName, 'Asha');
+      expect(
+          AppUser.fromJson(userJson(status: 'pending_verification'))
+              .isPendingVerification,
+          isTrue);
     });
   });
 
   group('Session', () {
     test('needs a refresh token (the mobile contract)', () {
       expect(
-        () => Session.fromJson({'user': userJson(), 'accessToken': 'a', 'expiresIn': 900}),
+        () => Session.fromJson(
+            {'user': userJson(), 'accessToken': 'a', 'expiresIn': 900}),
         throwsA(isA<FormatException>()),
       );
     });
 
     test('reads a full session', () {
-      final session = Session.fromJson({'user': userJson(), 'accessToken': 'a', 'refreshToken': 'r', 'expiresIn': 900});
+      final session = Session.fromJson({
+        'user': userJson(),
+        'accessToken': 'a',
+        'refreshToken': 'r',
+        'expiresIn': 900
+      });
       expect(session.accessToken, 'a');
       expect(session.refreshToken, 'r');
       expect(session.expiresIn, 900);
@@ -76,27 +92,23 @@ void main() {
   });
 
   group('Me', () {
-    test('reads the Green Score and verification status', () {
+    test('reads the verification status', () {
       final me = Me.fromJson({
         'user': userJson(role: 'technician'),
-        'profile': {'greenScore': 42},
         'verification': {'status': 'pending'},
       });
-      expect(me.greenScore, 42);
       expect(me.verificationStatus, 'pending');
     });
 
-    test('both are optional', () {
+    test('it is optional', () {
       final me = Me.fromJson({'user': userJson()});
-      expect(me.greenScore, isNull);
       expect(me.verificationStatus, isNull);
     });
 
     test('copyWith replaces the user only', () {
-      final me = sampleMe(greenScore: 7, verificationStatus: 'approved');
+      final me = sampleMe(verificationStatus: 'approved');
       final changed = me.copyWith(user: sampleMe(role: UserRole.recycler).user);
       expect(changed.user.role, UserRole.recycler);
-      expect(changed.greenScore, 7);
       expect(changed.verificationStatus, 'approved');
     });
   });

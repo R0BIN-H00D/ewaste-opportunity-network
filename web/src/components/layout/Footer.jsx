@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Recycle } from 'lucide-react';
 
 const COLUMNS = [
-  { title: 'Platform', links: [['Browse devices', '/browse'], ['List a device', '/list-device'], ['Find services', '/services'], ['Marketplace', '/marketplace'], ['Student opportunities', '/opportunities']] },
+  { title: 'Platform', links: [['Browse devices', '/browse'], ['List a device', '/list-device'], ['Find services', '/services'], ['Marketplace', '/marketplace']] },
   { title: 'Learn', links: [['How it works', '/how-it-works'], ['Learning centre', '/learn'], ['Environmental impact', '/impact']] },
   { title: 'Company', links: [['About us', '/about'], ['Contact & support', '/contact'], ['Privacy policy', '/privacy'], ['Terms & conditions', '/terms']] },
 ];

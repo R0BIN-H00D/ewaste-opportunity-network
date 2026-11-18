@@ -36,6 +36,8 @@ function serializeOrder(o, { role, profile, detail = true } = {}) {
   };
   if (!detail) return out;
   out.deliveryArea = o.deliveryArea;
+  out.deliveryCity = o.deliveryCity;
+  out.deliveryPincode = o.deliveryPincode;
   out.notes = o.notes;
   out.cancelReason = o.cancelReason;
   out.reviewed = Boolean(o.reviewed);

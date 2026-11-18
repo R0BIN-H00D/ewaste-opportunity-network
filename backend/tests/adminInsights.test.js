@@ -13,10 +13,6 @@ const RecyclingRecord = require('../src/models/RecyclingRecord');
 const RecyclingCenter = require('../src/models/RecyclingCenter');
 const Transaction = require('../src/models/Transaction');
 const EnvironmentalImpact = require('../src/models/EnvironmentalImpact');
-const LearningOpportunity = require('../src/models/LearningOpportunity');
-const StudentApplication = require('../src/models/StudentApplication');
-const Certificate = require('../src/models/Certificate');
-const Notification = require('../src/models/Notification');
 const AdminLog = require('../src/models/AdminLog');
 const monitors = require('../src/services/adminMonitorService');
 
@@ -61,7 +57,7 @@ describe('the admin guard on analytics, exports and certificates', () => {
     expect((await as(method, url, null, body(method))).status).toBe(401);
   });
 
-  it.each(['user', 'technician', 'student', 'refurbisher', 'recycler'])('is closed to a %s on every route', async (role) => {
+  it.each(['user', 'technician', 'refurbisher', 'recycler'])('is closed to a %s on every route', async (role) => {
     const who = await makeUser(role);
     for (const [method, url] of ROUTES) {
       const res = await as(method, url, who, body(method));
@@ -84,7 +80,7 @@ describe('GET /api/admin/analytics', () => {
     expect(d.period).toMatchObject({ months: 12, to: monthKey() });
     expect(d.registrations.series).toHaveLength(12);
     expect(d.registrations.series.every((s) => s.total === 0)).toBe(true);
-    expect(d.registrations.byRole).toEqual({ user: 0, technician: 0, student: 0, refurbisher: 0, recycler: 0 });
+    expect(d.registrations.byRole).toEqual({ user: 0, technician: 0, refurbisher: 0, recycler: 0 });
     expect(d.growth).toHaveLength(12);
     expect(d.activity).toHaveLength(12);
     expect(d.categories).toEqual([]);
@@ -109,7 +105,7 @@ describe('GET /api/admin/analytics', () => {
     await makeUser('technician');
     const lastMonth = await makeUser('user');
     await backdate(User, lastMonth, 40);
-    const ancient = await makeUser('student');
+    const ancient = await makeUser('refurbisher');
     await backdate(User, ancient, 400); // before the 12-month period: part of the starting total only
     await makeUser('user', { status: 'deleted' }); // not a person any more
     // the administrator is not counted either
@@ -118,8 +114,8 @@ describe('GET /api/admin/analytics', () => {
     expect(series[monthKey()]).toMatchObject({ members: 1, providers: 1, total: 2 });
     expect(series[monthKey(-40)].members).toBeGreaterThanOrEqual(1);
     expect(d.registrations.total).toBe(3);
-    expect(d.registrations.byRole).toEqual({ user: 2, technician: 1, student: 0, refurbisher: 0, recycler: 0 });
-    expect(d.growth[0].total).toBeGreaterThanOrEqual(1); // the 400-day-old student is already counted in the first month
+    expect(d.registrations.byRole).toEqual({ user: 2, technician: 1, refurbisher: 0, recycler: 0 });
+    expect(d.growth[0].total).toBeGreaterThanOrEqual(1); // the 400-day-old refurbisher is already counted in the first month
     expect(d.growth[d.growth.length - 1].total).toBe(4); // 3 in the period + 1 before it
     for (let i = 1; i < d.growth.length; i += 1) expect(d.growth[i].total).toBeGreaterThanOrEqual(d.growth[i - 1].total);
   });
@@ -377,90 +373,5 @@ describe('CSV exports: the monitored flows', () => {
     const whole = await monitors.exportRows('repairs', {}, 3);
     expect(whole.items).toHaveLength(3);
     expect(whole.truncated).toBe(false);
-  });
-});
-
-describe('student certificates', () => {
-  let tech;
-  let student;
-  const days = (n) => new Date(Date.now() + n * DAY);
-
-  async function completedTask(title = 'Fix a laptop charger', over = {}) {
-    const opp = await LearningOpportunity.create({ postedBy: tech.id, title, deviceType: cats.laptop._id, deadline: days(5), locationArea: 'Jayanagar' });
-    return StudentApplication.create({ opportunity: opp._id, student: student.id, status: 'completed', hours: 5, completedAt: new Date(), ...over });
-  }
-
-  beforeEach(async () => {
-    tech = await makeUser('technician');
-    student = await makeUser('student', { name: 'Sana Student' });
-  });
-
-  it('lists completed tasks that are waiting for a certificate, oldest first, and leaves out unfinished ones', async () => {
-    const first = await completedTask('First finished task', { completedAt: days(-5) });
-    await completedTask('Second finished task', { completedAt: days(-1) });
-    const opp = await LearningOpportunity.create({ postedBy: tech.id, title: 'Still going', deviceType: cats.laptop._id, deadline: days(5), locationArea: 'X' });
-    await StudentApplication.create({ opportunity: opp._id, student: student.id, status: 'in_progress' });
-
-    const res = await as('get', '/api/admin/certificates', admin);
-    expect(res.status).toBe(200);
-    expect(res.body.data.map((i) => i.task)).toEqual(['First finished task', 'Second finished task']);
-    expect(res.body.data[0]).toMatchObject({ _id: String(first._id), student: { name: 'Sana Student' }, hours: 5, certificate: null, canIssue: true });
-    expect(res.body.meta.counts).toEqual({ waiting: 2, issued: 0 });
-    expect(res.body.meta.total).toBe(2);
-  });
-
-  it('issues a certificate once, tells the student, and writes the audit row', async () => {
-    const a = await completedTask();
-    const res = await as('post', '/api/admin/certificates', admin, { applicationId: String(a._id) });
-    expect(res.status).toBe(201);
-    expect(res.body.data.certNo).toMatch(/^CERT-\d{4}-[0-9A-F]{6}$/);
-    expect(res.body.data.application).toBe(String(a._id));
-
-    expect(await Certificate.countDocuments()).toBe(1);
-    const told = await Notification.find({ user: student.id, type: 'learning.certificate' }).lean();
-    expect(told).toHaveLength(1);
-    const rows = await logs('certificate.issued');
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ targetType: 'Certificate', after: { certNo: res.body.data.certNo, application: String(a._id) } });
-    expect(String(rows[0].admin)).toBe(admin.id);
-
-    const waiting = await as('get', '/api/admin/certificates', admin);
-    expect(waiting.body.data).toEqual([]);
-    expect(waiting.body.meta.counts).toEqual({ waiting: 0, issued: 1 });
-    const issued = await as('get', '/api/admin/certificates?state=issued', admin);
-    expect(issued.body.data[0]).toMatchObject({ canIssue: false, certificate: { certNo: res.body.data.certNo } });
-    expect((await as('get', '/api/admin/certificates?state=all', admin)).body.data).toHaveLength(1);
-  });
-
-  it('refuses a second certificate for the same task (409) without a second audit row', async () => {
-    const a = await completedTask();
-    await as('post', '/api/admin/certificates', admin, { applicationId: String(a._id) });
-    const again = await as('post', '/api/admin/certificates', admin, { applicationId: String(a._id) });
-    expect(again.status).toBe(409);
-    expect(again.body.code).toBe('ALREADY_ISSUED');
-    expect(await Certificate.countDocuments()).toBe(1);
-    expect(await logs('certificate.issued')).toHaveLength(1);
-  });
-
-  it('refuses a task that is not completed (409), an unknown task (404) and bad input (422)', async () => {
-    const opp = await LearningOpportunity.create({ postedBy: tech.id, title: 'Still going', deviceType: cats.laptop._id, deadline: days(5), locationArea: 'X' });
-    const open = await StudentApplication.create({ opportunity: opp._id, student: student.id, status: 'in_progress' });
-    const notDone = await as('post', '/api/admin/certificates', admin, { applicationId: String(open._id) });
-    expect(notDone.status).toBe(409);
-    expect(notDone.body.code).toBe('NOT_COMPLETED');
-    expect((await as('post', '/api/admin/certificates', admin, { applicationId: String(oid()) })).status).toBe(404);
-    expect((await as('post', '/api/admin/certificates', admin, {})).status).toBe(422);
-    expect((await as('post', '/api/admin/certificates', admin, { applicationId: 'not-an-id' })).status).toBe(422);
-    expect((await as('post', '/api/admin/certificates', admin, { applicationId: String(open._id), extra: 1 })).status).toBe(422);
-    expect((await as('get', '/api/admin/certificates?state=wizard', admin)).status).toBe(422);
-    expect(await Certificate.countDocuments()).toBe(0);
-    expect(await logs('certificate.issued')).toHaveLength(0);
-  });
-
-  it('shows a removed student as such', async () => {
-    await completedTask();
-    await User.collection.deleteOne({ _id: new mongoose.Types.ObjectId(student.id) });
-    const res = await as('get', '/api/admin/certificates', admin);
-    expect(res.body.data[0].student.name).toBe('Removed account');
   });
 });

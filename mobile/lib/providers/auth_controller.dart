@@ -9,10 +9,13 @@ import 'core_providers.dart';
 enum AuthStatus { unknown, authenticated, unauthenticated }
 
 class AuthState {
-  const AuthState({this.status = AuthStatus.unknown, this.me});
+  const AuthState({this.status = AuthStatus.unknown, this.me, this.justRegistered = false});
 
   final AuthStatus status;
   final Me? me;
+
+  /// True right after sign-up, until the profile page has been opened: the next screen is their profile.
+  final bool justRegistered;
 
   AppUser? get user => me?.user;
 }
@@ -66,7 +69,7 @@ class AuthController extends Notifier<AuthState> {
     String? phone,
     String? organizationName,
   }) async {
-    state = _signedIn(await _repo.register(
+    final signedIn = _signedIn(await _repo.register(
       name: name,
       email: email,
       password: password,
@@ -74,6 +77,12 @@ class AuthController extends Notifier<AuthState> {
       phone: phone,
       organizationName: organizationName,
     ));
+    state = AuthState(status: signedIn.status, me: signedIn.me, justRegistered: true);
+  }
+
+  /// The profile page has been shown, so the one-time redirect after sign-up is done.
+  void welcomed() {
+    if (state.justRegistered) state = AuthState(status: state.status, me: state.me);
   }
 
   Future<void> signOut() async {

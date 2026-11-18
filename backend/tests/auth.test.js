@@ -327,6 +327,58 @@ describe('email verification', () => {
   });
 });
 
+describe('email verification by code', () => {
+  const codeFromMail = (to) => {
+    const mail = [...mailer.outbox].reverse().find((m) => m.to === to);
+    return /(\d{6})/.exec(mail.subject)[1];
+  };
+  const verifyCode = (u, code) => request(app).post('/api/auth/verify-email-code').set(u.auth).send({ code });
+
+  it('emails a 6-digit code at sign-up and verifies when it is entered', async () => {
+    const u = await signup(app);
+    const code = codeFromMail(u.email);
+    expect(code).toMatch(/^\d{6}$/);
+    expect(mailer.outbox.at(-1).text).toContain(`Your code: ${code}`);
+    expect((await verifyCode(u, code)).status).toBe(200);
+    expect((await User.findById(u.id)).emailVerified).toBe(true);
+    expect((await verifyCode(u, code)).status).toBe(200); // already verified: nothing more to do
+  });
+
+  it('refuses a wrong code, says how many tries are left, and locks after five', async () => {
+    const u = await signup(app);
+    const code = codeFromMail(u.email);
+    const wrong = code === '000000' ? '111111' : '000000';
+    const first = await verifyCode(u, wrong);
+    expect(first.status).toBe(400);
+    expect(first.body.message).toMatch(/4 tries left/);
+    for (let i = 0; i < 4; i += 1) await verifyCode(u, wrong);
+    const locked = await verifyCode(u, code);
+    expect(locked.status).toBe(429);
+    expect((await User.findById(u.id)).emailVerified).toBe(false);
+
+    await request(app).post('/api/auth/resend-verification').set(u.auth); // a new code clears the lock
+    expect((await verifyCode(u, codeFromMail(u.email))).status).toBe(200);
+  });
+
+  it('rejects an expired code and a badly shaped one', async () => {
+    const u = await signup(app);
+    const code = codeFromMail(u.email);
+    expect((await verifyCode(u, '12ab')).status).toBe(422);
+    await User.updateOne({ _id: u.id }, { $set: { emailVerifyCodeExpires: new Date(Date.now() - 1000) } });
+    const res = await verifyCode(u, code);
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/expired/);
+  });
+
+  it('only works for the signed-in person, and a code from another account does not work', async () => {
+    const a = await signup(app);
+    const b = await signup(app);
+    expect((await request(app).post('/api/auth/verify-email-code').send({ code: codeFromMail(a.email) })).status).toBe(401);
+    expect((await verifyCode(b, codeFromMail(a.email))).status).toBe(400);
+    expect((await User.findById(b.id)).emailVerified).toBe(false);
+  });
+});
+
 describe('change password', () => {
   it('needs the current password', async () => {
     const u = await signup(app);

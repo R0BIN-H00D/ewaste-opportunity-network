@@ -4,7 +4,7 @@
 > **Note:** Claude Code auto-loads `CLAUDE.md` from the repo root. This copy lives in `docs/claude.md`; copy or symlink it to `./CLAUDE.md` in the project root (`ln -s docs/claude.md CLAUDE.md`) so it loads automatically.
 
 ## 1. Project in one paragraph
-A professional web + Android platform that turns e-waste into opportunities. People list unused or broken electronics; the platform matches them with verified **repair technicians**, **students** (supervised learning), **refurbishers**, **donation recipients** and **authorised recycling centres**. **Two frontends** — React (MERN) web and Flutter Android — share **one** Node/Express backend and **one** MongoDB database. **Only free APIs and open-source tech.** Premium glassmorphism UI.
+A professional web + Android platform that turns e-waste into opportunities. People list unused or broken electronics; the platform matches them with verified **repair technicians**, **refurbishers**, **donation recipients** and **authorised recycling centres**. **Two frontends** — React (MERN) web and Flutter Android — share **one** Node/Express backend and **one** MongoDB database. **Only free APIs and open-source tech.** Premium glassmorphism UI.
 
 ## 2. Source-of-truth documents
 | File | Use it for |
@@ -26,9 +26,8 @@ If a task is not covered, check these docs first; if still unclear, choose the s
 6. **Server-side security always.** Authenticate, authorise by role, check ownership and state, validate input — on every route. UI hiding is not security. Admin routes are admin-only on the server.
 7. **Privacy by default.** Public payloads never include email, phone, exact address or private location. Verification documents are private (signed, expiring access).
 8. **Verified-only discovery.** Unverified/suspended providers never appear in matching, maps or marketplace.
-9. **Honest impact data.** Green Score and impact counters change only on completed, verified events. Keep **actual** and **estimated** values in separate fields and label them separately in the UI.
+9. **Honest impact data.** Impact counters change only on completed, verified events. Keep **actual** and **estimated** values in separate fields and label them separately in the UI.
 10. **Payments are offline** (COD / offline record / manual confirmation). The platform never moves money.
-11. **Students are supervised** and never independently handle hazardous e-waste.
 12. **Do not overwrite working code unnecessarily.** Make focused changes; don't rewrite files you weren't asked to touch.
 13. **Data stays in sync.** Anything created on web must appear on mobile and vice versa — verify, don't assume.
 
@@ -123,18 +122,17 @@ Use a task list for multi-step work. Report blockers early. Don't claim a featur
 - Hero copy: *"Give Your Electronics a Second Life."* with supporting text *"Transform electronic waste into opportunities through repair, reuse, donation and responsible recycling."*
 
 ## 12. Domain cheat-sheet
-- **Roles:** user, technician, student, refurbisher, recycler, admin (admin never self-registers). Donation recipients = user with verified organisation profile.
+- **Roles:** user, technician, refurbisher, recycler, admin (admin never self-registers). Donation recipients = user with verified organisation profile.
 - **Categories (15):** Laptop, Desktop computer, Smartphone, Tablet, Monitor, Television, Keyboard, Mouse, Printer, Charger, Battery, Electronic accessories, Circuit boards, Computer components, Other.
 - **Conditions:** Fully working · Minor damage · Major damage · Not working · For spare parts.
 - **Preferred services:** Repair · Reuse · Donation · Refurbishment · Recycling.
 - **Repair statuses (12):** Request Submitted → Technician Assigned → Device Collection Pending → Device Collected → Diagnosis in Progress → Quotation Submitted → Customer Approval Pending → Repair in Progress → Repair Completed → Device Delivery Pending → Device Delivered → Service Completed (+ `rejected`, `cancelled`).
 - **Key rules:** customer must approve a paid quotation before repair; reviews need a completed transaction; exact address released only to the accepted counterparty; data-protection checklist before handover; recycling materials: copper, aluminium, iron, plastics, glass, other (actual vs estimated separate).
 - **Matching:** hard filters (verified, category, radius, availability) then weighted score; return reasons. Weights in config.
-- **Green Score:** ledger-based, verified events only, idempotent, configurable points (`design.md` §A.6).
 
 ## 13. Testing expectations
 - Write tests with the feature, not after. Backend: auth, authz (403s), validation, state transitions, ownership, key workflows, NoSQL-injection payloads.
-- Must automate/verify the **11-step repair E2E** and also donation, refurbishment, recycling, student, verification, moderation, suspension flows.
+- Must automate/verify the **11-step repair E2E** and also donation, refurbishment, recycling, verification, moderation, suspension flows.
 - Always include negative tests: other user's resource, wrong role, unverified provider, suspended account, illegal transition, oversized/wrong-type upload.
 - Cross-client check: create on web → read on mobile and reverse; log it in `TESTING.md`.
 - Before saying "done": run lint + tests + the app; paste the real result summary.

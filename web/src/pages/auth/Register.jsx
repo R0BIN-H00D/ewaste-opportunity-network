@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { Factory, GraduationCap, Recycle, User, Wrench } from 'lucide-react';
+import { Factory, Recycle, User, Wrench } from 'lucide-react';
 import { NEEDS_ORG_NAME, ROLE_OPTIONS, registerSchema, toRegisterBody } from '../../lib/validation';
 import { registerUser } from '../../store/authSlice';
 import { applyFieldErrors } from '../../utils/errors';
@@ -12,7 +12,7 @@ import PasswordField from '../../components/ui/PasswordField';
 import Alert from '../../components/ui/Alert';
 import AuthShell, { linkClass } from './AuthShell';
 
-const ICONS = { user: User, technician: Wrench, student: GraduationCap, refurbisher: Recycle, recycler: Factory };
+const ICONS = { user: User, technician: Wrench, refurbisher: Recycle, recycler: Factory };
 const FIELDS = ['name', 'email', 'phone', 'organizationName', 'password', 'role'];
 
 export default function Register() {

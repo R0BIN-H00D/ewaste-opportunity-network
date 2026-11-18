@@ -23,11 +23,11 @@ const RESOURCE = {
   RecyclingRecord: 'recycling', RecyclingCenter: 'recycling-center',
   PickupSchedule: 'pickup',
   Review: 'review', Complaint: 'complaint', Report: 'report',
-  LearningOpportunity: 'learning', StudentApplication: 'learning', Certificate: 'learning',
   EducationArticle: 'education', Announcement: 'announcement', Category: 'category',
-  User: 'profile', UserProfile: 'profile', TechnicianProfile: 'profile', StudentProfile: 'profile', RefurbisherProfile: 'profile', VerificationDocument: 'verification',
-  GreenScoreLedger: 'impact', EnvironmentalImpact: 'impact',
+  User: 'profile', UserProfile: 'profile', TechnicianProfile: 'profile', RefurbisherProfile: 'profile', VerificationDocument: 'verification',
+  EnvironmentalImpact: 'impact',
   Transaction: 'payment',
+  WantedRequest: 'wanted', WantedResponse: 'wanted',
 };
 
 // Records that everyone may see while they are in one of these states. `'*'` means always.
@@ -35,7 +35,7 @@ const PUBLIC_WHEN = {
   DeviceListing: ['listed'],
   MarketplaceProduct: ['active'],
   Donation: ['open', 'requested'],
-  LearningOpportunity: ['open'],
+  WantedRequest: ['open'],
   EducationArticle: ['published'],
   Announcement: '*',
   Category: '*',

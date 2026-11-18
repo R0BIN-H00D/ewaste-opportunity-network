@@ -25,7 +25,6 @@ export const resetSchema = z
 export const ROLE_OPTIONS = [
   { value: 'user', label: 'Individual', hint: 'Donate, sell or recycle my old devices' },
   { value: 'technician', label: 'Technician', hint: 'Offer repair services' },
-  { value: 'student', label: 'Student', hint: 'Learn by helping with repairs' },
   { value: 'refurbisher', label: 'Refurbisher', hint: 'Refurbish and resell devices' },
   { value: 'recycler', label: 'Recycling centre', hint: 'Responsibly recycle e-waste' },
 ];
@@ -33,7 +32,7 @@ export const NEEDS_ORG_NAME = ['refurbisher', 'recycler'];
 
 export const registerSchema = z
   .object({
-    role: z.enum(['user', 'technician', 'student', 'refurbisher', 'recycler']),
+    role: z.enum(['user', 'technician', 'refurbisher', 'recycler']),
     name: z.string().trim().min(2, 'Enter your name').max(80),
     email,
     phone: optionalPhone,

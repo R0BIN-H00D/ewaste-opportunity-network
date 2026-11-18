@@ -36,7 +36,6 @@ const schema = baseSchema({
   ),
   customerConfirmedAt: Date,
   reviewed: { type: Boolean, default: false },
-  studentAssignments: [{ type: ObjectId, ref: 'StudentApplication' }],
 });
 schema.index({ customer: 1, status: 1, createdAt: -1 });
 schema.index({ technician: 1, status: 1, createdAt: -1 });

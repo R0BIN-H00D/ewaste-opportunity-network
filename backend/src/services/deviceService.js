@@ -11,7 +11,7 @@ const { serializeListing } = require('../serializers/listing');
 const { MAX_DEVICE_PHOTOS } = require('../config/constants');
 
 const POPULATE = [
-  { path: 'device', select: 'name brand model purchaseYear ageYears photos specs' },
+  { path: 'device', select: 'name brand model modelYear purchaseYear ageYears photos specs' },
   { path: 'category', select: 'name slug icon hazardous' },
   { path: 'owner', select: 'name avatar' },
 ];
@@ -52,9 +52,9 @@ async function createListing(user, input, files = []) {
       category: category._id,
       brand: input.brand,
       model: input.model,
+      modelYear: input.modelYear,
       purchaseYear: input.purchaseYear,
       photos: stored.map(storage.toPhoto),
-      ...(input.aiSuggestion ? { aiSuggestion: { ...input.aiSuggestion, confirmedByUser: true } } : {}),
     });
     const listing = await DeviceListing.create({
       device: device._id,
@@ -70,6 +70,7 @@ async function createListing(user, input, files = []) {
       pickupPreference: input.pickupPreference,
       addressArea: input.addressArea,
       city: input.city,
+      agentPhone: input.agentPhone,
       location: input.lat !== undefined ? makePoint(input.lng, input.lat) : undefined,
       status,
     });
@@ -172,11 +173,17 @@ async function updateListing(id, user, input, files = []) {
     device.category = cat._id;
     listing.category = cat._id;
   }
-  for (const f of ['name', 'brand', 'model', 'purchaseYear']) if (input[f] !== undefined) device[f] = input[f];
+  // The purchase year can never be before the model year, even when only one of them is being changed.
+  const nextModelYear = input.modelYear !== undefined ? input.modelYear : device.modelYear;
+  const nextPurchaseYear = input.purchaseYear !== undefined ? input.purchaseYear : device.purchaseYear;
+  if (nextModelYear && nextPurchaseYear && nextPurchaseYear < nextModelYear) {
+    throw ApiError.validation([{ field: 'purchaseYear', message: `The purchase year cannot be earlier than the model year (${nextModelYear})` }]);
+  }
+  for (const f of ['name', 'brand', 'model', 'modelYear', 'purchaseYear']) if (input[f] !== undefined) device[f] = input[f];
   if (input.name !== undefined) listing.title = input.name;
   if (input.brand !== undefined) listing.brand = input.brand;
   if (input.model !== undefined) listing.model = input.model;
-  for (const f of ['condition', 'description', 'preferredService', 'expectedPrice', 'pickupPreference', 'addressArea', 'city']) {
+  for (const f of ['condition', 'description', 'preferredService', 'expectedPrice', 'pickupPreference', 'addressArea', 'city', 'agentPhone']) {
     if (input[f] !== undefined) listing[f] = input[f];
   }
   if (input.lat !== undefined) listing.location = makePoint(input.lng, input.lat);

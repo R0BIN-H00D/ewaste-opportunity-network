@@ -12,6 +12,8 @@ const schema = baseSchema({
   paymentMethod: { type: String, enum: ['cod', 'offline'], default: 'cod' }, // no gateway (BR-10)
   paymentStatus: { type: String, enum: ['unpaid', 'paid_offline', 'confirmed'], default: 'unpaid' },
   deliveryArea: String,
+  deliveryCity: String,
+  deliveryPincode: String,
   notes: { type: String, maxlength: 500 },
   cancelReason: { type: String, maxlength: 500 },
   reviewed: { type: Boolean, default: false }, // the buyer has reviewed the seller for this order (BR-04)

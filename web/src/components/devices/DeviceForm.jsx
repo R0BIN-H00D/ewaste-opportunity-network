@@ -7,13 +7,11 @@ import GlassCard from '../glass/GlassCard';
 import TextField from '../ui/TextField';
 import Alert from '../ui/Alert';
 import PhotoPicker from './PhotoPicker';
-import AiSuggestion from './AiSuggestion';
-import AddressSearch from './AddressSearch';
-import { toSavedSuggestion } from '../../lib/ai';
 import { useCategories } from '../../hooks/useCategories';
 import { deviceApi } from '../../services/deviceApi';
+import { geoApi } from '../../services/geoApi';
 import { applyFieldErrors, toApiError } from '../../utils/errors';
-import { CONDITIONS, MAX_PHOTOS, PICKUPS, SERVICES, formatPrice, labelOf } from '../../lib/devices';
+import { CONDITIONS, LISTABLE_SERVICES, MAX_PHOTOS, PICKUPS, SERVICES, formatPrice, labelOf } from '../../lib/devices';
 import { CHECKLIST, EMPTY_VALUES, STEP_FIELDS, deviceSchema, listingToValues, toDevicePayload } from '../../lib/deviceSchema';
 
 const FIELD_STEP = Object.fromEntries(Object.entries(STEP_FIELDS).flatMap(([step, fields]) => fields.map((f) => [f, step])));
@@ -63,48 +61,51 @@ export default function DeviceForm({ mode = 'create', listing }) {
   const [submitError, setSubmitError] = useState('');
   const [progress, setProgress] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [accepted, setAccepted] = useState(null); // a suggestion the person chose to use (FR-AI-002)
-
-  /** Fills in what the person accepted. Nothing they have already typed is overwritten. */
-  const useSuggestion = (s) => {
-    setAccepted(s);
-    if (s.category?.slug) setValue('category', s.category.slug, { shouldValidate: true });
-    if (s.brand && !getValues('brand')?.trim()) setValue('brand', s.brand);
-    if (s.visibleDamage?.length && !getValues('description')?.trim()) setValue('description', `Looks like: ${s.visibleDamage.join(', ')}.`);
-  };
 
   const existing = editing ? listing.device?.photos || [] : [];
   const photoCount = existing.filter((p) => !removed.includes(p.publicId)).length + files.length;
   const step = steps[stepIndex];
   const allChecked = checks.every(Boolean);
+  const [checklistError, setChecklistError] = useState('');
   const hadLocation = Boolean(editing && listing.location);
 
   const goNext = async () => {
+    // Every data-protection box must be ticked to carry on; there is no way around it.
+    if (step.id === 'safety' && !allChecked) return setChecklistError('Please tick all three boxes to continue.');
     const fields = STEP_FIELDS[step.id];
-    if (fields && !(await trigger(fields, { shouldFocus: true }))) return;
+    const fieldsOk = !fields || (await trigger(fields, { shouldFocus: true }));
+    // A device needs at least one picture, so people can judge it. Checked on the photo step, alongside the condition.
+    if (step.id === 'photos' && photoCount === 0) setPhotoError('Add at least one photo of the device.');
+    else if (step.id === 'photos') setPhotoError('');
+    if (!fieldsOk || (step.id === 'photos' && photoCount === 0)) return;
     setStepIndex((i) => Math.min(i + 1, steps.length - 1));
   };
   const goBack = () => setStepIndex((i) => Math.max(i - 1, 0));
 
+  /** Finds where the person is, then fills in the area and city from that spot (they can still change them). */
   const locate = () => {
-    if (!navigator.geolocation) return setGeoMessage('Your browser cannot share its location. You can still list with the area and city.');
+    if (!navigator.geolocation) return setGeoMessage('Your browser cannot share its location. Please type the area and city.');
     setGeoMessage('Finding your location…');
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCoords({ lat: Number(pos.coords.latitude.toFixed(5)), lng: Number(pos.coords.longitude.toFixed(5)) });
-        setGeoMessage('Location saved. Others only ever see an approximate area.');
+      async (pos) => {
+        const lat = Number(pos.coords.latitude.toFixed(5));
+        const lng = Number(pos.coords.longitude.toFixed(5));
+        setCoords({ lat, lng });
+        try {
+          const place = await geoApi.reverse(lat, lng);
+          if (place.area) setValue('addressArea', place.area, { shouldValidate: true, shouldDirty: true });
+          if (place.city) setValue('city', place.city, { shouldValidate: true, shouldDirty: true });
+          const missing = [!place.area && 'area', !place.city && 'city'].filter(Boolean);
+          setGeoMessage(missing.length
+            ? `Location saved. Please type the ${missing.join(' and ')}. Others only ever see an approximate area.`
+            : 'Location found. Area and city are filled in; check them. Others only ever see an approximate area.');
+        } catch {
+          setGeoMessage('Location saved, but we could not look up the address just now. Please type the area and city.');
+        }
       },
-      () => setGeoMessage('Could not get your location. You can still list with the area and city.'),
+      () => setGeoMessage('Could not get your location. Please type the area and city.'),
       { timeout: 10000 },
     );
-  };
-
-  /** A place chosen from the address search: fills the area and city (without being asked twice) and keeps the point. */
-  const pickPlace = ({ area, city, lat, lng }) => {
-    if (area) setValue('addressArea', area, { shouldValidate: true });
-    if (city) setValue('city', city, { shouldValidate: true });
-    setCoords({ lat, lng });
-    setGeoMessage('Location saved from the address you chose. Others only ever see an approximate area.');
   };
 
   /** status: 'draft' | 'listed' | undefined (keep the current status when editing a live listing). */
@@ -118,16 +119,15 @@ export default function DeviceForm({ mode = 'create', listing }) {
       if (target >= 0) setStepIndex(target);
       return;
     }
-    if (status === 'listed' && photoCount === 0) {
+    if (photoCount === 0) {
       setStepIndex(steps.findIndex((s) => s.id === 'photos'));
-      return setPhotoError('Add at least one photo to publish. You can also save a draft without photos.');
+      return setPhotoError('Add at least one photo of the device.');
     }
     setBusy(true);
     setProgress(files.length ? 0 : null);
     try {
       const payload = toDevicePayload(getValues(), { coords, status });
       if (editing && removed.length) payload.removePhotoIds = removed;
-      if (!editing && accepted) payload.aiSuggestion = JSON.stringify(toSavedSuggestion(accepted));
       const saved = editing
         ? await deviceApi.update(listing._id, payload, files, setProgress)
         : await deviceApi.create(payload, files, setProgress);
@@ -179,12 +179,13 @@ export default function DeviceForm({ mode = 'create', listing }) {
                 <option value="">Choose a category…</option>
                 {categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
               </TextField>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <TextField label="Brand" error={e('brand')} {...register('brand')} />
-                <TextField label="Model" error={e('model')} {...register('model')} />
-                <TextField label="Purchase year" inputMode="numeric" placeholder="2019" error={e('purchaseYear')} {...register('purchaseYear')} />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <TextField label="Brand *" error={e('brand')} {...register('brand')} />
+                <TextField label="Model *" error={e('model')} {...register('model')} />
+                <TextField label="Model year *" inputMode="numeric" placeholder="2018" hint="The year this model came out." error={e('modelYear')} {...register('modelYear')} />
+                <TextField label="Purchase year *" inputMode="numeric" placeholder="2019" hint="Same as or after the model year." error={e('purchaseYear')} {...register('purchaseYear')} />
               </div>
-              <TextField as="textarea" rows={4} label="Description" hint="What works, what doesn't, accessories included…" error={e('description')} {...register('description')} />
+              <TextField as="textarea" rows={4} label="Description" hint="What works, what doesn't, accessories included." error={e('description')} {...register('description')} />
             </div>
           )}
 
@@ -198,9 +199,8 @@ export default function DeviceForm({ mode = 'create', listing }) {
               <div>
                 <p className="mb-1 text-sm font-medium text-ink dark:text-white">Photos</p>
                 <PhotoPicker existing={existing} files={files} onFiles={setFiles} removed={removed} onRemoved={setRemoved} error={photoError} />
-                <p className="mt-2 text-xs text-ink-muted dark:text-[#9FB2A7]">At least one photo is needed to publish. Drafts can be saved without photos.</p>
+                <p className="mt-2 text-xs text-ink-muted dark:text-[#9FB2A7]">At least one photo is needed. JPEG, PNG or WebP, up to 5 MB each.</p>
               </div>
-              {!editing && <AiSuggestion getText={() => ({ title: getValues('name'), description: getValues('description') })} photo={files[0] || null} onUse={useSuggestion} />}
             </div>
           )}
 
@@ -209,16 +209,17 @@ export default function DeviceForm({ mode = 'create', listing }) {
               <h2 className="text-xl font-bold text-ink dark:text-white">Service and location</h2>
               <TextField as="select" label="What should happen to it? *" error={e('preferredService')} {...register('preferredService')}>
                 <option value="">Choose a service…</option>
-                {SERVICES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                {SERVICES.filter(([v]) => LISTABLE_SERVICES.includes(v) || v === values.preferredService).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </TextField>
               <div className="grid gap-4 sm:grid-cols-2">
-                <TextField label="Expected price (₹)" type="number" min="0" inputMode="numeric" hint="Leave empty for “price on request”, or 0 to give it away." error={e('expectedPrice')} {...register('expectedPrice')} />
-                <TextField as="select" label="Handover" error={e('pickupPreference')} {...register('pickupPreference')}>
-                  <option value="">No preference</option>
+                <TextField label="Expected price (₹)" type="number" min="0" step="0.01" inputMode="decimal" hint="Leave empty for “price on request”, or 0 to give it away." error={e('expectedPrice')} {...register('expectedPrice')} />
+                <TextField as="select" label="Handover *" error={e('pickupPreference')} {...register('pickupPreference')}>
+                  <option value="">Choose a handover option…</option>
                   {PICKUPS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </TextField>
-                <TextField label="Area / locality" error={e('addressArea')} {...register('addressArea')} />
-                <TextField label="City" error={e('city')} {...register('city')} />
+                <TextField label="Area / locality *" error={e('addressArea')} {...register('addressArea')} />
+                <TextField label="City *" error={e('city')} {...register('city')} />
+                <TextField label="Your phone number *" type="tel" inputMode="tel" autoComplete="tel" placeholder="98765 43210" hint="Your 10-digit mobile number, so the person handling the delivery can reach you. It is not shown publicly." error={e('agentPhone')} className="sm:col-span-2" {...register('agentPhone')} />
               </div>
               <div className="glass-subtle p-4">
                 <p className="text-sm text-ink dark:text-[#E8F1EB]">Your exact location stays private. Others only see an approximate area.</p>
@@ -227,24 +228,24 @@ export default function DeviceForm({ mode = 'create', listing }) {
                   {geoMessage || (coords ? 'Location saved.' : hadLocation ? 'A location is already saved for this listing.' : 'No exact location set (optional).')}
                 </p>
               </div>
-              <AddressSearch onPick={pickPlace} />
             </div>
           )}
 
           {step.id === 'safety' && (
             <div className="space-y-4">
               <h2 className="text-xl font-bold text-ink dark:text-white">Protect your data</h2>
-              <p className="text-sm text-ink-muted dark:text-[#9FB2A7]">Please confirm each point before the device goes live. You can skip this by saving a draft.</p>
+              <p className="text-sm text-ink-muted dark:text-[#9FB2A7]">Please confirm every point below. You cannot continue until all three boxes are ticked.</p>
               <ul className="space-y-3">
                 {CHECKLIST.map((text, i) => (
                   <li key={text}>
                     <label className="flex cursor-pointer items-start gap-3 text-sm text-ink dark:text-[#E8F1EB]">
-                      <input type="checkbox" className="mt-1 h-5 w-5 accent-[#047857]" checked={checks[i]} onChange={(ev) => setChecks((c) => c.map((v, j) => (j === i ? ev.target.checked : v)))} />
+                      <input type="checkbox" className="mt-1 h-5 w-5 accent-[#047857]" checked={checks[i]} onChange={(ev) => { setChecklistError(''); setChecks((c) => c.map((v, j) => (j === i ? ev.target.checked : v))); }} required aria-invalid={checklistError && !checks[i] ? 'true' : undefined} />
                       <span>{text}</span>
                     </label>
                   </li>
                 ))}
               </ul>
+              {checklistError && <p role="alert" className="text-sm font-medium text-danger">{checklistError}</p>}
             </div>
           )}
 
@@ -259,8 +260,9 @@ export default function DeviceForm({ mode = 'create', listing }) {
                   ['Condition', labelOf(CONDITIONS, values.condition)],
                   ['Service', labelOf(SERVICES, values.preferredService)],
                   ['Price', values.expectedPrice === '' ? 'Price on request' : formatPrice(Number(values.expectedPrice))],
-                  ['Handover', values.pickupPreference ? labelOf(PICKUPS, values.pickupPreference) : 'No preference'],
+                  ['Handover', labelOf(PICKUPS, values.pickupPreference)],
                   ['Place', [values.addressArea, values.city].filter(Boolean).join(', ')],
+                  ['Phone', values.agentPhone],
                   ['Photos', `${photoCount} of ${MAX_PHOTOS}`],
                 ].map(([k, v]) => v && (
                   <div key={k} className="flex justify-between gap-3 border-b border-black/5 py-1.5 dark:border-white/10">
@@ -293,7 +295,7 @@ export default function DeviceForm({ mode = 'create', listing }) {
                   <button type="button" className="btn btn-primary" disabled={busy} onClick={() => submit(undefined)}>{busy ? 'Saving…' : 'Save changes'}</button>
                 ) : (
                   <>
-                    <button type="button" className="btn btn-glass" disabled={busy} onClick={() => submit('draft')}>{busy ? 'Saving…' : 'Save as draft'}</button>
+                    <button type="button" className="btn btn-glass" disabled={busy || !allChecked} title={allChecked ? undefined : 'Confirm the data-protection checklist first'} onClick={() => submit('draft')}>{busy ? 'Saving…' : 'Save as draft'}</button>
                     <button type="button" className="btn btn-primary" disabled={busy || !allChecked} title={allChecked ? undefined : 'Confirm the data-protection checklist first'} onClick={() => submit('listed')}>
                       {busy ? 'Publishing…' : 'Publish listing'}
                     </button>

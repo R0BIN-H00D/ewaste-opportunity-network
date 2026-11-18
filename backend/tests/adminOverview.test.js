@@ -39,7 +39,7 @@ describe('overview and monitor guards', () => {
     expect((await request(app).get(url)).status).toBe(401);
   });
 
-  it.each(['user', 'technician', 'student', 'refurbisher', 'recycler'])('is closed to a %s', async (role) => {
+  it.each(['user', 'technician', 'refurbisher', 'recycler'])('is closed to a %s', async (role) => {
     const u = await makeUser(role);
     for (const url of ROUTES) {
       const res = await get(url, u);
@@ -54,7 +54,7 @@ describe('GET /api/admin/dashboard', () => {
     expect(res.status).toBe(200);
     const d = res.body.data;
     expect(d.people).toMatchObject({ total: 0, active: 0, suspended: 0, newThisMonth: 0 });
-    expect(d.people.byRole).toEqual({ user: 0, technician: 0, student: 0, refurbisher: 0, recycler: 0 });
+    expect(d.people.byRole).toEqual({ user: 0, technician: 0, refurbisher: 0, recycler: 0 });
     expect(d.listings.total).toBe(0);
     expect(d.services).toMatchObject({ completed: 0, repairs: { total: 0, open: 0, completed: 0 } });
     expect(d.attention).toMatchObject({ openReports: 0, openComplaints: 0, pendingVerifications: { total: 0 } });
@@ -65,16 +65,15 @@ describe('GET /api/admin/dashboard', () => {
     await makeUser('user');
     await makeUser('user', { status: 'suspended' });
     await makeUser('user', { status: 'deleted' });
-    await makeUser('student');
     await makeUser('refurbisher', { status: 'pending_verification' });
     await makeTechnician();
     const d = (await get('/api/admin/dashboard', admin)).body.data;
-    expect(d.people.total).toBe(5);
-    expect(d.people.active).toBe(3);
+    expect(d.people.total).toBe(4);
+    expect(d.people.active).toBe(2);
     expect(d.people.suspended).toBe(1);
     expect(d.people.waitingForVerification).toBe(1);
-    expect(d.people.newThisMonth).toBe(5);
-    expect(d.people.byRole).toEqual({ user: 2, technician: 1, student: 1, refurbisher: 1, recycler: 0 });
+    expect(d.people.newThisMonth).toBe(4);
+    expect(d.people.byRole).toEqual({ user: 2, technician: 1, refurbisher: 1, recycler: 0 });
   });
 
   it('counts listings and separates recycling centres from their authorisation', async () => {

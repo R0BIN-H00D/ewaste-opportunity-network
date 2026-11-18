@@ -14,7 +14,6 @@ const announcements = require('../services/announcementService');
 const auditLog = require('../services/adminAuditService');
 const analytics = require('../services/adminAnalyticsService');
 const exportsSvc = require('../services/adminExportService');
-const certificates = require('../services/adminCertificateService');
 const education = require('../services/educationService');
 
 // ---- users ----
@@ -114,7 +113,7 @@ exports.listAudit = asyncHandler(async (req, res) => {
   return ok(res, items, 'OK', meta);
 });
 
-// ---- analytics, exports, certificates ----
+// ---- analytics, exports ----
 exports.analytics = asyncHandler(async (req, res) => ok(res, await analytics.get(req.query)));
 
 /** A file, not JSON. Never cached: it holds people's details. The headers tell the web app how many rows and whether the file was cut short. */
@@ -130,12 +129,6 @@ exports.exportCsv = asyncHandler(async (req, res) => {
   });
   return res.send(file.csv);
 });
-
-exports.listCertificates = asyncHandler(async (req, res) => {
-  const { items, meta } = await certificates.list(req.query);
-  return ok(res, items, 'OK', meta);
-});
-exports.issueCertificate = asyncHandler(async (req, res) => ok(res, await certificates.issue(req.user, req.body.applicationId, req.ip), 'Certificate issued', undefined, 201));
 
 // ---- learning-centre articles ----
 exports.listArticles = asyncHandler(async (req, res) => {

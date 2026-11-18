@@ -58,7 +58,7 @@ describe('the admin guard on moderation routes', () => {
     expect((await as(method, url, null, body(method))).status).toBe(401);
   });
 
-  it.each(['user', 'technician', 'student', 'refurbisher', 'recycler'])('is closed to a %s on every route', async (role) => {
+  it.each(['user', 'technician', 'refurbisher', 'recycler'])('is closed to a %s on every route', async (role) => {
     const u = await makeUser(role);
     for (const [method, url] of ROUTES) {
       const res = await as(method, url, u, body(method));

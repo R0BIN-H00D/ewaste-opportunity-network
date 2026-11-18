@@ -3,13 +3,12 @@
 const ROLES = Object.freeze({
   USER: 'user',
   TECHNICIAN: 'technician',
-  STUDENT: 'student',
   REFURBISHER: 'refurbisher',
   RECYCLER: 'recycler',
   ADMIN: 'admin',
 });
-const SELF_REGISTER_ROLES = [ROLES.USER, ROLES.TECHNICIAN, ROLES.STUDENT, ROLES.REFURBISHER, ROLES.RECYCLER];
-const PROVIDER_ROLES = [ROLES.TECHNICIAN, ROLES.STUDENT, ROLES.REFURBISHER, ROLES.RECYCLER];
+const SELF_REGISTER_ROLES = [ROLES.USER, ROLES.TECHNICIAN, ROLES.REFURBISHER, ROLES.RECYCLER];
+const PROVIDER_ROLES = [ROLES.TECHNICIAN, ROLES.REFURBISHER, ROLES.RECYCLER];
 
 const ACCOUNT_STATUS = Object.freeze({
   ACTIVE: 'active',
@@ -19,14 +18,14 @@ const ACCOUNT_STATUS = Object.freeze({
 });
 
 const VERIFICATION_STATUS = ['not_submitted', 'pending', 'approved', 'rejected', 'resubmission_required'];
-const DOC_TYPES = ['id_proof', 'qualification', 'student_id', 'business', 'authorization', 'other'];
+const DOC_TYPES = ['id_proof', 'qualification', 'business', 'authorization', 'other'];
 
 const CONDITIONS = ['fully_working', 'minor_damage', 'major_damage', 'not_working', 'for_spare_parts'];
 const SERVICES = ['repair', 'reuse', 'donation', 'refurbishment', 'recycling'];
 const LISTING_STATUS = ['draft', 'listed', 'in_service', 'completed', 'withdrawn', 'removed_by_admin'];
 const MAX_DEVICE_PHOTOS = 6;
 
-// name, slug, icon (Lucide), hazardous (design default; used to exclude student tasks, BR-07)
+// name, slug, icon (Lucide), hazardous (design default)
 const CATEGORY_SEED = [
   ['Laptop', 'laptop', 'laptop', false],
   ['Desktop computer', 'desktop-computer', 'monitor-smartphone', false],
@@ -61,7 +60,6 @@ const PRODUCT_CONDITIONS = ['like_new', 'excellent', 'good', 'fair']; // disclos
 const ORDER_STATUS = ['placed', 'confirmed', 'ready', 'delivered', 'completed', 'cancelled'];
 const RECYCLING_STATUS = ['requested', 'accepted', 'pickup_scheduled', 'collected', 'received_at_center', 'processed', 'completed', 'rejected', 'cancelled'];
 const MATERIAL_TYPES = ['copper', 'aluminium', 'iron', 'plastics', 'glass', 'other'];
-const APPLICATION_STATUS = ['applied', 'accepted', 'rejected', 'in_progress', 'completed', 'withdrawn'];
 const COMPLAINT_STATUS = ['open', 'assigned', 'in_review', 'resolved', 'rejected'];
 const IMPACT_TYPES = ['repair', 'reuse', 'donation', 'refurbishment', 'recycling'];
 
@@ -70,5 +68,5 @@ module.exports = {
   CONDITIONS, SERVICES, LISTING_STATUS, MAX_DEVICE_PHOTOS, CATEGORY_SEED,
   SERVICE_REQUEST_STATUS, QUOTATION_STATUS, PICKUP_STATUS, DONATION_STATUS, DONATION_REQUEST_STATUS,
   REFURB_JOB_STATUS, PRODUCT_STATUS, PRODUCT_CONDITIONS, ORDER_STATUS, RECYCLING_STATUS, MATERIAL_TYPES,
-  APPLICATION_STATUS, COMPLAINT_STATUS, IMPACT_TYPES,
+  COMPLAINT_STATUS, IMPACT_TYPES,
 };

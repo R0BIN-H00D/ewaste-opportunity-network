@@ -13,15 +13,6 @@ export const ROLE_FIELDS = {
       { name: 'serviceRadiusKm', label: 'Service radius (km)', type: 'number', min: 1, max: 200 },
     ],
   },
-  student: {
-    title: 'Student details',
-    fields: [
-      { name: 'college', label: 'College / university', type: 'text', full: true },
-      { name: 'course', label: 'Course', type: 'text' },
-      { name: 'yearOfStudy', label: 'Year of study', type: 'number', min: 1, max: 8 },
-      { name: 'skills', label: 'Skills', type: 'list', hint: 'Separate with commas, e.g. soldering, Windows setup', full: true },
-    ],
-  },
   refurbisher: {
     title: 'Business details',
     fields: [

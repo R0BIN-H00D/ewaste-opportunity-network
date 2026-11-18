@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { setAccessToken } from '../services/api';
 import { categoryApi, deviceApi } from '../services/deviceApi';
+import { geoApi } from '../services/geoApi';
 import { _resetCategoriesCache } from '../hooks/useCategories';
 import { TECH, USER, anonymous, renderApp, signedIn } from './helpers';
 
@@ -10,6 +11,7 @@ vi.mock('../services/deviceApi', () => ({
   deviceApi: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), setStatus: vi.fn(), remove: vi.fn() },
   reportApi: { create: vi.fn() },
 }));
+vi.mock('../services/geoApi', () => ({ geoApi: { reverse: vi.fn(), search: vi.fn() } }));
 vi.mock('../services/api', async (importOriginal) => ({
   ...(await importOriginal()),
   getHealth: () => Promise.resolve({ success: true, data: { db: 'connected' } }),
@@ -25,6 +27,8 @@ const lastListParams = () => deviceApi.list.mock.calls.at(-1)[0];
 
 beforeEach(() => {
   vi.resetAllMocks();
+  URL.createObjectURL = vi.fn(() => 'blob:preview');
+  URL.revokeObjectURL = vi.fn();
   _resetCategoriesCache();
   setAccessToken(null);
   categoryApi.list.mockResolvedValue(CATEGORIES);
@@ -141,8 +145,8 @@ describe('route guards for listing pages', () => {
     expect(screen.queryByRole('heading', { name: 'List your device' })).not.toBeInTheDocument();
   });
 
-  it('keeps students away from the listings dashboard', async () => {
-    renderApp('/dashboard/listings', signedIn({ ...USER, role: 'student' }));
+  it('keeps recycling centres away from the listings dashboard', async () => {
+    renderApp('/dashboard/listings', signedIn({ ...USER, role: 'recycler' }));
     expect(await screen.findByText('This area is not available for your account')).toBeInTheDocument();
   });
 
@@ -166,27 +170,45 @@ describe('listing form', () => {
   async function fillDetails() {
     fireEvent.change(field(/Device name/), { target: { value: 'Old laptop' } });
     fireEvent.change(field(/Category/), { target: { value: 'laptops' } });
+    fireEvent.change(field(/Brand/), { target: { value: 'Dell' } });
+    fireEvent.change(field(/^Model \*/), { target: { value: 'Inspiron 15' } });
+    fireEvent.change(field(/Model year/), { target: { value: '2018' } });
+    fireEvent.change(field(/Purchase year/), { target: { value: '2019' } });
   }
-  async function reachReview({ ticked = true } = {}) {
+  const addPhoto = () => fireEvent.change(screen.getByTestId('photo-input'), { target: { files: [new File(['x'], 'a.png', { type: 'image/png' })] } });
+  function fillPlace() {
+    fireEvent.change(field(/What should happen/), { target: { value: 'refurbishment' } });
+    fireEvent.change(field(/Handover/), { target: { value: 'pickup' } });
+    fireEvent.change(field(/Area \/ locality/), { target: { value: 'Indiranagar' } });
+    fireEvent.change(field(/^City/), { target: { value: 'Bengaluru' } });
+    fireEvent.change(field(/Your phone number/), { target: { value: '98765 43210' } });
+  }
+  async function reachReview({ ticked = true, stopAtChecklist = false } = {}) {
     await fillDetails();
     next();
     await screen.findByRole('heading', { name: 'Condition and photos' });
     fireEvent.change(field('Condition *'), { target: { value: 'fully_working' } });
+    addPhoto();
     next();
     await screen.findByRole('heading', { name: 'Service and location' });
-    fireEvent.change(field(/What should happen/), { target: { value: 'reuse' } });
+    fillPlace();
     next();
     await screen.findByRole('heading', { name: 'Protect your data' });
+    if (stopAtChecklist) return;
     if (ticked) screen.getAllByRole('checkbox').forEach((box) => fireEvent.click(box));
     next();
     await screen.findByRole('heading', { name: 'Review your listing' });
   }
 
-  it('will not leave the first step until the name and category are valid', async () => {
+  it('will not leave the first step until the name, category, brand, model and year are valid', async () => {
     await openForm();
     next();
-    expect(await screen.findByText('Enter the device name (at least 2 characters)')).toBeInTheDocument();
+    expect(await screen.findByText('Enter the device name (at least 3 characters)')).toBeInTheDocument();
     expect(screen.getByText('Choose a category')).toBeInTheDocument();
+    expect(screen.getByText('Enter the brand (at least 2 characters)')).toBeInTheDocument();
+    expect(screen.getByText(/Enter the model, for example/)).toBeInTheDocument();
+    expect(screen.getByText('Enter the model year')).toBeInTheDocument();
+    expect(screen.getByText('Enter the year it was bought')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Tell us about the device' })).toBeInTheDocument();
   });
 
@@ -197,17 +219,31 @@ describe('listing form', () => {
     await screen.findByRole('heading', { name: 'Condition and photos' });
     next();
     expect(await screen.findByText('Choose the condition')).toBeInTheDocument();
+    expect(screen.getByText('Add at least one photo of the device.')).toBeInTheDocument();
     fireEvent.change(field('Condition *'), { target: { value: 'fully_working' } });
+    next();
+    await waitFor(() => expect(screen.queryByText('Choose the condition')).not.toBeInTheDocument());
+    expect(screen.getByRole('heading', { name: 'Condition and photos' })).toBeInTheDocument();
+    addPhoto();
     next();
     await screen.findByRole('heading', { name: 'Service and location' });
     next();
     expect(await screen.findByText('Choose what should happen to this device')).toBeInTheDocument();
+    expect(screen.getByText('Choose a handover option')).toBeInTheDocument();
+    expect(screen.getByText('Enter the area or locality (at least 3 characters)')).toBeInTheDocument();
+    expect(screen.getByText('Enter the city')).toBeInTheDocument();
+    expect(screen.getAllByText('Enter a valid 10-digit mobile number').length).toBeGreaterThan(0);
+    fireEvent.change(field(/Area \/ locality/), { target: { value: '12' } });
+    fireEvent.change(field(/^City/), { target: { value: '560038' } });
+    next();
+    await waitFor(() => expect(screen.getByText('The city can only have letters')).toBeInTheDocument());
+    expect(screen.getByRole('heading', { name: 'Service and location' })).toBeInTheDocument();
   });
 
   it('validates the price and year with clear messages', async () => {
     await openForm();
-    fireEvent.change(field(/Purchase year/), { target: { value: '1800' } });
     await fillDetails();
+    fireEvent.change(field(/Purchase year/), { target: { value: '1800' } });
     next();
     expect(await screen.findByText(/Enter a year between 1990 and/)).toBeInTheDocument();
   });
@@ -221,37 +257,57 @@ describe('listing form', () => {
     expect(await screen.findByLabelText(/Device name/)).toHaveValue('Old laptop');
   });
 
-  it('saves a draft without photos and tells the owner', async () => {
+  it('saves a draft and tells the owner', async () => {
     deviceApi.create.mockResolvedValue({ _id: 'd1', title: 'Old laptop', status: 'draft' });
     await openForm();
-    await reachReview({ ticked: false });
+    await reachReview();
     fireEvent.click(screen.getByRole('button', { name: 'Save as draft' }));
     expect(await screen.findByText(/Old laptop.*saved as a draft/)).toBeInTheDocument();
     const [values, photos] = deviceApi.create.mock.calls[0];
-    expect(values).toMatchObject({ name: 'Old laptop', category: 'laptops', condition: 'fully_working', preferredService: 'reuse', status: 'draft' });
-    expect(photos).toEqual([]);
+    expect(values).toMatchObject({ name: 'Old laptop', category: 'laptops', condition: 'fully_working', preferredService: 'refurbishment', brand: 'Dell', city: 'Bengaluru', addressArea: 'Indiranagar', status: 'draft' });
+    expect(photos).toHaveLength(1);
   });
 
-  it('only allows publishing after the data-protection checklist, and requires a photo', async () => {
+  it('will not go past the data-protection step until all three boxes are ticked', async () => {
+    deviceApi.create.mockResolvedValue({ _id: 'd1', title: 'Old laptop', status: 'listed' });
     await openForm();
-    await reachReview({ ticked: false });
-    const publish = screen.getByRole('button', { name: 'Publish listing' });
-    expect(publish).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'confirm the data-protection checklist' }));
-    await screen.findByRole('heading', { name: 'Protect your data' });
-    screen.getAllByRole('checkbox').forEach((box) => fireEvent.click(box));
+    await reachReview({ ticked: false, stopAtChecklist: true });
+    const boxes = screen.getAllByRole('checkbox');
+    expect(boxes).toHaveLength(3);
+
+    next();
+    expect(await screen.findByText('Please tick all three boxes to continue.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Protect your data' })).toBeInTheDocument();
+
+    fireEvent.click(boxes[0]);
+    fireEvent.click(boxes[1]);
+    next();
+    expect(await screen.findByText('Please tick all three boxes to continue.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Protect your data' })).toBeInTheDocument();
+
+    fireEvent.click(boxes[2]);
+    expect(screen.queryByText('Please tick all three boxes to continue.')).not.toBeInTheDocument();
     next();
     await screen.findByRole('heading', { name: 'Review your listing' });
     fireEvent.click(screen.getByRole('button', { name: 'Publish listing' }));
-    expect((await screen.findAllByText(/Add at least one photo to publish/)).length).toBeGreaterThan(0);
-    expect(deviceApi.create).not.toHaveBeenCalled();
-    expect(screen.getByRole('heading', { name: 'Condition and photos' })).toBeInTheDocument();
+    await waitFor(() => expect(deviceApi.create).toHaveBeenCalled());
+    expect(deviceApi.create.mock.calls[0][0]).toMatchObject({ status: 'listed' });
+  });
+
+  it('turns the draft and publish buttons off again if a box is unticked on the way back', async () => {
+    await openForm();
+    await reachReview();
+    fireEvent.click(screen.getByRole('button', { name: /Back/ }));
+    await screen.findByRole('heading', { name: 'Protect your data' });
+    fireEvent.click(screen.getAllByRole('checkbox')[1]);
+    next();
+    expect(await screen.findByText('Please tick all three boxes to continue.')).toBeInTheDocument();
   });
 
   it('shows the server message when saving fails and keeps the form', async () => {
     deviceApi.create.mockRejectedValue({ response: { status: 500, data: { message: 'Upload service is down' } } });
     await openForm();
-    await reachReview({ ticked: false });
+    await reachReview();
     fireEvent.click(screen.getByRole('button', { name: 'Save as draft' }));
     expect(await screen.findByText('Upload service is down')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Review your listing' })).toBeInTheDocument();
@@ -261,16 +317,68 @@ describe('listing form', () => {
   it('jumps to the step with the problem when the server rejects a field', async () => {
     deviceApi.create.mockRejectedValue({ response: { status: 422, data: { message: 'Validation failed', code: 'VALIDATION_ERROR', errors: [{ field: 'body.name', message: 'A device with this name already exists' }] } } });
     await openForm();
-    await reachReview({ ticked: false });
+    await reachReview();
     fireEvent.click(screen.getByRole('button', { name: 'Save as draft' }));
     expect(await screen.findByText('A device with this name already exists')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Tell us about the device' })).toBeInTheDocument();
   });
 });
 
+describe('Use my current location on the listing form', () => {
+  const stepToPlace = async () => {
+    renderApp('/list-device', signedIn(USER));
+    await screen.findByRole('heading', { name: 'Tell us about the device' });
+    await screen.findByRole('option', { name: 'Laptops' });
+    fireEvent.change(screen.getByLabelText(/Device name/), { target: { value: 'Old laptop' } });
+    fireEvent.change(screen.getByLabelText(/Category/), { target: { value: 'laptops' } });
+    fireEvent.change(screen.getByLabelText(/Brand/), { target: { value: 'Dell' } });
+    fireEvent.change(screen.getByLabelText(/^Model \*/), { target: { value: 'Inspiron 15' } });
+    fireEvent.change(screen.getByLabelText(/Model year/), { target: { value: '2018' } });
+    fireEvent.change(screen.getByLabelText(/Purchase year/), { target: { value: '2019' } });
+    fireEvent.click(screen.getByRole('button', { name: /Next/ }));
+    await screen.findByRole('heading', { name: 'Condition and photos' });
+    fireEvent.change(screen.getByLabelText('Condition *'), { target: { value: 'fully_working' } });
+    fireEvent.change(screen.getByTestId('photo-input'), { target: { files: [new File(['x'], 'a.png', { type: 'image/png' })] } });
+    fireEvent.click(screen.getByRole('button', { name: /Next/ }));
+    await screen.findByRole('heading', { name: 'Service and location' });
+  };
+
+  it('has no address search box, but has the phone number box', async () => {
+    await stepToPlace();
+    expect(screen.queryByText('Find your address')).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Your phone number/)).toBeInTheDocument();
+  });
+
+  it('fills in the area and city from where the person is', async () => {
+    Object.defineProperty(global.navigator, 'geolocation', {
+      configurable: true,
+      value: { getCurrentPosition: (ok) => ok({ coords: { latitude: 12.97389, longitude: 77.64077 } }) },
+    });
+    geoApi.reverse.mockResolvedValue({ area: 'Indiranagar', city: 'Bengaluru', state: 'Karnataka', postcode: '560038' });
+    await stepToPlace();
+    fireEvent.click(screen.getByRole('button', { name: 'Use my current location' }));
+    await waitFor(() => expect(geoApi.reverse).toHaveBeenCalledWith(12.97389, 77.64077));
+    await waitFor(() => expect(screen.getByLabelText(/Area \/ locality/)).toHaveValue('Indiranagar'));
+    expect(screen.getByLabelText(/^City/)).toHaveValue('Bengaluru');
+    expect(await screen.findByText(/Area and city are filled in/)).toBeInTheDocument();
+  });
+
+  it('keeps the location and asks for the area and city when the lookup fails', async () => {
+    Object.defineProperty(global.navigator, 'geolocation', {
+      configurable: true,
+      value: { getCurrentPosition: (ok) => ok({ coords: { latitude: 12.9, longitude: 77.6 } }) },
+    });
+    geoApi.reverse.mockRejectedValue({ response: { status: 503, data: { message: 'down' } } });
+    await stepToPlace();
+    fireEvent.click(screen.getByRole('button', { name: 'Use my current location' }));
+    expect(await screen.findByText(/could not look up the address/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^City/)).toHaveValue('');
+  });
+});
+
 describe('edit listing', () => {
   it('loads the listing, skips the checklist for a live one and saves changes', async () => {
-    deviceApi.get.mockResolvedValue(listing({ description: 'Works well', device: { photos: [], purchaseYear: 2019 } }));
+    deviceApi.get.mockResolvedValue(listing({ description: 'Works well, battery is fine.', model: 'Inspiron 15', addressArea: 'Kothrud', city: 'Pune', agentPhone: '9876543210', pickupPreference: 'pickup', preferredService: 'repair', device: { photos: [{ url: '/a.png', publicId: 'a' }], modelYear: 2018, purchaseYear: 2019 } }));
     deviceApi.update.mockResolvedValue(listing({ title: 'Dell Inspiron 15 (new battery)' }));
     renderApp('/dashboard/listings/l1/edit', signedIn(USER));
     const name = await screen.findByLabelText(/Device name/);

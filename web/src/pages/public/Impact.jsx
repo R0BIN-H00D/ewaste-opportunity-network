@@ -6,7 +6,6 @@ import Skeleton from '../../components/ui/Skeleton';
 import ChartCard from '../../components/charts/ChartCard';
 import { MonthlyBars } from '../../components/charts/Charts';
 import { Tile } from '../../components/impact/Tiles';
-import RulesList from '../../components/impact/RulesList';
 import { useFetch } from '../../hooks/useFetch';
 import { impactApi } from '../../services/impactApi';
 import BarList from '../../components/impact/BarList';
@@ -65,9 +64,8 @@ export default function ImpactPage() {
 
           <section aria-labelledby="people-h" className="space-y-3">
             <h2 id="people-h" className="text-xl font-bold text-ink dark:text-white">The community</h2>
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
               <Tile label="Verified technicians" value={number(d.activeTechnicians)} kind="actual" />
-              <Tile label="Verified students" value={number(d.studentParticipants)} kind="actual" />
               <Tile label="Completed donations" value={number(d.completedDonations)} kind="actual" />
             </div>
           </section>
@@ -90,7 +88,6 @@ export default function ImpactPage() {
       {yearly.data && hasValues(yearlyItems(yearly.data.years)) && <BarList title="Year by year" summary="Devices kept in use each year, from confirmed activity only." items={yearlyItems(yearly.data.years)} />}
       {categories.data && hasValues(categoryItems(categories.data.categories)) && <BarList title="By kind of device" summary="Which devices the confirmed activity was about." items={categoryItems(categories.data.categories)} />}
 
-      <RulesList />
       {d && <p className="text-xs text-ink-muted dark:text-[#9FB2A7]">{d.method}</p>}
     </PageShell>
   );

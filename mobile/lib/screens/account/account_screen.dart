@@ -101,9 +101,9 @@ class AccountScreen extends ConsumerWidget {
               type: MaterialType.transparency,
               child: Column(
                 children: [
+                  tile(Icons.person_outline_rounded, 'Profile', 'Name, phone and your area', Routes.profile),
                   tile(Icons.notifications_none_rounded, 'Notifications', 'Updates about your devices and requests', Routes.notifications, badge: unread),
                   tile(Icons.chat_bubble_outline, 'Messages', 'Conversations with the people you work with', Routes.messages, badge: unreadMessages),
-                  tile(Icons.person_outline_rounded, 'Profile', 'Name, phone and your area', Routes.profile),
                   if (user.role.isProvider) tile(Icons.verified_user_outlined, 'Verification', 'Your documents and approval', Routes.verification),
                   tile(Icons.receipt_long_outlined, 'Transaction history', 'What you paid and were paid', Routes.payments),
                   tile(Icons.tune_rounded, 'Settings', 'Theme and messages', Routes.settings),

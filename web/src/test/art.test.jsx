@@ -5,7 +5,7 @@ import EmptyState from '../components/ui/EmptyState';
 
 describe('illustrations', () => {
   it('has every drawing hidden from screen readers and coloured by the theme', () => {
-    expect(ART_NAMES.length).toBeGreaterThanOrEqual(8);
+    expect(ART_NAMES.length).toBeGreaterThanOrEqual(7);
     for (const name of ART_NAMES) {
       const { container, unmount } = render(<Art name={name} />);
       const svg = container.querySelector('svg');

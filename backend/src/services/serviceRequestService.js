@@ -486,8 +486,8 @@ async function confirmCompletion(id, user) {
       ),
       TechnicianProfile.updateOne({ user: done.technician }, { $inc: { completedJobs: 1, earningsTotal: quotation.amount } }),
       DeviceListing.updateOne({ _id: done.listing }, { $set: { status: 'completed' } }),
-      // Verified impact and Green Score points (BR-05). The technician earns points for the work too. Idempotent.
-      impact.record({ user: done.customer, provider: done.technician, type: 'repair', refType: 'ServiceRequest', refId: done._id, category: listing?.category, devices: 1, verifiedBy: user.id }),
+      // Verified impact (BR-05). Idempotent.
+      impact.record({ user: done.customer, type: 'repair', refType: 'ServiceRequest', refId: done._id, category: listing?.category, devices: 1, verifiedBy: user.id }),
     ]);
   } catch (err) {
     logger.error({ err: err.message, requestId: String(done._id) }, 'service completion side effects failed');

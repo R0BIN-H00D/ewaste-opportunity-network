@@ -18,6 +18,8 @@ import { friendlyMessage, toApiError } from '../../utils/errors';
 import { LISTING_STATUS, SERVICES, formatPrice, labelOf } from '../../lib/devices';
 
 const TABS = [['', 'All'], ['listed', 'Listed'], ['draft', 'Drafts'], ['withdrawn', 'Withdrawn'], ['in_service', 'In service']];
+const formatDateTime = (value) => new Date(value).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }).replace(/am|pm/, (m) => m.toUpperCase());
+
 const TONE = { listed: 'green', draft: 'neutral', withdrawn: 'amber', in_service: 'blue', completed: 'green', removed_by_admin: 'red' };
 const LOCKED = ['in_service', 'completed', 'removed_by_admin'];
 
@@ -145,6 +147,7 @@ export default function MyListings() {
                     <p className="mt-1 text-xs text-ink-muted dark:text-[#9FB2A7]">
                       {labelOf(SERVICES, l.preferredService)} · {formatPrice(l.expectedPrice)} · {l.viewCount ?? 0} views
                     </p>
+                    {l.createdAt && <p className="mt-1 text-xs text-ink-muted dark:text-[#9FB2A7]">Listed on <time dateTime={l.createdAt}>{formatDateTime(l.createdAt)}</time></p>}
                     {locked && <p className="mt-1 text-xs text-ink-muted dark:text-[#9FB2A7]">This listing is part of a service and cannot be changed.</p>}
                   </div>
                   <div className="flex flex-wrap gap-2">

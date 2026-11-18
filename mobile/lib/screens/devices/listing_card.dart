@@ -62,6 +62,8 @@ class ListingCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         Text(formatPrice(listing.expectedPrice), style: theme.textTheme.titleLarge?.copyWith(fontSize: 17, color: theme.colorScheme.primary)),
+                        if (listing.createdAt != null)
+                          Text('Listed on ${formatDateTime(listing.createdAt)}', style: theme.textTheme.bodyMedium?.copyWith(fontSize: 12)),
                         if (place.isNotEmpty)
                           Row(
                             children: [

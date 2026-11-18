@@ -2,13 +2,12 @@
 export const ROLE_LABEL = {
   user: 'Member',
   technician: 'Technician',
-  student: 'Student',
   refurbisher: 'Refurbisher',
   recycler: 'Recycling centre',
   admin: 'Administrator',
 };
 export const ROLES = Object.entries(ROLE_LABEL);
-export const PROVIDER_ROLES = ROLES.filter(([r]) => ['technician', 'student', 'refurbisher', 'recycler'].includes(r));
+export const PROVIDER_ROLES = ROLES.filter(([r]) => ['technician', 'refurbisher', 'recycler'].includes(r));
 
 export const ACCOUNT_STATUS = {
   active: ['Active', 'green'],
@@ -32,7 +31,6 @@ export const verificationTone = (s) => VERIFICATION[s]?.[1] || 'neutral';
 export const DOC_LABEL = {
   id_proof: 'ID proof',
   qualification: 'Qualification',
-  student_id: 'Student ID',
   business: 'Business registration',
   authorization: 'Authorisation',
   other: 'Other document',
@@ -113,7 +111,6 @@ const ACTION_LABEL = {
   'announcement.updated': 'Edited an announcement',
   'announcement.deleted': 'Deleted an announcement',
   'export.downloaded': 'Downloaded a data file',
-  'certificate.issued': 'Issued a certificate',
 };
 export const actionLabel = (a) => ACTION_LABEL[a] || String(a || '').replace(/[._]/g, ' ');
 
@@ -133,6 +130,5 @@ export const auditTargetLink = (type, id) => {
     Review: '/dashboard/admin/reviews',
     Category: '/dashboard/admin/categories',
     Announcement: '/dashboard/admin/announcements',
-    Certificate: '/dashboard/admin/certificates',
   })[type] || '';
 };

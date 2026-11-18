@@ -77,6 +77,8 @@ async function placeOrder(user, input) {
     priceAtOrder: product.price,
     paymentMethod: input.paymentMethod,
     deliveryArea: input.deliveryArea,
+    deliveryCity: input.deliveryCity,
+    deliveryPincode: input.deliveryPincode,
     notes: input.notes,
     statusHistory: [entry('placed', user.id)],
   });

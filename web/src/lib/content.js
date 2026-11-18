@@ -1,14 +1,13 @@
 // Public site copy. Education articles live here until the admin-managed API (P9) replaces them.
 export const HOW_STEPS = [
   { title: 'List your device', text: 'Add photos, the condition and what you would like to happen: repair, reuse, donation, refurbishment or recycling.' },
-  { title: 'Get matched', text: 'Verified technicians, students, refurbishers and recycling centres nearby can see your listing and respond.' },
+  { title: 'Get matched', text: 'Verified technicians, refurbishers and recycling centres nearby can see your listing and respond.' },
   { title: 'Hand it over safely', text: 'Agree a pickup or drop-off. Your exact address is shared only after you accept a request.' },
-  { title: 'See your impact', text: 'Completed, verified activities earn Green Score points and count towards the platform impact.' },
+  { title: 'See your impact', text: 'Completed, verified activities count towards your impact and the totals shown on the Impact page.' },
 ];
 
 export const AUDIENCES = [
   { id: 'repair', title: 'Repair services', text: 'Find verified technicians for repairs, with quotes you can compare.', to: '/services', cta: 'Find a technician' },
-  { id: 'students', title: 'Student opportunities', text: 'Students learn hands-on skills by assisting with repairs and earn certificates.', to: '/opportunities', cta: 'See opportunities' },
   { id: 'donate', title: 'Donation marketplace', text: 'Give working devices to schools, colleges and organisations that need them.', to: '/marketplace', cta: 'See donations' },
   { id: 'refurbished', title: 'Refurbished products', text: 'Buy devices that were repaired and tested by verified refurbishers.', to: '/marketplace', cta: 'Browse products' },
   { id: 'recycle', title: 'Recycling partners', text: 'Send what cannot be saved to authorised centres that recycle responsibly.', to: '/services', cta: 'Find a centre' },
@@ -66,7 +65,7 @@ export const EDUCATION_TOPICS = [
     summary: 'Why fixing a device often beats replacing it.',
     points: [
       'Many faults, such as a worn battery, a cracked screen or a failed charging port, are inexpensive to fix compared with a new device.',
-      'Repair keeps money in the local economy and creates skilled work for technicians and trainee students.',
+      'Repair keeps money in the local economy and creates skilled work for technicians.',
       'A repaired device can be used, resold or donated, and it avoids creating new waste.',
       'Ask for a quotation before agreeing, and prefer technicians who explain the fault and give a warranty on the work.',
     ],
@@ -127,7 +126,7 @@ export const TERMS = [
   ['Using the service', 'You must provide accurate information and keep your password private. You are responsible for activity on your account.'],
   ['Listings', 'List only devices you own or may give away. Describe the condition honestly. Do not list stolen, counterfeit or prohibited items.'],
   ['Your data on devices', 'You are responsible for backing up and erasing personal data before handing over a device.'],
-  ['Providers', 'Technicians, students, refurbishers and recycling centres must be verified by an administrator before offering services. Verification can be withdrawn if information is false.'],
+  ['Providers', 'Technicians, refurbishers and recycling centres must be verified by an administrator before offering services. Verification can be withdrawn if information is false.'],
   ['Transactions and safety', 'Agree prices and handover details directly with the other person. Meet in safe places and inspect devices before accepting them.'],
   ['Reports and removal', 'Listings and accounts that break these terms or the law can be removed. You can report content you think is unsafe, fraudulent or inappropriate.'],
   ['Liability', 'The platform connects people and does not own, repair or transport the devices. To the extent the law allows, we are not liable for the quality of services provided by others.'],

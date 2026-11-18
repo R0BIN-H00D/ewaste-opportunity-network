@@ -10,18 +10,19 @@ afterAll(db.disconnect);
 beforeEach(db.clear);
 
 const EXPECTED = [
-  'User', 'UserProfile', 'Device', 'DeviceListing', 'ServiceRequest', 'TechnicianProfile', 'StudentProfile',
+  'User', 'UserProfile', 'Device', 'DeviceListing', 'ServiceRequest', 'TechnicianProfile',
   'RefurbisherProfile', 'RecyclingCenter', 'VerificationDocument', 'Quotation', 'Donation', 'DonationRequest',
   'MarketplaceProduct', 'Order', 'Transaction', 'PickupSchedule', 'Conversation', 'Message', 'Notification',
-  'Review', 'RecyclingRecord', 'EnvironmentalImpact', 'Complaint', 'AdminLog', 'StudentApplication', 'LearningOpportunity',
+  'Review', 'RecyclingRecord', 'EnvironmentalImpact', 'Complaint', 'AdminLog',
   // added during design (requirements §8.2)
-  'Category', 'RefreshToken', 'Report', 'DeviceToken', 'GreenScoreLedger', 'Announcement', 'EducationArticle', 'Certificate', 'RefurbishmentJob', 'AiUsage',
+  'Category', 'RefreshToken', 'Report', 'DeviceToken', 'Announcement', 'EducationArticle', 'RefurbishmentJob',
+  'WantedRequest', 'WantedResponse',
 ];
 
 describe('model registry', () => {
-  it('registers all 27 SRS collections plus 10 added ones', () => {
+  it('registers every collection', () => {
     expect(Object.keys(M).sort()).toEqual([...EXPECTED].sort());
-    expect(EXPECTED).toHaveLength(37);
+    expect(EXPECTED).toHaveLength(33);
   });
 });
 
@@ -37,13 +38,6 @@ describe('model rules', () => {
   it('enforces unique email (case-insensitive via lowercase)', async () => {
     await makeUser('user', { email: 'dup@test.local' });
     await expect(makeUser('user', { email: 'DUP@test.local' })).rejects.toThrow(/duplicate|E11000/i);
-  });
-
-  it('student learning tasks must exclude hazardous handling (BR-07)', async () => {
-    const t = await makeUser('technician');
-    const base = { postedBy: t.id, title: 'Replace a laptop keyboard', deadline: new Date(Date.now() + 86400000) };
-    await expect(M.LearningOpportunity.create({ ...base, hazardousExcluded: false })).rejects.toThrow(/hazardous/i);
-    await expect(M.LearningOpportunity.create(base)).resolves.toBeTruthy();
   });
 
   it('one review per transaction and whole-number ratings (BR-04)', async () => {

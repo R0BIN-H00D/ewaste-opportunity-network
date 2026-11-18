@@ -11,7 +11,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import '../helpers.dart';
 
-Future<ProviderContainer> _pump(WidgetTester tester, Widget screen, FakeAuthRepository repo) async {
+Future<ProviderContainer> _pump(
+    WidgetTester tester, Widget screen, FakeAuthRepository repo) async {
   tester.view.physicalSize = const Size(900, 2600);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -32,7 +33,8 @@ Finder _field(String label) => find.widgetWithText(TextFormField, label);
 
 void main() {
   group('LoginScreen', () {
-    testWidgets('empty fields show messages and nothing is sent', (tester) async {
+    testWidgets('empty fields show messages and nothing is sent',
+        (tester) async {
       final repo = FakeAuthRepository();
       await _pump(tester, const LoginScreen(), repo);
 
@@ -45,7 +47,9 @@ void main() {
     });
 
     testWidgets('a server error is shown as a message', (tester) async {
-      final repo = FakeAuthRepository(loginError: const ApiException('Incorrect email or password', failure: ApiFailure.unauthorized));
+      final repo = FakeAuthRepository(
+          loginError: const ApiException('Incorrect email or password',
+              failure: ApiFailure.unauthorized));
       await _pump(tester, const LoginScreen(), repo);
 
       await tester.enterText(_field('Email'), 'asha@example.com');
@@ -59,7 +63,9 @@ void main() {
     });
 
     testWidgets('editing a field clears the message', (tester) async {
-      final repo = FakeAuthRepository(loginError: const ApiException('Incorrect email or password', failure: ApiFailure.unauthorized));
+      final repo = FakeAuthRepository(
+          loginError: const ApiException('Incorrect email or password',
+              failure: ApiFailure.unauthorized));
       await _pump(tester, const LoginScreen(), repo);
       await tester.enterText(_field('Email'), 'asha@example.com');
       await tester.enterText(_field('Password'), 'wrong-pass1');
@@ -75,7 +81,8 @@ void main() {
     });
 
     testWidgets('a good sign-in signs the person in', (tester) async {
-      final repo = FakeAuthRepository(loginResult: sampleMe(role: UserRole.student));
+      final repo =
+          FakeAuthRepository(loginResult: sampleMe(role: UserRole.refurbisher));
       final container = await _pump(tester, const LoginScreen(), repo);
 
       await tester.enterText(_field('Email'), '  asha@example.com ');
@@ -84,8 +91,10 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(container.read(authControllerProvider).status, AuthStatus.authenticated);
-      expect(container.read(authControllerProvider).user?.role, UserRole.student);
+      expect(container.read(authControllerProvider).status,
+          AuthStatus.authenticated);
+      expect(container.read(authControllerProvider).user?.role,
+          UserRole.refurbisher);
     });
 
     testWidgets('the password can be shown and hidden', (tester) async {
@@ -109,7 +118,9 @@ void main() {
       expect(find.text('Administrator'), findsNothing);
     });
 
-    testWidgets('the organisation name appears only for refurbishers and recyclers', (tester) async {
+    testWidgets(
+        'the organisation name appears only for refurbishers and recyclers',
+        (tester) async {
       await _pump(tester, const RegisterScreen(), FakeAuthRepository());
       expect(_field('Organisation name'), findsNothing);
 
@@ -129,10 +140,12 @@ void main() {
       await tester.tap(find.text('Technician'));
       await tester.pump();
 
-      expect(find.textContaining('checked by an administrator'), findsOneWidget);
+      expect(
+          find.textContaining('checked by an administrator'), findsOneWidget);
     });
 
-    testWidgets('mismatched passwords are caught before sending', (tester) async {
+    testWidgets('mismatched passwords are caught before sending',
+        (tester) async {
       final repo = FakeAuthRepository();
       await _pump(tester, const RegisterScreen(), repo);
 
@@ -147,7 +160,8 @@ void main() {
       expect(repo.lastRegistration, isNull);
     });
 
-    testWidgets('a complete form registers with the chosen role', (tester) async {
+    testWidgets('a complete form registers with the chosen role',
+        (tester) async {
       final repo = FakeAuthRepository();
       final container = await _pump(tester, const RegisterScreen(), repo);
 
@@ -164,7 +178,8 @@ void main() {
 
       expect(repo.lastRegistration?['role'], UserRole.recycler);
       expect(repo.lastRegistration?['organizationName'], 'GreenCycle');
-      expect(container.read(authControllerProvider).status, AuthStatus.authenticated);
+      expect(container.read(authControllerProvider).status,
+          AuthStatus.authenticated);
     });
   });
 }

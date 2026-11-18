@@ -7,6 +7,7 @@ export const CONTEXT_LABELS = {
   donation: 'Donation',
   offer: 'Refurbishment offer',
   enquiry: 'Question about a device',
+  wanted: 'Wanted device request',
 };
 
 export const contextLabel = (type) => CONTEXT_LABELS[type] || 'Conversation';

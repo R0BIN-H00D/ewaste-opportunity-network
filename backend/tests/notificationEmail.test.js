@@ -41,7 +41,7 @@ describe('email for key notifications', () => {
   });
 
   it('leaves the chatty ones in the app only', async () => {
-    for (const type of ['request.progress', 'request.status', 'refurbishment.progress', 'marketplace.enquiry', 'learning.applied', 'message.new', 'something.new']) {
+    for (const type of ['request.progress', 'request.status', 'refurbishment.progress', 'marketplace.enquiry', 'message.new', 'something.new']) {
       expect(isEmailed(type)).toBe(false);
       expect(await sendForNotification([asha.id], { type, title: 'x', body: 'y' })).toBe(0);
     }

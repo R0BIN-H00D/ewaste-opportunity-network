@@ -29,7 +29,8 @@ const makeProduct = (extra = {}) => MarketplaceProduct.create({
   seller: seller.id, title: 'Refurbished ThinkPad T450', category: cats.laptop._id, condition: 'good',
   refurbishmentInfo: 'New battery and SSD, fully tested.', price: 15000, stock: 1, photos: [{ url: '/uploads/p.png', publicId: 'p' }], ...extra,
 });
-const place = (product, user = buyer, body = {}) => api('post', '', user, { productId: String(product._id), ...body });
+const DELIVERY = { deliveryArea: 'Indiranagar', deliveryCity: 'Bengaluru', deliveryPincode: '560038' };
+const place = (product, user = buyer, body = {}) => api('post', '', user, { productId: String(product._id), ...DELIVERY, ...body });
 const status = (id, to, user = seller) => api('put', `/${id}/status`, user, { status: to });
 /** Walks an order to the wanted status through the API. */
 async function orderAt(target, product, user = buyer) {
@@ -85,16 +86,37 @@ describe('workflow rules', () => {
 describe('POST /api/orders', () => {
   it('places an order for cash on delivery and tells the seller', async () => {
     const p = await makeProduct();
-    const res = await place(p, buyer, { deliveryArea: 'Indiranagar, Bengaluru', notes: 'Evening please' });
+    const res = await place(p, buyer, { deliveryArea: 'Indiranagar', notes: 'Evening please' });
     expect(res.status).toBe(201);
     expect(res.body.data).toMatchObject({
       status: 'placed', quantity: 1, priceAtOrder: 15000, total: 15000, paymentMethod: 'cod', paymentStatus: 'unpaid',
-      deliveryArea: 'Indiranagar, Bengaluru', viewerRole: 'buyer', actions: ['cancel'],
+      deliveryArea: 'Indiranagar', deliveryCity: 'Bengaluru', deliveryPincode: '560038', viewerRole: 'buyer', actions: ['cancel'],
       product: { title: 'Refurbished ThinkPad T450', condition: 'good', label: 'Refurbished' },
       seller: { businessName: 'Ravi Kumar Works' },
     });
     expect((await Order.findById(res.body.data._id)).statusHistory.map((h) => h.status)).toEqual(['placed']);
     expect(await Notification.countDocuments({ user: seller.id, type: 'order.placed' })).toBe(1);
+  });
+
+  it('needs a proper delivery area, city and pincode before it places the order', async () => {
+    const p = await makeProduct();
+    const none = await api('post', '', buyer, { productId: String(p._id) });
+    expect(none.status).toBe(422);
+    const bad = [
+      [{ deliveryArea: '' }, 'deliveryArea'],
+      [{ deliveryArea: '12' }, 'deliveryArea'],
+      [{ deliveryCity: '' }, 'deliveryCity'],
+      [{ deliveryCity: '560038' }, 'deliveryCity'],
+      [{ deliveryPincode: '56003' }, 'deliveryPincode'],
+      [{ deliveryPincode: '056038' }, 'deliveryPincode'],
+      [{ deliveryPincode: 'ABCDEF' }, 'deliveryPincode'],
+    ];
+    for (const [override, field] of bad) {
+      const res = await place(p, buyer, override);
+      expect(res.status).toBe(422);
+      expect(JSON.stringify(res.body)).toContain(field);
+    }
+    expect(await Order.countDocuments()).toBe(0);
   });
 
   it('does not take stock yet: that happens when the seller confirms', async () => {
@@ -110,7 +132,7 @@ describe('POST /api/orders', () => {
     expect((await place(p, buyer, { paymentMethod: 'card' })).status).toBe(422);
     expect((await place(p, buyer, { cardNumber: '4111111111111111' })).status).toBe(422);
     expect((await api('post', '', buyer, { productId: 'nope' })).status).toBe(422);
-    expect((await api('post', '', buyer, { productId: '64b000000000000000000000' })).status).toBe(404);
+    expect((await api('post', '', buyer, { productId: '64b000000000000000000000', ...DELIVERY })).status).toBe(404);
     expect(await Order.countDocuments()).toBe(0);
   });
 
@@ -258,9 +280,6 @@ describe('completing an order (BR-05, BR-10)', () => {
     expect(impact).toMatchObject({ type: 'refurbishment', devices: 1 });
     expect(String(impact.user)).toBe(seller.id);
     expect(String(impact.verifiedBy)).toBe(buyer.id);
-    // The seller earns 40 points once the buyer confirms receipt; the buyer earns none for buying.
-    const ledger = await require('../src/models/GreenScoreLedger').find().lean();
-    expect(ledger.map((l) => [String(l.user), l.points, l.rule])).toEqual([[seller.id, 40, 'refurbishment_sold']]);
     expect(res.body.data.history.map((h) => h.status)).toEqual(['placed', 'confirmed', 'ready', 'delivered', 'completed']);
   });
 

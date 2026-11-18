@@ -26,8 +26,6 @@ function providerFacts(role, p = {}) {
   switch (role) {
     case 'technician':
       return { headline: p.headline || '', city: p.city || '', experienceYears: p.experienceYears || 0, specializations: p.specializations || [], qualifications: (p.qualifications || []).map((q) => ({ title: q.title, institution: q.institution, year: q.year })) };
-    case 'student':
-      return { college: p.college || '', course: p.course || '', yearOfStudy: p.yearOfStudy || null };
     case 'refurbisher':
       return { businessName: p.businessName || '', registrationNo: p.registrationNo || '', city: p.city || '', description: p.description || '' };
     case 'recycler':

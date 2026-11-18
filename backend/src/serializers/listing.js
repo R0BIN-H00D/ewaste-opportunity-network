@@ -12,6 +12,7 @@ function serializeListing(listing, viewer) {
   }
   if (!isOwner && !isAdmin) {
     delete out.location;
+    delete out.agentPhone;
     delete out.lockedBy;
     delete out.reportCount;
   }

@@ -96,9 +96,15 @@ exports.verifyEmail = asyncHandler(async (req, res) => {
   ok(res, null, 'Email verified');
 });
 
+exports.verifyEmailCode = asyncHandler(async (req, res) => {
+  await auth.verifyEmailCode(req.user.id, req.body.code);
+  ok(res, null, 'Email verified');
+});
+
 exports.resendVerification = asyncHandler(async (req, res) => {
-  await auth.resendVerification(req.user.id);
-  ok(res, null, 'Verification email sent');
+  const delivery = await auth.resendVerification(req.user.id);
+  // 'console' means no email service is set up (development): the code is in the server log instead of an inbox.
+  ok(res, { delivery }, delivery === 'console' ? 'No email service is set up, so the code was printed in the server log' : 'Verification email sent');
 });
 
 exports.sessions = asyncHandler(async (req, res) => {

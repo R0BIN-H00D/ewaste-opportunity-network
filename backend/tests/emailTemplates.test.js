@@ -51,12 +51,15 @@ describe('the emails the platform sends', () => {
   it('verification mail has both versions, the person\'s name escaped, and the link in both', async () => {
     await request(app).post('/api/auth/register').send({ name: 'Asha <b>Rao</b>', email: 'asha@test.local', password: 'Str0ng!Passw0rd', role: 'user' });
     const mail = mailer.outbox.find((m) => m.to === 'asha@test.local');
-    expect(mail.subject).toBe('Verify your email - E-Waste Network');
-    expect(mail.html).toContain('Confirm my email');
+    expect(mail.subject).toMatch(/^\d{6} is your E-Waste Network verification code$/);
+    const code = /^(\d{6})/.exec(mail.subject)[1];
+    expect(mail.html).toContain(code);
+    expect(mail.text).toContain(`Your code: ${code}`);
+    expect(mail.html).toContain('Or confirm with one click');
     expect(mail.html).not.toContain('<b>Rao</b>');
     const link = /https?:\/\/[^\s"<]+verify-email\?token=[\w-]+/.exec(mail.text)[0];
     expect(mail.html).toContain(link);
-    expect(mail.text).toContain('valid for 48 hours');
+    expect(mail.text).toContain('valid for 15 minutes');
   });
 
   it('reset mail has both versions and says the link is single-use', async () => {

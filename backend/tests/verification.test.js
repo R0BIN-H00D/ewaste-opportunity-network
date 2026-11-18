@@ -7,7 +7,6 @@ const { PNG } = require('./helpers/factories');
 const { signup, mailer } = require('./helpers/auth');
 const VerificationDocument = require('../src/models/VerificationDocument');
 const TechnicianProfile = require('../src/models/TechnicianProfile');
-const StudentProfile = require('../src/models/StudentProfile');
 
 const app = createApp();
 const PDF = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<<>>\n%%EOF');
@@ -53,11 +52,11 @@ describe('submitting documents', () => {
 
   it('only accepts document types that fit the role', async () => {
     const tech = await signup(app, { role: 'technician' });
-    expect((await submit(tech, 'student_id')).status).toBe(422);
+    expect((await submit(tech, 'business')).status).toBe(422);
     expect((await submit(tech, 'passport')).status).toBe(422);
     expect((await submit(tech, null)).status).toBe(422);
-    const student = await signup(app, { role: 'student' });
-    expect((await submit(student, 'student_id')).status).toBe(201);
+    const refurb = await signup(app, { role: 'refurbisher', organizationName: 'ReNew Electronics' });
+    expect((await submit(refurb, 'business')).status).toBe(201);
   });
 
   it('checks the real file type, not the label', async () => {
@@ -86,13 +85,6 @@ describe('submitting documents', () => {
     const after = (await status(u)).body.data;
     expect(after.status).toBe('pending');
     expect(after.reason).toBeUndefined();
-  });
-
-  it('links a student ID document to the student profile', async () => {
-    const u = await signup(app, { role: 'student' });
-    const res = await submit(u, 'student_id');
-    const stored = await StudentProfile.findOne({ user: u.id });
-    expect(String(stored.studentIdDoc)).toBe(res.body.data.documents[0]._id);
   });
 
   it('does not serve private files over HTTP', async () => {

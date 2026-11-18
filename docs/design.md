@@ -40,7 +40,7 @@ Where this document makes a choice the SRS left open, it is marked **Decision** 
 
 **Principles**
 1. The backend is the single source of truth; both clients are thin and stateless apart from caches.
-2. Business rules (status transitions, ownership, verification gating, Green Score) live **only** in backend services so web and mobile cannot diverge.
+2. Business rules (status transitions, ownership, verification gating) live **only** in backend services so web and mobile cannot diverge.
 3. Every external dependency sits behind an adapter with a fallback (`services/integrations/*`), so a missing key degrades gracefully (CON-12).
 4. API and DB are versioned by convention (`/api`, additive changes; breaking changes need `/api/v2`).
 
@@ -82,13 +82,12 @@ Location format (GeoJSON): `{ type: "Point", coordinates: [lng, lat] }` with `2d
 
 | Collection | Key fields | Indexes / notes |
 |---|---|---|
-| **Users** | `name, email(unique,lowercase), phone, passwordHash, role(user|technician|student|refurbisher|recycler|admin), status(active|pending_verification|suspended|deleted), emailVerified, avatar{url,publicId}, lastLoginAt, failedLogins, lockUntil` | `email` unique; `role+status`; never return `passwordHash` (`select:false`) |
-| **UserProfiles** | `user(ref,unique), bio, addressArea, city, state, pincode, location(Point,private), publicLocation, orgProfile{ isOrg, orgType, orgName, registrationNo, recipientVerified }, preferences{notifications,theme}, greenScore, badges[]` | `location` 2dsphere; orgProfile powers donation recipients (A-02) |
+| **Users** | `name, email(unique,lowercase), phone, passwordHash, role(user|technician|refurbisher|recycler|admin), status(active|pending_verification|suspended|deleted), emailVerified, avatar{url,publicId}, lastLoginAt, failedLogins, lockUntil` | `email` unique; `role+status`; never return `passwordHash` (`select:false`) |
+| **UserProfiles** | `user(ref,unique), bio, addressArea, city, state, pincode, location(Point,private), publicLocation, orgProfile{ isOrg, orgType, orgName, registrationNo, recipientVerified }, preferences{notifications,theme}[]` | `location` 2dsphere; orgProfile powers donation recipients (A-02) |
 | **TechnicianProfiles** | `user, headline, experienceYears, qualifications[], specializations[], deviceCategories[ref Categories], serviceLocation(Point), serviceRadiusKm, baseRate, availability{status, weekly[]}, verification{status, reviewedBy, reviewedAt, reason}, ratingAvg, ratingCount, completedJobs, earningsTotal` | 2dsphere; `verification.status+deviceCategories`; `ratingAvg` |
-| **StudentProfiles** | `user, college, course, yearOfStudy, studentIdDoc(ref VerificationDocuments), verification{...}, skills[], portfolio[], hoursCompleted` | `verification.status` |
 | **RefurbisherProfiles** | `user, businessName, gstOrRegNo, categories[], address, location, verification{...}, ratingAvg, ratingCount` | 2dsphere |
 | **RecyclingCenters** | `user, name, authorizationNo, authorizingBody, validUntil, facilityDetails, acceptedCategories[], collectionLocations[Point+label], operatingHours, verification{...}, ratingAvg, totals{actualKg, estimatedKg}` | 2dsphere; shown as "Authorized" only if `verification.status=approved` and not expired |
-| **VerificationDocuments** | `owner, ownerRole, docType(id_proof|qualification|student_id|business|authorization|other), file{publicId, resourceType, deliveryType:"authenticated", bytes, mime}, status(pending|approved|rejected), reviewedBy, reason, submittedAt` | Private storage; admin access via signed URL (A.8) |
+| **VerificationDocuments** | `owner, ownerRole, docType(id_proof|qualification|business|authorization|other), file{publicId, resourceType, deliveryType:"authenticated", bytes, mime}, status(pending|approved|rejected), reviewedBy, reason, submittedAt` | Private storage; admin access via signed URL (A.8) |
 | **RefreshTokens** *(added)* | `user, tokenHash, family, device, ip, expiresAt, revokedAt, replacedBy` | TTL index on `expiresAt`; rotation + reuse detection |
 | **DeviceTokens** *(added)* | `user, fcmToken(unique), platform, lastSeenAt` | prune on FCM `UNREGISTERED` |
 
@@ -105,7 +104,7 @@ Location format (GeoJSON): `{ type: "Point", coordinates: [lng, lat] }` with `2d
 
 | Collection | Key fields | Notes |
 |---|---|---|
-| **ServiceRequests** | `listing, customer, technician(nullable), mode(targeted|open), invitedTechnicians[], status, statusHistory[{status,by,at,note,photos[]}], diagnosisNotes, repairNotes[], progressPhotos[], completionPhotos[], activeQuotation(ref), pickup(ref PickupSchedules), customerConfirmedAt, reviewed(bool), studentAssignments[]` | Indexes: `customer+status`, `technician+status`, `status+createdAt`; state machine A.4.1 |
+| **ServiceRequests** | `listing, customer, technician(nullable), mode(targeted|open), invitedTechnicians[], status, statusHistory[{status,by,at,note,photos[]}], diagnosisNotes, repairNotes[], progressPhotos[], completionPhotos[], activeQuotation(ref), pickup(ref PickupSchedules), customerConfirmedAt, reviewed(bool)` | Indexes: `customer+status`, `technician+status`, `status+createdAt`; state machine A.4.1 |
 | **Quotations** | `serviceRequest, technician, version, amount, breakdown[{label,amount}], parts[], etaDays, validUntil, notes, status(submitted|accepted|rejected|expired|superseded), decidedAt` | Only one `accepted`; revised quote supersedes |
 | **PickupSchedules** | `context{type,id}, requester, provider, date, timeSlot, addressArea, exactAddressShared(bool), status(requested|confirmed|rescheduled|collected|cancelled), rescheduleCount, handoverConfirmed{byOwner,byProvider}, checklistAcknowledgedAt` | See A.13 |
 
@@ -120,14 +119,6 @@ Location format (GeoJSON): `{ type: "Point", coordinates: [lng, lat] }` with `2d
 | **Orders** | `product, buyer, seller, quantity, priceAtOrder, status(placed|confirmed|ready|delivered|completed|cancelled), paymentMethod(cod|offline), paymentStatus(unpaid|paid_offline|confirmed), deliveryArea, notes, statusHistory[]` | |
 | **Transactions** | `type(repair|order|refurb_purchase|donation|recycling), refType, refId, payer, payee, amount, method(cod|offline), reference, status(recorded|confirmed|disputed), confirmedBy` | Records only; platform handles no money (BR-10) |
 | **RecyclingRecords** | `request{...}, listing, requester, center, categories[], status, pickup, handover{byUser,byCenter,at}, receivedAt, materials[{type, actualKg, estimatedKg, measuredBy, measuredAt}], reportNotes` | `actual*` and `estimated*` always separate fields (BR-06) |
-
-### A.3.5 Student learning
-
-| Collection | Key fields |
-|---|---|
-| **LearningOpportunities** | `postedBy(technician), title, description, deviceType, requiredSkills[], difficulty(beginner|intermediate|advanced), location, deadline, seats, status(open|closed|filled), linkedServiceRequest?, hazardousExcluded:true` |
-| **StudentApplications** | `opportunity, student, message, status(applied|accepted|rejected|in_progress|completed|withdrawn), supervisorFeedback, hours, completedAt` — unique `(opportunity, student)` |
-| **Certificates** *(added)* | `student, application, certNo(unique), issuedBy(admin), issuedAt, file` |
 
 ### A.3.6 Communication & trust
 
@@ -144,7 +135,6 @@ Location format (GeoJSON): `{ type: "Point", coordinates: [lng, lat] }` with `2d
 | Collection | Key fields |
 |---|---|
 | **EnvironmentalImpact** | Event-sourced: `user, type(repair|reuse|donation|refurbishment|recycling), refType, refId, category, devices:1, materials{actual{},estimated{}}, co2eEstimate, verifiedBy, verifiedAt, month, year` — written only on verified completion; aggregates computed from it (or cached nightly) |
-| **GreenScoreLedger** *(added)* | `user, eventRef, points, rule, createdAt` — sum equals `UserProfiles.greenScore` |
 | **AdminLogs** | `admin, action, targetType, targetId, before, after, reason, ip, createdAt` — insert-only |
 | **Announcements** *(added)* | `title, body, audience[], startsAt, endsAt, createdBy` |
 | **EducationArticles** *(added)* | `title, slug, topic, body, cover, status, author` |
@@ -217,18 +207,18 @@ Location: `services/matching/`. Pure functions + a thin DB candidate query; weig
 **Service routing:** Repair → technicians · Refurbishment/Reuse → refurbishers · Recycling → centres (accepted categories + authorised) · Donation → verified recipient orgs (need-based filter, distance).
 Extensible by registering new scorers; no ML in v1.
 
-## A.6 Environmental impact and Green Score (FR-IMP-*)
+## A.6 Environmental impact (FR-IMP-*)
 
 ### A.6.1 Events
 An `EnvironmentalImpact` event is created **only** when a workflow reaches its verified terminal state:
 
-| Activity | Verifying event | Points (default, configurable) |
-|---|---|---:|
-| Successful repair | Customer confirms *Service Completed* | 50 |
-| Donation | Recipient + donor confirm completion | 40 |
-| Reuse (device sold/handed on whole) | Both parties confirm | 30 |
-| Refurbishment | Order completed for product from the job | 40 |
-| Authorised recycling | Verified centre confirms receipt/processing | 30 |
+| Activity | Verifying event |
+|---|---|
+| Successful repair | Customer confirms *Service Completed* |
+| Donation | Recipient + donor confirm completion |
+| Reuse (device sold/handed on whole) | Both parties confirm |
+| Refurbishment | Order completed for product from the job |
+| Authorised recycling | Verified centre confirms receipt/processing |
 | Review left (verified transaction) | Review saved | 2 (max 1 per txn) |
 
 Rules: points are idempotent per `(user, eventRef)`; reversals if a complaint is upheld; no points for listing, browsing or unverified providers; optional daily caps to prevent gaming.
@@ -273,7 +263,7 @@ Threat checklist for Phase 10: IDOR on every `:id` route; mass assignment; role 
 
 - `multer` memory storage → validate (MIME **and** magic bytes with `file-type`, extension allow-list, size caps) → stream to Cloudinary.
 - Public images (device photos, product photos, avatars): standard delivery, folder `ewaste/{type}/{userId}`; transformations for thumbnails/WebP/`q_auto,f_auto`.
-- **Private documents** (verification, student IDs, authorisations): `type: "authenticated"` (or `private`) upload; the DB stores `publicId`; Admin/owner receives **short-lived signed URLs** from the API — never a permanent public URL.
+- **Private documents** (verification documents, authorisations): `type: "authenticated"` (or `private`) upload; the DB stores `publicId`; Admin/owner receives **short-lived signed URLs** from the API — never a permanent public URL.
 - Limits (defaults): images ≤ 5 MB, documents ≤ 10 MB (PDF/JPG/PNG), chat attachments ≤ 5 MB; counts per request enforced.
 - Dev fallback: `LocalDiskStorage` adapter writing to `backend/uploads/` (git-ignored), served only in `NODE_ENV=development` and logged as a warning. Private docs in dev are served through an authenticated route.
 - Orphan cleanup job: remove Cloudinary assets whose DB references were deleted.
@@ -353,14 +343,13 @@ Never send images containing personal data intentionally; store the suggestion a
 |---|---|
 | Auth extras | `POST /api/auth/refresh` · `POST /api/auth/verify-email` · `POST /api/auth/resend-verification` · `GET /api/auth/sessions` · `DELETE /api/auth/sessions/:id` |
 | Technicians | `PUT /api/technicians/profile` · `PUT /api/technicians/availability` |
-| Verification | `GET /api/verification/me` · `POST /api/verification/documents` (students, refurbishers, recyclers) |
+| Verification | `GET /api/verification/me` · `POST /api/verification/documents` (technicians, refurbishers, recyclers) |
 | Requests/quotes | `GET /api/service-requests/:id/quotations` · `PUT /api/service-requests/:id/quotation/:qid/decision` · `POST /api/service-requests/:id/progress` (notes + photos) · `POST /api/service-requests/:id/confirm-completion` · `POST /api/service-requests/:id/cancel` |
 | Matching | `GET /api/matching/recommendations?listingId=&service=` |
 | Donations | `GET /api/donations/:id` · `PUT /api/donations/:id` · `PUT /api/donation-requests/:id/decision` · `GET /api/donations/:id/confirmation` |
 | Marketplace | `PUT /api/marketplace/:id` · `DELETE /api/marketplace/:id` · `GET /api/orders` · `GET /api/orders/:id` · `PUT /api/orders/:id/status` · `POST /api/marketplace/:id/enquiry` |
 | Refurbishment | `GET /api/refurbishment/opportunities` · `POST /api/refurbishment/offers` · `PUT /api/refurbishment/offers/:id/decision` · `GET /api/refurbishment/jobs` · `PUT /api/refurbishment/jobs/:id/status` · `POST /api/refurbishment/jobs/:id/photos` |
 | Recycling | `GET /api/recycling-centers/:id` · `GET /api/recycling-requests/:id` · `POST /api/recycling-requests/:id/materials` · `GET /api/recycling-reports?from&to` |
-| Students | `POST /api/students/opportunities` (technician) · `GET /api/students/opportunities/:id` · `PUT /api/students/applications/:id/decision` · `PUT /api/students/applications/:id/complete` · `GET /api/students/certificates` |
 | Pickup | `POST /api/pickups` · `GET /api/pickups` · `PUT /api/pickups/:id/confirm` · `PUT /api/pickups/:id/reschedule` · `PUT /api/pickups/:id/handover` |
 | Chat | `GET /api/chat/conversations` · `POST /api/chat/conversations` · `GET /api/chat/conversations/:id/messages` · `POST /api/chat/conversations/:id/messages` · `PUT /api/chat/conversations/:id/read` |
 | Reviews | `POST /api/reviews` · `GET /api/reviews?target=` · `POST /api/reviews/:id/report` |
@@ -371,7 +360,7 @@ Never send images containing personal data intentionally; store the suggestion a
 | Impact | `GET /api/analytics/green-score` |
 | AI / Geo | `POST /api/ai/classify-device` · `GET /api/geo/search` · `GET /api/geo/reverse` |
 | Education | `GET /api/education` · `GET /api/education/:slug` |
-| Admin | `PUT /api/admin/users/:id/status` · `GET /api/admin/users/:id` · `GET/POST/PUT /api/admin/categories` · `GET /api/admin/listings` · `DELETE /api/admin/listings/:id` · `GET /api/admin/reports` · `PUT /api/admin/reports/:id` · `GET/PUT /api/admin/complaints/:id` · `GET /api/admin/reviews` · `PUT /api/admin/reviews/:id` · `GET/POST/PUT/DELETE /api/admin/announcements` · `GET /api/admin/audit-logs` · `GET /api/admin/reports/export` · `POST /api/admin/certificates` · `GET/POST/PUT /api/admin/education` |
+| Admin | `PUT /api/admin/users/:id/status` · `GET /api/admin/users/:id` · `GET/POST/PUT /api/admin/categories` · `GET /api/admin/listings` · `DELETE /api/admin/listings/:id` · `GET /api/admin/reports` · `PUT /api/admin/reports/:id` · `GET/PUT /api/admin/complaints/:id` · `GET /api/admin/reviews` · `PUT /api/admin/reviews/:id` · `GET/POST/PUT/DELETE /api/admin/announcements` · `GET /api/admin/audit-logs` · `GET /api/admin/reports/export` · `GET/POST/PUT /api/admin/education` |
 | Ops | `GET /api/health` |
 
 Auto-generated OpenAPI is optional; `docs/API_DOCUMENTATION.md` must list each endpoint with auth, roles, request/response, errors.
@@ -616,12 +605,11 @@ Build once, reuse everywhere (web: `components/ui`, `components/glass`; Flutter:
 | **Skeletons / EmptyState / ErrorState** | One per list/card/dashboard; error state with retry. |
 | **Chat** | Conversation list + thread; bubble styles (own = deep green tint, other = glass), timestamps, read ticks, typing indicator, attachment preview. |
 | **Checklist modal** | Data-protection checklist with required ticks before handover confirm. |
-| **Green Score ring** | Animated radial progress with level, badges grid, ledger table. |
 
 ## B.10 Page-level design (web)
 
 ### Public
-- **Landing:** full-bleed hero (`--grad-hero`) with floating glass navbar; left: eyebrow chip, display headline *"Give Your Electronics a Second Life."*, supporting text *"Transform electronic waste into opportunities through repair, reuse, donation and responsible recycling."*, CTAs **List Your E-Waste** (primary) and **Explore Opportunities** (secondary glass); right: large 3D recycling illustration with 3–4 floating glass device cards (e.g., "Laptop · Repair", "Phone · Donate") and soft lime glow. Below: trust strip (counts), How It Works (4 steps, isometric icons), Device Categories grid (15), Repair Services, Student Opportunities, Donation Marketplace preview, Refurbished Products carousel, Recycling Partners, Impact statistics (animated), Featured Technicians, Testimonials, FAQ accordion, premium footer with newsletter/contact.
+- **Landing:** full-bleed hero (`--grad-hero`) with floating glass navbar; left: eyebrow chip, display headline *"Give Your Electronics a Second Life."*, supporting text *"Transform electronic waste into opportunities through repair, reuse, donation and responsible recycling."*, CTAs **List Your E-Waste** (primary) and **Browse the marketplace** (secondary glass); right: large 3D recycling illustration with 3–4 floating glass device cards (e.g., "Laptop · Repair", "Phone · Donate") and soft lime glow. Below: trust strip (counts), How It Works (4 steps, isometric icons), Device Categories grid (15), Repair Services, Donation Marketplace preview, Refurbished Products carousel, Recycling Partners, Impact statistics (animated), Featured Technicians, Testimonials, FAQ accordion, premium footer with newsletter/contact.
 - **Browse/Find/Marketplace pages:** left glass filter panel (collapsible drawer on mobile), results grid/list toggle, map toggle, sort, pagination, skeletons.
 - **Device details:** gallery with zoom, glass spec panel, condition, preferred service, location (approximate) map, action rail (Request / Offer / Chat), report link.
 - **Auth pages:** split layout — glass form card over an abstract green background with illustration; role selection cards on registration; password strength meter; clear validation.
@@ -633,9 +621,8 @@ Glass sidebar + top bar (search, notifications, theme, avatar). Content: greetin
 
 | Role | Primary widgets |
 |---|---|
-| User | My listings, active requests with timeline, quotations awaiting decision, Green Score ring, recent notifications, recommended providers |
+| User | My listings, active requests with timeline, quotations awaiting decision, recent notifications, recommended providers |
 | Technician | Verification banner, nearby requests (map + list), quotations sent, active jobs board (Kanban by status), earnings chart, ratings |
-| Student | Verification status, opportunities feed, my applications, hours/skills portfolio, certificates |
 | Refurbisher | Reusable device feed, offers, jobs pipeline with before/after photo uploader, product listings, orders |
 | Recycling Center | Collection requests, schedule calendar, receipt confirmations, material recording form, report builder |
 | Admin | KPI tiles, verification queue (priority), reported items, complaints, growth/impact charts, audit log feed |
@@ -647,7 +634,7 @@ Dense but calm: solid-surface tables for performance, glass only for tiles and p
 
 - **Navigation:** floating, frosted glass bottom bar (pill, 16 dp margins, `BackdropFilter` blur 16), 4–5 role-aware tabs (Home · Discover · [＋ List] · Requests · Profile) with a prominent centre action; secondary items in the profile/drawer. Back gestures and shared-axis transitions.
 - **Onboarding:** 3–4 full-bleed illustrated pages with parallax and a "Get started" CTA; skip option; shown once.
-- **Home:** greeting, Green Score ring, quick-action grid (List device, Find technician, Recycle, Donate), active request carousel, nearby providers, impact snapshot.
+- **Home:** greeting, quick-action grid (List device, Find technician, Recycle, Donate), active request carousel, nearby providers, impact snapshot.
 - **List device:** camera-first flow (take/choose photos → AI suggestion (optional, editable) → details → service → location (map pin/GPS/manual) → checklist → submit).
 - **Discovery:** map + draggable bottom sheet list; chips for filters.
 - **Request tracking:** vertical timeline with status icons, photo carousel, sticky action bar (Approve quote / Confirm completion / Chat).

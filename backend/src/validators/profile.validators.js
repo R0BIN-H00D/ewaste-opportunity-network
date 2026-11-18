@@ -68,11 +68,6 @@ const technician = z
   .partial()
   .strict();
 
-const student = z
-  .object({ college: str(150), course: str(120), yearOfStudy: z.number().int().min(1).max(8), skills: z.array(str(60)).max(30) })
-  .partial()
-  .strict();
-
 const refurbisher = z
   .object({
     businessName: z.string().trim().min(2).max(150),
@@ -103,7 +98,6 @@ const recycler = z
 
 const ROLE_PROFILE_BODY = {
   [ROLES.TECHNICIAN]: technician,
-  [ROLES.STUDENT]: student,
   [ROLES.REFURBISHER]: refurbisher,
   [ROLES.RECYCLER]: recycler,
 };

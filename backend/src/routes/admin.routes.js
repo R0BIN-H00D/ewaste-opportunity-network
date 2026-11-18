@@ -64,10 +64,8 @@ router.delete('/announcements/:id', validObjectIdParam('id'), ctrl.deleteAnnounc
 // Audit log (read-only)
 router.get('/audit', validate({ query: v.auditListQuery }), ctrl.listAudit);
 
-// Analytics, CSV exports and student certificates
+// Analytics and CSV exports
 router.get('/analytics', validate({ query: v.analyticsQuery }), ctrl.analytics);
 router.get('/exports/:kind', validate({ query: v.exportQuery }), ctrl.exportCsv);
-router.get('/certificates', validate({ query: v.certificateListQuery }), ctrl.listCertificates);
-router.post('/certificates', validate({ body: v.certificateIssueBody }), ctrl.issueCertificate);
 
 module.exports = router;

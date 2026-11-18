@@ -18,7 +18,6 @@ export function HowItWorksPage() {
           <ul className="list-disc space-y-1 pl-5">
             <li><strong>Individuals</strong> list devices and choose a service.</li>
             <li><strong>Technicians</strong> offer repairs and send quotations.</li>
-            <li><strong>Students</strong> learn by assisting technicians and earn certificates.</li>
             <li><strong>Refurbishers</strong> restore devices and sell them.</li>
             <li><strong>Recycling centres</strong> process what cannot be saved, with records.</li>
           </ul>

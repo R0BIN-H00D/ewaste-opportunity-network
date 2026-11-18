@@ -33,6 +33,14 @@ Map<String, dynamic> listingJson({String id = 'l1', String status = 'listed', bo
     };
 
 void main() {
+  group('Listing.createdAt', () {
+    test('is read from the server so lists can say when it was listed', () {
+      final l = Listing.fromJson({...listingJson(), 'createdAt': '2026-11-18T14:31:00.000Z'});
+      expect(l.createdAt, DateTime.utc(2026, 11, 18, 14, 31));
+      expect(Listing.fromJson(listingJson()).createdAt, isNull);
+    });
+  });
+
   group('Listing.fromJson', () {
     test('reads the listing, its device, category and owner', () {
       final l = Listing.fromJson(listingJson(isOwner: true));

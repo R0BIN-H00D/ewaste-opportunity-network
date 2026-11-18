@@ -4,7 +4,7 @@ import { refreshSession, setAccessToken } from '../services/api';
 import { toApiError } from '../utils/errors';
 
 // status: idle (not checked yet) -> loading -> authenticated | anonymous
-const initialState = { status: 'idle', user: null, profile: null, roleProfile: null, verification: null };
+const initialState = { status: 'idle', user: null, profile: null, roleProfile: null, verification: null, justRegistered: false };
 
 const reject = (err, { rejectWithValue }) => rejectWithValue(toApiError(err));
 
@@ -77,6 +77,9 @@ const authSlice = createSlice({
   reducers: {
     sessionExpired: clear,
     signedOut: clear,
+    welcomed: (s) => {
+      s.justRegistered = false;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -86,16 +89,19 @@ const authSlice = createSlice({
       .addCase(bootstrapAuth.fulfilled, (s, a) => apply(s, a.payload))
       .addCase(bootstrapAuth.rejected, (s, a) => (a.meta.condition ? s : clear()))
       .addCase(loginUser.fulfilled, (s, a) => apply(s, a.payload))
-      .addCase(registerUser.fulfilled, (s, a) => apply(s, a.payload))
+      .addCase(registerUser.fulfilled, (s, a) => {
+        apply(s, a.payload);
+        s.justRegistered = true; // the next page is their profile, so they can fill in their details first
+      })
       .addCase(loadMe.fulfilled, (s, a) => apply(s, a.payload))
       .addCase(logoutUser.fulfilled, clear)
       .addCase(logoutUser.rejected, clear);
   },
 });
 
-export const { sessionExpired, signedOut } = authSlice.actions;
+export const { sessionExpired, signedOut, welcomed } = authSlice.actions;
 export default authSlice.reducer;
 
-export const PROVIDER_ROLES = ['technician', 'student', 'refurbisher', 'recycler'];
+export const PROVIDER_ROLES = ['technician', 'refurbisher', 'recycler'];
 /** Where each role lands after login. Role dashboards are built in later phases. */
-export const homePathFor = () => '/dashboard';
+export const homePathFor = (_role, justRegistered = false) => (justRegistered ? '/dashboard/settings#profile' : '/dashboard');

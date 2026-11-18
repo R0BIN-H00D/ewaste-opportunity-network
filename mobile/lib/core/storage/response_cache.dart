@@ -17,7 +17,11 @@ class CachedResponse {
 /// - The number of entries and the size of one entry are capped; the least recently saved entries go first.
 /// - It sits on the same secure storage as the refresh token, so it is encrypted on the phone.
 class ResponseCache {
-  ResponseCache(this._store, {this.maxEntries = 40, this.maxEntryChars = 200000, DateTime Function()? clock}) : _clock = clock ?? DateTime.now;
+  ResponseCache(this._store,
+      {this.maxEntries = 40,
+      this.maxEntryChars = 200000,
+      DateTime Function()? clock})
+      : _clock = clock ?? DateTime.now;
 
   final KeyValueStore _store;
   final int maxEntries;
@@ -39,7 +43,6 @@ class ResponseCache {
     RegExp(r'^/recycling-centers(/[^/]+)?$'),
     RegExp(r'^/refurbishment/jobs$'),
     RegExp(r'^/refurbishment/opportunities$'),
-    RegExp(r'^/students/(opportunities(/[^/]+)?|applications|certificates|experience)$'),
     RegExp(r'^/technicians(/[^/]+)?$'),
     RegExp(r'^/transactions(/summary)?$'),
     RegExp(r'^/users/me/profile$'),
@@ -53,7 +56,10 @@ class ResponseCache {
   }
 
   /// The key for one request by one person: the same path with the same filters.
-  static String keyFor({required String owner, required String path, Map<String, dynamic>? query}) {
+  static String keyFor(
+      {required String owner,
+      required String path,
+      Map<String, dynamic>? query}) {
     final p = path.startsWith('/') ? path : '/$path';
     final pairs = <String>[];
     (query ?? const {}).forEach((k, v) {
@@ -69,13 +75,16 @@ class ResponseCache {
     final raw = await _store.read(_indexKey);
     if (raw == null) return [];
     try {
-      return (jsonDecode(raw) as List).map((e) => (e as Map).cast<String, dynamic>()).toList();
+      return (jsonDecode(raw) as List)
+          .map((e) => (e as Map).cast<String, dynamic>())
+          .toList();
     } catch (_) {
       return [];
     }
   }
 
-  Future<void> _writeIndex(List<Map<String, dynamic>> index) => _store.write(_indexKey, jsonEncode(index));
+  Future<void> _writeIndex(List<Map<String, dynamic>> index) =>
+      _store.write(_indexKey, jsonEncode(index));
 
   Future<T> _locked<T>(Future<T> Function() action) {
     final run = _queue.then((_) => action());
@@ -86,7 +95,8 @@ class ResponseCache {
   /// Saves [body] (the decoded JSON). Silently does nothing if it cannot be written or is too big.
   Future<void> write(String key, Object? body) => _locked(() async {
         try {
-          final text = jsonEncode({'at': _clock().toUtc().toIso8601String(), 'body': body});
+          final text = jsonEncode(
+              {'at': _clock().toUtc().toIso8601String(), 'body': body});
           if (text.length > maxEntryChars) return;
           final index = await _readIndex();
           index.removeWhere((e) => e['k'] == key);
@@ -107,7 +117,8 @@ class ResponseCache {
       final raw = await _store.read(_entryKey(key));
       if (raw == null) return null;
       final map = (jsonDecode(raw) as Map).cast<String, dynamic>();
-      return CachedResponse(at: DateTime.parse(map['at'] as String), body: map['body']);
+      return CachedResponse(
+          at: DateTime.parse(map['at'] as String), body: map['body']);
     } catch (_) {
       return null;
     }

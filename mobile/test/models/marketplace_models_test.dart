@@ -4,7 +4,15 @@ import 'package:ewaste_opportunity/models/marketplace.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// A product as `GET /api/marketplace` (and, with [detail], `/:id`) sends it.
-Map<String, dynamic> productJson({String id = 'p1', String title = 'Refurbished ThinkPad', bool detail = false, int stock = 3, String status = 'active', bool isMine = false, String condition = 'good'}) => {
+Map<String, dynamic> productJson(
+        {String id = 'p1',
+        String title = 'Refurbished ThinkPad',
+        bool detail = false,
+        int stock = 3,
+        String status = 'active',
+        bool isMine = false,
+        String condition = 'good'}) =>
+    {
       '_id': id,
       'title': title,
       'brand': 'Lenovo',
@@ -19,7 +27,14 @@ Map<String, dynamic> productJson({String id = 'p1', String title = 'Refurbished 
       'status': status,
       'isRefurbished': true,
       'label': 'Refurbished',
-      'seller': {'_id': 's1', 'name': 'Meera', 'businessName': 'ReNew Devices', 'city': 'Pune', 'ratingAvg': 4.6, 'ratingCount': 8},
+      'seller': {
+        '_id': 's1',
+        'name': 'Meera',
+        'businessName': 'ReNew Devices',
+        'city': 'Pune',
+        'ratingAvg': 4.6,
+        'ratingCount': 8
+      },
       'createdAt': '2026-11-10T09:00:00.000Z',
       if (isMine) 'isMine': true,
       if (detail) ...{
@@ -58,7 +73,12 @@ Map<String, dynamic> orderJson({
       'paymentMethod': 'cod',
       'paymentStatus': paymentStatus,
       'buyer': {'_id': 'u1', 'name': 'Asha'},
-      'seller': {'_id': 's1', 'name': 'Meera', 'businessName': 'ReNew Devices', 'city': 'Pune'},
+      'seller': {
+        '_id': 's1',
+        'name': 'Meera',
+        'businessName': 'ReNew Devices',
+        'city': 'Pune'
+      },
       'viewerRole': role,
       'createdAt': '2026-11-10T09:00:00.000Z',
       'updatedAt': '2026-11-12T09:00:00.000Z',
@@ -85,7 +105,8 @@ void main() {
       expect(p.stock, 3);
       expect(p.categoryName, 'Laptops');
       expect(p.photos.single.url, '/uploads/products/p.jpg');
-      expect(p.sellerName, 'ReNew Devices'); // the business name wins over the person's name
+      expect(p.sellerName,
+          'ReNew Devices'); // the business name wins over the person's name
       expect(p.sellerCity, 'Pune');
       expect(p.hasSellerRating, isTrue);
       expect(p.canOrder, isTrue);
@@ -104,8 +125,13 @@ void main() {
       expect(Product.fromJson(productJson(isMine: true)).canOrder, isFalse);
     });
 
-    test('falls back to the seller\'s name, and to safe values for missing fields', () {
-      final p = Product.fromJson(const {'_id': 'x', 'seller': {'_id': 's', 'name': 'Meera'}});
+    test(
+        'falls back to the seller\'s name, and to safe values for missing fields',
+        () {
+      final p = Product.fromJson(const {
+        '_id': 'x',
+        'seller': {'_id': 's', 'name': 'Meera'}
+      });
       expect(p.sellerName, 'Meera');
       expect(p.title, 'Product');
       expect(p.hasSellerRating, isFalse);
@@ -127,8 +153,14 @@ void main() {
       expect(o.isSellerView, isFalse);
     });
 
-    test('the detail form reads actions, history, payment and review state', () {
-      final o = Order.fromJson(orderJson(status: 'completed', role: 'seller', actions: ['cancel'], canReview: true, paymentStatus: 'paid_offline'));
+    test('the detail form reads actions, history, payment and review state',
+        () {
+      final o = Order.fromJson(orderJson(
+          status: 'completed',
+          role: 'seller',
+          actions: ['cancel'],
+          canReview: true,
+          paymentStatus: 'paid_offline'));
       expect(o.isSellerView, isTrue);
       expect(o.can('cancel'), isTrue);
       expect(o.can('confirm'), isFalse);
@@ -140,7 +172,8 @@ void main() {
     });
 
     test('an order that is still moving is not finished', () {
-      expect(Order.fromJson(orderJson(status: 'delivered')).isFinished, isFalse);
+      expect(
+          Order.fromJson(orderJson(status: 'delivered')).isFinished, isFalse);
       expect(Order.fromJson(orderJson(status: 'cancelled')).isFinished, isTrue);
     });
   });
@@ -154,7 +187,8 @@ void main() {
     test('order statuses have buyer and seller wording', () {
       expect(orderStatusLabel('placed'), 'Waiting for the seller');
       expect(orderStatusLabel('placed', seller: true), 'New order');
-      expect(orderStatusLabel('delivered', seller: true), 'Waiting for the buyer to confirm');
+      expect(orderStatusLabel('delivered', seller: true),
+          'Waiting for the buyer to confirm');
       expect(orderStatusLabel('confirmed', seller: true), 'Confirmed');
       expect(orderStatusLabel('new_thing'), 'new_thing');
     });
@@ -171,9 +205,18 @@ void main() {
       expect(validateEnquiry('x' * 1001), isNotNull);
     });
 
-    test('delivery area and notes are optional but limited', () {
-      expect(validateDeliveryArea(null), isNull);
+    test(
+        'delivery area, city and pincode are required and checked; notes are optional but limited',
+        () {
+      expect(validateDeliveryArea(null), isNotNull);
+      expect(validateDeliveryArea('12'), isNotNull);
+      expect(validateDeliveryArea('Indiranagar'), isNull);
       expect(validateDeliveryArea('x' * 151), isNotNull);
+      expect(validateDeliveryCity('560038'), isNotNull);
+      expect(validateDeliveryCity('Bengaluru'), isNull);
+      expect(validateDeliveryPincode('56003'), isNotNull);
+      expect(validateDeliveryPincode('056038'), isNotNull);
+      expect(validateDeliveryPincode('560038'), isNull);
       expect(validateOrderNotes('x' * 501), isNotNull);
     });
   });

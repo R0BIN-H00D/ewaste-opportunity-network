@@ -99,7 +99,9 @@ describe('Register page', () => {
     fill();
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
 
-    expect(await screen.findByText(/Provider verification/)).toBeInTheDocument();
+    // A new person lands on their profile first, with the email code box and the documents section for providers.
+    expect(await screen.findByRole('heading', { name: 'Profile' })).toBeInTheDocument();
+    expect(screen.getByText(/Welcome! Start by filling in your profile/)).toBeInTheDocument();
     expect(screen.getByText('Verify your email address')).toBeInTheDocument();
     expect(authApi.register).toHaveBeenCalledWith({ role: 'technician', name: 'Asha Rao', email: 'asha@test.local', password: 'Passw0rd!x' });
   });

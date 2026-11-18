@@ -13,7 +13,7 @@ vi.mock('../services/deviceApi', () => ({
   reportApi: { create: vi.fn() },
 }));
 vi.mock('../services/refurbishmentApi', () => ({
-  refurbApi: { opportunities: vi.fn(), offer: vi.fn(), jobs: vi.fn(), job: vi.fn(), decide: vi.fn(), withdraw: vi.fn(), handover: vi.fn(), confirmHandover: vi.fn(), advance: vi.fn(), addPhotos: vi.fn(), cancel: vi.fn() },
+  refurbApi: { opportunities: vi.fn(), offer: vi.fn(), jobs: vi.fn(), job: vi.fn(), decide: vi.fn(), withdraw: vi.fn(), handover: vi.fn(), confirmHandover: vi.fn(), advance: vi.fn(), addPhotos: vi.fn(), cancel: vi.fn(), wanted: vi.fn(), addWanted: vi.fn(), setWantedStatus: vi.fn(), deleteWanted: vi.fn(), respondWanted: vi.fn(), wantedResponses: vi.fn() },
 }));
 vi.mock('../services/api', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -40,6 +40,7 @@ beforeEach(() => {
   categoryApi.list.mockResolvedValue([{ slug: 'laptops', name: 'Laptops' }]);
   deviceApi.list.mockResolvedValue(page([]));
   refurbApi.opportunities.mockResolvedValue(page([]));
+  refurbApi.wanted.mockResolvedValue(page([]));
   refurbApi.jobs.mockResolvedValue(page([]));
 });
 
@@ -82,6 +83,16 @@ describe('devices to refurbish', () => {
     renderApp('/dashboard/opportunities', signedIn(USER));
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Devices to refurbish' })).not.toBeInTheDocument());
     expect(refurbApi.opportunities).not.toHaveBeenCalled();
+  });
+
+  it('lets a refurbisher add a new wanted-device request', async () => {
+    refurbApi.addWanted.mockResolvedValue({ _id: 'w1', title: 'Used laptops', status: 'open', quantity: 3 });
+    renderApp('/dashboard/opportunities', signedIn(REFURB));
+    fireEvent.click(await screen.findByRole('button', { name: /New request/ }));
+    fireEvent.change(screen.getByLabelText('What are you looking for?'), { target: { value: 'Used laptops' } });
+    fireEvent.change(screen.getByLabelText('How many?'), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add request' }));
+    await waitFor(() => expect(refurbApi.addWanted).toHaveBeenCalledWith({ title: 'Used laptops', quantity: 3 }));
   });
 
   it('shows a friendly empty state', async () => {
@@ -288,5 +299,26 @@ describe('job page: the refurbisher', () => {
     expect(await screen.findByText('Replaced the battery')).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Photo from before the work' })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Photo from after the work' })).toBeInTheDocument();
+  });
+});
+
+describe('wanted devices board', () => {
+  const wanted = (over = {}) => ({ _id: 'w1', title: 'Used laptops', quantity: 2, status: 'open', refurbisher: { name: 'Green Tech' }, hasResponded: false, ...over });
+
+  it('lets a device owner accept a refurbisher request', async () => {
+    refurbApi.wanted.mockResolvedValue(page([wanted()]));
+    refurbApi.respondWanted.mockResolvedValue({ _id: 'r1' });
+    renderApp('/dashboard/wanted', signedIn(USER));
+    fireEvent.click(await screen.findByRole('button', { name: 'Accept request Used laptops' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
+    await waitFor(() => expect(refurbApi.respondWanted).toHaveBeenCalledWith('w1', ''));
+    expect(refurbApi.wanted).toHaveBeenCalledWith(expect.objectContaining({ as: 'board' }), expect.anything());
+  });
+
+  it('shows an already accepted request as accepted', async () => {
+    refurbApi.wanted.mockResolvedValue(page([wanted({ hasResponded: true })]));
+    renderApp('/dashboard/wanted', signedIn(USER));
+    expect(await screen.findByText('Accepted')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Accept request Used laptops' })).not.toBeInTheDocument();
   });
 });

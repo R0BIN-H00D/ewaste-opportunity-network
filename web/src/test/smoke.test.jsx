@@ -32,7 +32,7 @@ describe('app shell', () => {
     await screen.findByText(/API: online/i);
     expect(screen.getByRole('heading', { level: 1, name: /give your electronics a second life/i })).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /list your e-waste/i })[0]).toHaveAttribute('href', '/list-device');
-    expect(screen.getAllByRole('link', { name: /explore opportunities/i })[0]).toHaveAttribute('href', '/opportunities');
+    expect(screen.getAllByRole('link', { name: /browse the marketplace/i })[0]).toHaveAttribute('href', '/marketplace');
   });
 
   it('shows a 404 page for unknown routes', async () => {

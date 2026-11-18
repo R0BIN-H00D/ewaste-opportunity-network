@@ -200,7 +200,7 @@ describe('requests list', () => {
   it('shows a customer their requests and flags the ones that need action', async () => {
     requestApi.list.mockResolvedValue(page([request({ actions: ['approve_quotation'], status: 'customer_approval_pending' })]));
     renderApp('/dashboard/requests', signedIn(USER));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Repair requests' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'My repairs' })).toBeInTheDocument();
     const link = await screen.findByRole('link', { name: 'Open request for Dell Inspiron 15' });
     expect(link).toHaveAttribute('href', '/dashboard/requests/r1');
     expect(link).toHaveTextContent('Action needed');
@@ -210,10 +210,10 @@ describe('requests list', () => {
   it('shows technicians their jobs, the open board and an availability control', async () => {
     technicianApi.setAvailability.mockResolvedValue({ availability: { status: 'limited' } });
     renderApp('/dashboard/requests', signedIn(TECHNICIAN_USER));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Repair jobs' })).toBeInTheDocument();
-    expect(requestApi.list.mock.calls[0][0]).toMatchObject({ as: 'technician', active: 'true' });
-    fireEvent.click(screen.getByRole('tab', { name: 'Open requests' }));
-    await waitFor(() => expect(requestApi.list.mock.calls.at(-1)[0]).toMatchObject({ as: 'board' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Repair requests and jobs' })).toBeInTheDocument();
+    expect(requestApi.list.mock.calls[0][0]).toMatchObject({ as: 'board' }); // technicians land on the open requests
+    fireEvent.click(screen.getByRole('tab', { name: 'My jobs' }));
+    await waitFor(() => expect(requestApi.list.mock.calls.at(-1)[0]).toMatchObject({ as: 'technician', active: 'true' }));
     fireEvent.change(screen.getByLabelText('Your availability'), { target: { value: 'limited' } });
     await waitFor(() => expect(technicianApi.setAvailability).toHaveBeenCalledWith('limited'));
     expect(await screen.findByText('Availability updated')).toBeInTheDocument();

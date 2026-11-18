@@ -1,9 +1,15 @@
 import 'listing.dart' show ListingPhoto;
 
 DateTime? _date(Object? v) => v is String ? DateTime.tryParse(v) : null;
-Map<String, dynamic> _map(Object? v) => v is Map ? v.cast<String, dynamic>() : const <String, dynamic>{};
+Map<String, dynamic> _map(Object? v) =>
+    v is Map ? v.cast<String, dynamic>() : const <String, dynamic>{};
 
-List<ListingPhoto> _photos(Object? v) => v is List ? [for (final p in v) if (p is Map) ListingPhoto.fromJson(p.cast<String, dynamic>())] : const [];
+List<ListingPhoto> _photos(Object? v) => v is List
+    ? [
+        for (final p in v)
+          if (p is Map) ListingPhoto.fromJson(p.cast<String, dynamic>())
+      ]
+    : const [];
 
 /// A refurbished product on sale. Every product carries the "Refurbished" label and its disclosed condition (BR-11).
 class Product {
@@ -59,7 +65,8 @@ class Product {
   bool get hasSellerRating => sellerRatingCount > 0;
 
   /// "Brand · Model", skipping what is missing.
-  String get subtitle => [brand, model].where((p) => p != null && p.trim().isNotEmpty).join(' · ');
+  String get subtitle =>
+      [brand, model].where((p) => p != null && p.trim().isNotEmpty).join(' · ');
 
   factory Product.fromJson(Map<String, dynamic> json) {
     final seller = _map(json['seller']);
@@ -79,12 +86,17 @@ class Product {
       categorySlug: category['slug'] as String?,
       status: (json['status'] as String?) ?? 'active',
       sellerId: (seller['_id'] as String?) ?? '',
-      sellerName: business is String && business.trim().isNotEmpty ? business : seller['name'] as String?,
+      sellerName: business is String && business.trim().isNotEmpty
+          ? business
+          : seller['name'] as String?,
       sellerCity: seller['city'] as String?,
       sellerRatingAvg: (seller['ratingAvg'] as num?)?.toDouble() ?? 0,
       sellerRatingCount: (seller['ratingCount'] as num?)?.toInt() ?? 0,
       isMine: json['isMine'] == true,
-      specs: {for (final e in specs.entries) if (e.value is String) e.key: e.value as String},
+      specs: {
+        for (final e in specs.entries)
+          if (e.value is String) e.key: e.value as String
+      },
       refurbishmentInfo: json['refurbishmentInfo'] as String?,
       createdAt: _date(json['createdAt']),
     );
@@ -98,7 +110,10 @@ class OrderStep {
   final DateTime? at;
   final String? note;
 
-  factory OrderStep.fromJson(Map<String, dynamic> json) => OrderStep(status: (json['status'] as String?) ?? '', at: _date(json['at']), note: json['note'] as String?);
+  factory OrderStep.fromJson(Map<String, dynamic> json) => OrderStep(
+      status: (json['status'] as String?) ?? '',
+      at: _date(json['at']),
+      note: json['note'] as String?);
 }
 
 /// An order for a refurbished product. Lists carry the short form; one order carries everything, including the
@@ -122,6 +137,8 @@ class Order {
     this.createdAt,
     this.updatedAt,
     this.deliveryArea,
+    this.deliveryCity,
+    this.deliveryPincode,
     this.notes,
     this.cancelReason,
     this.reviewed = false,
@@ -149,6 +166,8 @@ class Order {
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final String? deliveryArea;
+  final String? deliveryCity;
+  final String? deliveryPincode;
   final String? notes;
   final String? cancelReason;
   final bool reviewed;
@@ -174,22 +193,38 @@ class Order {
       productId: (product['_id'] as String?) ?? '',
       productTitle: product['title'] as String?,
       productCondition: product['condition'] as String?,
-      photo: product['photo'] is Map ? ListingPhoto.fromJson(_map(product['photo'])) : null,
+      photo: product['photo'] is Map
+          ? ListingPhoto.fromJson(_map(product['photo']))
+          : null,
       quantity: (json['quantity'] as num?)?.toInt() ?? 1,
       priceAtOrder: (json['priceAtOrder'] as num?)?.toDouble() ?? 0,
       total: (json['total'] as num?)?.toDouble() ?? 0,
       paymentMethod: (json['paymentMethod'] as String?) ?? 'cod',
       paymentStatus: json['paymentStatus'] as String?,
       buyerName: buyer['name'] as String?,
-      sellerName: business is String && business.trim().isNotEmpty ? business : seller['name'] as String?,
+      sellerName: business is String && business.trim().isNotEmpty
+          ? business
+          : seller['name'] as String?,
       createdAt: _date(json['createdAt']),
       updatedAt: _date(json['updatedAt']),
       deliveryArea: json['deliveryArea'] as String?,
+      deliveryCity: json['deliveryCity'] as String?,
+      deliveryPincode: json['deliveryPincode'] as String?,
       notes: json['notes'] as String?,
       cancelReason: json['cancelReason'] as String?,
       reviewed: json['reviewed'] == true,
-      history: history is List ? [for (final h in history) if (h is Map) OrderStep.fromJson(h.cast<String, dynamic>())] : const [],
-      actions: actions is List ? [for (final a in actions) if (a is String) a] : const [],
+      history: history is List
+          ? [
+              for (final h in history)
+                if (h is Map) OrderStep.fromJson(h.cast<String, dynamic>())
+            ]
+          : const [],
+      actions: actions is List
+          ? [
+              for (final a in actions)
+                if (a is String) a
+            ]
+          : const [],
       canReview: json['canReview'] == true,
     );
   }

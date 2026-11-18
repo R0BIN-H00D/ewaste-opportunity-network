@@ -13,10 +13,12 @@ import 'message_banner.dart';
 /// phone will not say where it is (permission refused, location off, no signal) the screen explains why and says the
 /// city and area still work, so nobody is stuck.
 class LocationField extends ConsumerStatefulWidget {
-  const LocationField({super.key, required this.value, required this.onChanged});
+  const LocationField({super.key, required this.value, required this.onChanged, this.title = 'Where is it? (optional)', this.blurb = 'This helps people nearby find it. Others only see a blurred spot, never your exact address.'});
 
   final GeoPoint? value;
   final ValueChanged<GeoPoint?> onChanged;
+  final String title;
+  final String blurb;
 
   @override
   ConsumerState<LocationField> createState() => _LocationFieldState();
@@ -78,9 +80,9 @@ class _LocationFieldState extends ConsumerState<LocationField> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Semantics(header: true, child: Text('Where is it? (optional)', style: theme.textTheme.titleLarge?.copyWith(fontSize: 16))),
+          Semantics(header: true, child: Text(widget.title, style: theme.textTheme.titleLarge?.copyWith(fontSize: 16))),
           const SizedBox(height: 4),
-          Text('This helps people nearby find it. Others only see a blurred spot, never your exact address.', style: theme.textTheme.bodyMedium),
+          Text(widget.blurb, style: theme.textTheme.bodyMedium),
           const SizedBox(height: 12),
           if (value != null) ...[
             Row(

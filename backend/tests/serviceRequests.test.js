@@ -139,9 +139,6 @@ describe('repair workflow (happy path, FR-SVC)', () => {
     expect(txs).toHaveLength(1);
     expect(txs[0]).toMatchObject({ type: 'repair', amount: 800, method: 'offline', status: 'recorded' });
     expect(await EnvironmentalImpact.countDocuments({ refId: id, type: 'repair' })).toBe(1);
-    // Verified by the customer: the customer earns 50 Green Score points and the technician 30, once.
-    const GreenScoreLedger = require('../src/models/GreenScoreLedger');
-    expect((await GreenScoreLedger.find({ eventRef: new RegExp(`^repair:${id}`) }).lean()).map((l) => [String(l.user), l.points]).sort()).toEqual([[owner.id, 50], [tech.id, 30]].sort());
     const profile = await TechnicianProfile.findOne({ user: tech.id });
     expect(profile.completedJobs).toBe(1);
     expect(profile.earningsTotal).toBe(800);
@@ -150,7 +147,6 @@ describe('repair workflow (happy path, FR-SVC)', () => {
     // confirming twice must not double count
     expect((await api.post(owner, id, 'confirm-completion')).status).toBe(409);
     expect(await EnvironmentalImpact.countDocuments({ refId: id })).toBe(1);
-    expect(await GreenScoreLedger.countDocuments({ eventRef: new RegExp(`^repair:${id}`) })).toBe(2);
     expect((await TechnicianProfile.findOne({ user: tech.id })).completedJobs).toBe(1);
     const q = (await api.get(owner, id)).body.data;
     expect(String(q.activeQuotation._id)).toBe(qid);

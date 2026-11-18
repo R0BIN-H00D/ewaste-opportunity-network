@@ -5,16 +5,25 @@ import '../../widgets/app_chip.dart';
 
 /// What the buyer chose in the order sheet.
 class OrderChoice {
-  const OrderChoice({required this.quantity, required this.paymentMethod, this.deliveryArea = '', this.notes = ''});
+  const OrderChoice(
+      {required this.quantity,
+      required this.paymentMethod,
+      required this.deliveryArea,
+      required this.deliveryCity,
+      required this.deliveryPincode,
+      this.notes = ''});
 
   final int quantity;
   final String paymentMethod;
   final String deliveryArea;
+  final String deliveryCity;
+  final String deliveryPincode;
   final String notes;
 }
 
-/// The order form: how many, how they will pay the seller, and the delivery area (never an exact address, BR-08). `null` if the buyer backs out.
-Future<OrderChoice?> askOrder(BuildContext context, {required String title, required double price, required int stock}) {
+/// The order form: how many, how they will pay the seller, and the delivery area, city and pincode (never an exact address, BR-08). `null` if the buyer backs out.
+Future<OrderChoice?> askOrder(BuildContext context,
+    {required String title, required double price, required int stock}) {
   return showModalBottomSheet<OrderChoice>(
     context: context,
     isScrollControlled: true,
@@ -24,7 +33,8 @@ Future<OrderChoice?> askOrder(BuildContext context, {required String title, requ
 }
 
 class _OrderSheet extends StatefulWidget {
-  const _OrderSheet({required this.title, required this.price, required this.stock});
+  const _OrderSheet(
+      {required this.title, required this.price, required this.stock});
 
   final String title;
   final double price;
@@ -37,29 +47,43 @@ class _OrderSheet extends StatefulWidget {
 class _OrderSheetState extends State<_OrderSheet> {
   final _formKey = GlobalKey<FormState>();
   final _area = TextEditingController();
+  final _city = TextEditingController();
+  final _pincode = TextEditingController();
   final _notes = TextEditingController();
   int _quantity = 1;
   String _payment = 'cod';
 
-  int get _max => widget.stock < maxOrderQuantity ? widget.stock : maxOrderQuantity;
+  int get _max =>
+      widget.stock < maxOrderQuantity ? widget.stock : maxOrderQuantity;
 
   @override
   void dispose() {
     _area.dispose();
+    _city.dispose();
+    _pincode.dispose();
     _notes.dispose();
     super.dispose();
   }
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
-    Navigator.pop(context, OrderChoice(quantity: _quantity, paymentMethod: _payment, deliveryArea: _area.text.trim(), notes: _notes.text.trim()));
+    Navigator.pop(
+        context,
+        OrderChoice(
+            quantity: _quantity,
+            paymentMethod: _payment,
+            deliveryArea: _area.text.trim(),
+            deliveryCity: _city.text.trim(),
+            deliveryPincode: _pincode.text.trim(),
+            notes: _notes.text.trim()));
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.viewInsetsOf(context).bottom),
+      padding: EdgeInsets.fromLTRB(
+          20, 0, 20, 20 + MediaQuery.viewInsetsOf(context).bottom),
       child: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -71,39 +95,96 @@ class _OrderSheetState extends State<_OrderSheet> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Expanded(child: Text('How many?', style: theme.textTheme.titleSmall)),
+                  Expanded(
+                      child:
+                          Text('How many?', style: theme.textTheme.titleSmall)),
                   IconButton(
                     tooltip: 'One fewer',
-                    constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                    constraints:
+                        const BoxConstraints(minWidth: 48, minHeight: 48),
                     icon: const Icon(Icons.remove_circle_outline),
-                    onPressed: _quantity <= 1 ? null : () => setState(() => _quantity--),
+                    onPressed: _quantity <= 1
+                        ? null
+                        : () => setState(() => _quantity--),
                   ),
-                  Semantics(liveRegion: true, label: '$_quantity', child: ExcludeSemantics(child: Text('$_quantity', style: theme.textTheme.titleLarge))),
+                  Semantics(
+                      liveRegion: true,
+                      label: '$_quantity',
+                      child: ExcludeSemantics(
+                          child: Text('$_quantity',
+                              style: theme.textTheme.titleLarge))),
                   IconButton(
                     tooltip: 'One more',
-                    constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                    constraints:
+                        const BoxConstraints(minWidth: 48, minHeight: 48),
                     icon: const Icon(Icons.add_circle_outline),
-                    onPressed: _quantity >= _max ? null : () => setState(() => _quantity++),
+                    onPressed: _quantity >= _max
+                        ? null
+                        : () => setState(() => _quantity++),
                   ),
                 ],
               ),
-              Text('Total: ${formatPrice(widget.price * _quantity)}', style: theme.textTheme.titleMedium),
+              Text('Total: ${formatPrice(widget.price * _quantity)}',
+                  style: theme.textTheme.titleMedium),
               const SizedBox(height: 12),
-              Text('How will you pay the seller?', style: theme.textTheme.titleSmall),
+              Text('How will you pay the seller?',
+                  style: theme.textTheme.titleSmall),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: [for (final (value, label) in paymentMethods) AppChip(label: label, selected: _payment == value, onTap: () => setState(() => _payment = value))],
+                children: [
+                  for (final (value, label) in paymentMethods)
+                    AppChip(
+                        label: label,
+                        selected: _payment == value,
+                        onTap: () => setState(() => _payment = value))
+                ],
               ),
               const SizedBox(height: 4),
-              Text('You pay the seller directly. The app never handles money.', style: theme.textTheme.bodyMedium),
+              Text('You pay the seller directly. The app never handles money.',
+                  style: theme.textTheme.bodyMedium),
               const SizedBox(height: 12),
-              TextFormField(controller: _area, validator: validateDeliveryArea, decoration: const InputDecoration(labelText: 'Delivery area (optional)', prefixIcon: Icon(Icons.place_outlined))),
+              Text('Where should it be delivered?',
+                  style: theme.textTheme.titleSmall),
+              const SizedBox(height: 8),
+              TextFormField(
+                  controller: _area,
+                  validator: validateDeliveryArea,
+                  decoration: const InputDecoration(
+                      labelText: 'Area or locality',
+                      prefixIcon: Icon(Icons.place_outlined))),
               const SizedBox(height: 12),
-              TextFormField(controller: _notes, validator: validateOrderNotes, maxLines: 2, decoration: const InputDecoration(labelText: 'Note for the seller (optional)')),
+              TextFormField(
+                  controller: _city,
+                  validator: validateDeliveryCity,
+                  decoration: const InputDecoration(
+                      labelText: 'City',
+                      prefixIcon: Icon(Icons.location_city_outlined))),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _pincode,
+                validator: validateDeliveryPincode,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                decoration: const InputDecoration(
+                    labelText: 'Pincode',
+                    prefixIcon: Icon(Icons.pin_drop_outlined),
+                    counterText: ''),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                  controller: _notes,
+                  validator: validateOrderNotes,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                      labelText: 'Note for the seller (optional)')),
               const SizedBox(height: 16),
-              FilledButton(onPressed: _submit, style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)), child: const Text('Place order')),
+              FilledButton(
+                  onPressed: _submit,
+                  style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48)),
+                  child: const Text('Place order')),
             ],
           ),
         ),
@@ -150,7 +231,8 @@ class _EnquirySheetState extends State<_EnquirySheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.viewInsetsOf(context).bottom),
+      padding: EdgeInsets.fromLTRB(
+          20, 0, 20, 20 + MediaQuery.viewInsetsOf(context).bottom),
       child: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -169,7 +251,11 @@ class _EnquirySheetState extends State<_EnquirySheet> {
                 decoration: const InputDecoration(labelText: 'Your question'),
               ),
               const SizedBox(height: 8),
-              FilledButton(onPressed: _send, style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)), child: const Text('Send question')),
+              FilledButton(
+                  onPressed: _send,
+                  style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48)),
+                  child: const Text('Send question')),
             ],
           ),
         ),

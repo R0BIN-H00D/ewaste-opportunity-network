@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ClipboardList, Wrench } from 'lucide-react';
+import { ClipboardList } from 'lucide-react';
 import GlassCard from '../../components/glass/GlassCard';
 import Alert from '../../components/ui/Alert';
 import Badge from '../../components/ui/Badge';
@@ -17,7 +17,7 @@ import { requestApi, technicianApi } from '../../services/repairApi';
 import { AVAILABILITY, formatDate, statusLabel, statusTone } from '../../lib/requests';
 
 const CUSTOMER_TABS = [['active', 'Active'], ['all', 'All']];
-const TECH_TABS = [['jobs', 'My jobs'], ['board', 'Open requests'], ['all', 'All jobs'], ['mine', 'My own requests']];
+const TECH_TABS = [['board', 'Open requests'], ['jobs', 'My jobs'], ['all', 'All my jobs'], ['mine', 'My own requests']];
 
 function RequestRow({ request: r, technicianView }) {
   const other = technicianView ? r.customer : r.technician;
@@ -74,13 +74,11 @@ export default function Requests() {
     : { as: 'customer', ...(tab === 'active' ? { active: 'true' } : {}) };
   const { data, error, loading, reload } = useFetch((signal) => requestApi.list({ ...query, page, limit: 8 }, signal), [tab, page, user?.role]);
   const items = data?.items || [];
-  const canRequest = ['user', 'technician', 'refurbisher'].includes(user?.role);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-ink dark:text-white">{technician ? 'Repair jobs' : 'Repair requests'}</h1>
-        {canRequest && <Link to="/dashboard/requests/new" className="btn btn-primary"><Wrench size={16} aria-hidden /> Request a repair</Link>}
+        <h1 className="text-2xl font-bold text-ink dark:text-white">{technician ? 'Repair requests and jobs' : 'My repairs'}</h1>
       </div>
 
       {technician && <AvailabilityControl initial={roleProfile?.availability?.status || ''} />}

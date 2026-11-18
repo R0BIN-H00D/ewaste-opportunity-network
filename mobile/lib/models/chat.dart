@@ -1,4 +1,5 @@
-DateTime? _date(Object? v) => v is String ? DateTime.tryParse(v)?.toLocal() : null;
+DateTime? _date(Object? v) =>
+    v is String ? DateTime.tryParse(v)?.toLocal() : null;
 
 /// What a conversation is about, in words ("Repair", "Order"). The server decides who the two people are from this record.
 const Map<String, String> chatContextLabels = {
@@ -8,9 +9,11 @@ const Map<String, String> chatContextLabels = {
   'donation': 'Donation',
   'offer': 'Refurbishment offer',
   'enquiry': 'Question about a device',
+  'wanted': 'Wanted device request',
 };
 
-String chatContextLabel(String type) => chatContextLabels[type] ?? 'Conversation';
+String chatContextLabel(String type) =>
+    chatContextLabels[type] ?? 'Conversation';
 
 /// A thread between the signed-in person and one other person about something they share.
 class Conversation {
@@ -46,7 +49,13 @@ class Conversation {
 
   String get contextLabel => chatContextLabel(contextType);
 
-  Conversation copyWith({String? lastText, DateTime? lastAt, bool? lastMine, int? unread, DateTime? updatedAt}) => Conversation(
+  Conversation copyWith(
+          {String? lastText,
+          DateTime? lastAt,
+          bool? lastMine,
+          int? unread,
+          DateTime? updatedAt}) =>
+      Conversation(
         id: id,
         contextType: contextType,
         contextId: contextId,
@@ -61,14 +70,20 @@ class Conversation {
       );
 
   factory Conversation.fromJson(Map<String, dynamic> json) {
-    final other = json['other'] is Map ? (json['other'] as Map).cast<String, dynamic>() : const <String, dynamic>{};
-    final last = json['lastMessage'] is Map ? (json['lastMessage'] as Map).cast<String, dynamic>() : null;
+    final other = json['other'] is Map
+        ? (json['other'] as Map).cast<String, dynamic>()
+        : const <String, dynamic>{};
+    final last = json['lastMessage'] is Map
+        ? (json['lastMessage'] as Map).cast<String, dynamic>()
+        : null;
     return Conversation(
       id: json['_id'] as String,
       contextType: (json['contextType'] as String?) ?? '',
       contextId: (json['contextId'] as String?) ?? '',
       otherId: (other['_id'] as String?) ?? '',
-      otherName: ((other['name'] as String?) ?? '').trim().isEmpty ? 'Someone' : other['name'] as String,
+      otherName: ((other['name'] as String?) ?? '').trim().isEmpty
+          ? 'Someone'
+          : other['name'] as String,
       otherRole: (other['role'] as String?) ?? '',
       lastText: last?['text'] as String?,
       lastAt: _date(last?['at']),
@@ -103,7 +118,8 @@ class ChatMessage {
   final bool pending;
   final bool failed;
 
-  ChatMessage copyWith({bool? read, bool? pending, bool? failed}) => ChatMessage(
+  ChatMessage copyWith({bool? read, bool? pending, bool? failed}) =>
+      ChatMessage(
         id: id,
         conversationId: conversationId,
         senderId: senderId,
@@ -126,7 +142,8 @@ class ChatMessage {
 
 /// A page of messages, oldest first, and where to ask for the ones before it.
 class MessagePage {
-  const MessagePage({required this.items, required this.hasMore, this.nextBefore});
+  const MessagePage(
+      {required this.items, required this.hasMore, this.nextBefore});
 
   final List<ChatMessage> items;
   final bool hasMore;

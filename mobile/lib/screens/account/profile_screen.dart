@@ -2,9 +2,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import '../../core/network/api_exception.dart';
+import '../../providers/location_providers.dart';
+import '../../services/location_service.dart';
+import '../../widgets/location_field.dart';
 import '../../models/account.dart';
 import '../../providers/account_providers.dart';
 import '../../providers/auth_controller.dart';
+import '../../routes/route_paths.dart';
 import '../../widgets/app_background.dart';
 import '../../widgets/glass_app_bar.dart';
 import '../../widgets/glass_container.dart';
@@ -58,10 +62,16 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
   late final TextEditingController _bio;
   bool _saving = false;
   String? _error;
+  GeoPoint? _where;
+  String? _whereNote;
 
   @override
   void initState() {
     super.initState();
+    // The one-time redirect after sign-up has done its job once this page is open.
+    Future.microtask(() {
+      if (mounted) ref.read(authControllerProvider.notifier).welcomed();
+    });
     final user = ref.read(authControllerProvider).user;
     final p = widget.profile;
     _name = TextEditingController(text: user?.name ?? '');
@@ -90,16 +100,54 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
     final repo = ref.read(accountRepositoryProvider);
     try {
       final user = await repo.updateAccount(name: _name.text, phone: _phone.text);
-      await repo.updateProfile(bio: _bio.text, addressArea: _area.text, city: _city.text, state: _state.text, pincode: _pincode.text);
+      await repo.updateProfile(bio: _bio.text, addressArea: _area.text, city: _city.text, state: _state.text, pincode: _pincode.text, lat: _where?.lat, lng: _where?.lng);
       ref.read(authControllerProvider.notifier).adoptUser(user);
       ref.invalidate(ownProfileProvider);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile saved')));
-      context.pop();
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go(Routes.home);
+      }
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// Finds where the person is, then fills in the area, city, state and pincode from that spot.
+  Future<void> _onWhere(GeoPoint? point) async {
+    setState(() {
+      _where = point;
+      _whereNote = null;
+    });
+    if (point == null) return;
+    try {
+      final place = await ref.read(geoRepositoryProvider).reverse(point.lat, point.lng);
+      if (!mounted || !identical(_where, point)) return;
+      if (place == null || (place.area.isEmpty && place.city.isEmpty && place.state.isEmpty && place.postcode.isEmpty)) {
+        setState(() => _whereNote = 'Location saved, but nothing is known about this spot. Please type your address.');
+        return;
+      }
+      setState(() {
+        if (place.area.isNotEmpty) _area.text = place.area;
+        if (place.city.isNotEmpty) _city.text = place.city;
+        if (place.state.isNotEmpty) _state.text = place.state;
+        if (place.postcode.isNotEmpty) _pincode.text = place.postcode;
+        final missing = [
+          if (place.area.isEmpty) 'area',
+          if (place.city.isEmpty) 'city',
+          if (place.state.isEmpty) 'state',
+          if (place.postcode.isEmpty) 'pincode',
+        ];
+        _whereNote = missing.isEmpty
+            ? 'Location found. Area, city, state and pincode are filled in. Check them, then save.'
+            : 'Location saved and filled in what we could find. Please type the ${missing.join(' and ')}.';
+      });
+    } on ApiException {
+      if (mounted) setState(() => _whereNote = 'Location saved, but we could not look up the address just now. Please type your area, city, state and pincode.');
     }
   }
 
@@ -143,6 +191,14 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
                     return t.isEmpty || RegExp(r'^\+?[0-9\s-]{7,15}$').hasMatch(t) ? null : 'Enter a valid phone number';
                   },
                 ),
+                LocationField(
+                  value: _where,
+                  onChanged: _onWhere,
+                  title: 'Where are you?',
+                  blurb: 'Use your location to fill in your address. Others only see a blurred spot, never your exact address.',
+                ),
+                if (_whereNote != null) Padding(padding: const EdgeInsets.only(top: 8, bottom: 12), child: Text(_whereNote!, style: Theme.of(context).textTheme.bodyMedium)),
+                const SizedBox(height: 12),
                 _field(_area, 'Area or locality', helper: 'Others see only your area and city.', maxLength: 100),
                 _field(_city, 'City', maxLength: 80),
                 _field(_state, 'State', maxLength: 80),

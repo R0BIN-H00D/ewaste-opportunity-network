@@ -19,6 +19,9 @@ const LabelPairs services = [
   ('recycling', 'Recycling'),
 ];
 
+/// What a person can choose for a new listing; [services] keeps every label so older listings read correctly.
+const listableServices = ['repair', 'refurbishment', 'recycling'];
+
 const LabelPairs pickups = [
   ('pickup', 'Pickup from my place'),
   ('drop_off', 'I can drop it off'),
@@ -84,7 +87,12 @@ String assetUrl(String? path, {String? apiBaseUrl}) {
   final uri = Uri.tryParse(path);
   if (uri == null || !uri.hasScheme) return path;
   if (uri.host == 'localhost' || uri.host == '127.0.0.1') {
-    return uri.replace(scheme: base.scheme, host: base.host, port: base.hasPort ? base.port : null).toString();
+    return uri
+        .replace(
+            scheme: base.scheme,
+            host: base.host,
+            port: base.hasPort ? base.port : null)
+        .toString();
   }
   return path;
 }
@@ -130,12 +138,27 @@ const Map<String, String> technicianStatusLabels = {
 
 /// A status in words for whoever is looking: the technician's wording where it differs, otherwise the owner's.
 String requestStatusLabel(String status, {bool technician = false}) =>
-    (technician ? technicianStatusLabels[status] : null) ?? requestStatusLabels[status] ?? status;
+    (technician ? technicianStatusLabels[status] : null) ??
+    requestStatusLabels[status] ??
+    status;
 
 /// Requests that can no longer change.
 const finalRequestStatuses = {'service_completed', 'rejected', 'cancelled'};
 
-const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const _months = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec'
+];
 
 /// "16 Nov 2026, 3:05 PM" in the phone's time zone, or an empty string when there is no date.
 String formatDateTime(DateTime? value) {
@@ -198,7 +221,6 @@ String formatDate(DateTime? value) {
 const Map<String, String> docTypeLabels = {
   'id_proof': 'ID proof',
   'qualification': 'Qualification certificate',
-  'student_id': 'Student ID',
   'business': 'Business registration',
   'authorization': 'Authorisation or licence',
   'other': 'Other document',
@@ -235,7 +257,9 @@ const Map<String, String> recyclingCenterStatusLabels = {
 
 /// A recycling status in words for whoever is looking.
 String recyclingStatusLabel(String status, {bool center = false}) =>
-    (center ? recyclingCenterStatusLabels[status] : null) ?? recyclingStatusLabels[status] ?? status;
+    (center ? recyclingCenterStatusLabels[status] : null) ??
+    recyclingStatusLabels[status] ??
+    status;
 
 /// Recycling requests that can no longer change.
 const finalRecyclingStatuses = {'completed', 'rejected', 'cancelled'};
@@ -252,7 +276,9 @@ const LabelPairs materialTypes = [
 
 /// Kilograms the way people read them: "12 kg", "0.45 kg". No trailing zeros.
 String formatKg(num value) {
-  final text = value == value.roundToDouble() ? value.round().toString() : value.toStringAsFixed(3).replaceFirst(RegExp(r'0+$'), '');
+  final text = value == value.roundToDouble()
+      ? value.round().toString()
+      : value.toStringAsFixed(3).replaceFirst(RegExp(r'0+$'), '');
   return '$text kg';
 }
 
@@ -293,10 +319,14 @@ const Map<String, String> sellerOrderStatusLabels = {
   'delivered': 'Waiting for the buyer to confirm',
 };
 
-String orderStatusLabel(String status, {bool seller = false}) => (seller ? sellerOrderStatusLabels[status] : null) ?? orderStatusLabels[status] ?? status;
+String orderStatusLabel(String status, {bool seller = false}) =>
+    (seller ? sellerOrderStatusLabels[status] : null) ??
+    orderStatusLabels[status] ??
+    status;
 
 /// "Refurbished · Good": the label and the disclosed grade always travel together (BR-11).
-String refurbishedLabel(String condition) => 'Refurbished · ${labelOf(productConditions, condition)}';
+String refurbishedLabel(String condition) =>
+    'Refurbished · ${labelOf(productConditions, condition)}';
 
 /// Where a donation stands (mirrors the donation workflow in the API).
 const Map<String, String> donationStatusLabels = {
@@ -316,7 +346,10 @@ const Map<String, String> recipientDonationStatusLabels = {
   'handover_scheduled': 'Handover arranged',
 };
 
-String donationStatusLabel(String status, {bool recipient = false}) => (recipient ? recipientDonationStatusLabels[status] : null) ?? donationStatusLabels[status] ?? status;
+String donationStatusLabel(String status, {bool recipient = false}) =>
+    (recipient ? recipientDonationStatusLabels[status] : null) ??
+    donationStatusLabels[status] ??
+    status;
 
 const Map<String, String> donationRequestStatusLabels = {
   'pending': 'Waiting for a decision',
@@ -333,40 +366,6 @@ const LabelPairs orgTypes = [
   ('company', 'Company'),
   ('other', 'Other'),
 ];
-
-const LabelPairs difficulties = [
-  ('beginner', 'Beginner'),
-  ('intermediate', 'Intermediate'),
-  ('advanced', 'Advanced'),
-];
-
-/// Where a student's application stands, worded for the student.
-const Map<String, String> applicationStatusLabels = {
-  'applied': 'Waiting for review',
-  'accepted': 'Accepted',
-  'in_progress': 'In progress',
-  'completed': 'Completed',
-  'rejected': 'Not selected',
-  'withdrawn': 'Withdrawn',
-};
-
-String applicationStatusLabel(String status) => applicationStatusLabels[status] ?? status;
-
-/// Why a student cannot apply, in plain words (mirrors `BLOCK_MESSAGE` in the API).
-const Map<String, String> applyBlockMessages = {
-  'not_verified': 'Your student account must be verified by an administrator first.',
-  'already_applied': 'You have already applied to this task.',
-  'closed': 'This task is closed.',
-  'filled': 'All places on this task are taken.',
-  'deadline_passed': 'The application deadline has passed.',
-};
-
-/// "2 hours", "1.5 hours", "1 hour". Whole numbers have no decimal.
-String formatHours(num hours) {
-  final whole = hours == hours.roundToDouble();
-  final text = whole ? hours.round().toString() : hours.toStringAsFixed(1);
-  return '$text ${hours == 1 ? 'hour' : 'hours'}';
-}
 
 /// Where a refurbishment job stands, worded for the refurbisher.
 const Map<String, String> refurbStatusLabels = {
@@ -394,7 +393,10 @@ const Map<String, String> ownerRefurbStatusLabels = {
   'cancelled': 'Cancelled',
 };
 
-String refurbStatusLabel(String status, {bool owner = false}) => (owner ? ownerRefurbStatusLabels[status] : null) ?? refurbStatusLabels[status] ?? status;
+String refurbStatusLabel(String status, {bool owner = false}) =>
+    (owner ? ownerRefurbStatusLabels[status] : null) ??
+    refurbStatusLabels[status] ??
+    status;
 
 /// The label for the button that moves a job on, by the step it leads to.
 const Map<String, String> refurbAdvanceLabels = {
@@ -408,11 +410,4 @@ const LabelPairs productStatuses = [
   ('active', 'On sale'),
   ('hidden', 'Hidden'),
   ('sold', 'Sold out'),
-];
-
-/// The states of a task a supervisor posted (mirrors the opportunity status).
-const LabelPairs opportunityStatuses = [
-  ('open', 'Open'),
-  ('closed', 'Closed'),
-  ('filled', 'Full'),
 ];

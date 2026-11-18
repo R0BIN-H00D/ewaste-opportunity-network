@@ -30,8 +30,6 @@ const schema = baseSchema({
     },
     { _id: false },
   ),
-  greenScore: { type: Number, default: 0, min: 0 },
-  badges: [String],
 });
 schema.index({ location: '2dsphere' });
 schema.index({ city: 1 });

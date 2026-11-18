@@ -41,7 +41,7 @@ export default function Hero() {
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link to="/list-device" className="btn btn-primary">List Your E-Waste</Link>
-          <Link to="/opportunities" className="btn btn-glass">Explore Opportunities</Link>
+          <Link to="/marketplace" className="btn btn-glass">Browse the marketplace</Link>
         </div>
       </div>
       <HeroArt />

@@ -17,20 +17,6 @@ export const monthlyRows = (months = []) => months.map((m) => ({ month: m.month,
 export const monthlyTable = (months = []) => months.map((m) => [monthLabel(m.month, 'long'), ...TYPE_ORDER.map((t) => m.byType?.[t] || 0)]);
 export const monthlyColumns = ['Month', ...TYPE_ORDER.map((t) => TYPE_LABEL[t])];
 
-/** "8 more points to reach Sprout." or the top-level message. */
-export function nextLevelText(level, score) {
-  if (!level?.next) return 'You have reached the highest level.';
-  return `${Math.max(0, level.next.min - score)} more points to reach ${level.next.name}.`;
-}
-
-export const signedPoints = (n) => (n > 0 ? `+${n}` : String(n));
-
-/** How far through a badge's goal someone is, as "2.5 of 10". */
-export const badgeProgress = (b) => {
-  const fmt = (v) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
-  return `${fmt(b.progress.done)} of ${fmt(b.progress.needed)}`;
-};
-
 /** True when nothing has been recorded at all, so a page can say so instead of showing a wall of zeros. */
 export const isEmptyImpact = (d) => !d || ((d.devices?.diverted ?? d.devices?.total ?? 0) === 0 && (d.materials?.measuredKg ?? 0) === 0 && (d.materials?.estimatedKg ?? 0) === 0);
 

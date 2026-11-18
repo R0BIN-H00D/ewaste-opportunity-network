@@ -29,17 +29,13 @@ React Web  ─┐
 Flutter App ─┘        │
                       └─► Cloudinary · FCM · Gemini(opt) · Nominatim · SMTP (all with fallbacks)
 
-## Decision: how the Green Score and impact figures are made (2026-11-17)
-The rules live in one file, `backend/src/config/impact.js`, and are served as they run by `GET /api/analytics/rules`, so the apps show exactly what the server does (P9-03). Nothing is computed on a phone or in a browser.
+## Decision: how the impact figures are made (2026-11-17; the Green Score points were removed on 2026-11-18)
+The rules live in one file, `backend/src/config/impact.js`, so the apps show exactly what the server does (P9-03). Nothing is computed on a phone or in a browser.
 
 - **When something counts.** Only when the other side has confirmed the activity (BR-05): a repair when the customer confirms completion, a donation when the recipient confirms, a refurbished sale when the buyer confirms receipt, recycling when the centre has received it and recorded a measured weight. Each of those workflow steps calls `impactService.record()`, which writes one `EnvironmentalImpact` event and the points, once (unique indexes on the event and on the ledger line make a repeated call do nothing).
-- **Points.** Repair 50 for the customer and 30 for the technician, donation 40 (donor), refurbishment 40 (seller), recycling 30 (sender), reuse 30, a review of a completed service 2 (once per transaction). Listing, browsing and unverified activity earn nothing. At most 10 scored activities per person per UTC day: later ones are recorded at 0, so they are never scored afterwards.
-- **The ledger is the truth.** The score is the sum of `GreenScoreLedger` lines, one line per thing that earned or removed points, each with its rule name, so every point can be explained to the person who has it. Points are stored as they were when earned, so changing a number in the config never rewrites history.
 - **Reversal.** When an administrator resolves (upholds) a complaint about a repair, order, donation or recycling request, `impactService.reverse()` marks the event reversed and adds an opposite ledger line for each person who earned from it, once. The score never goes below zero and the event drops out of every total.
-- **Levels and badges** (Seed, Sprout, Sapling, Tree, Forest; seven badges) are derived from recorded events, never stored as facts, so a reversal can take a badge away.
 - **Actual and estimated stay apart (BR-06).** Device counts are actual. Kilograms weighed on a scale at a recycling centre are measured. Everything else is an estimate: unweighed material and CO2e avoided come from per-category factors. Those factors are **placeholders, not sourced values** (A-11); every response says `factorsProvisional: true` and carries a plain-words `method` note, and the apps label each figure Actual, Measured or Estimate. They must be replaced with cited values (P10-12) before any public environmental claim.
-- **Old data.** `node src/rebuildScore.js` gives events recorded before scoring existed the points they should have earned, and fills in missing CO2e estimates. It is safe to run again.
-- **Public figures** (`/api/analytics/platform-impact`, `/rules`, platform `/monthly`) are the same for everyone, cached for a minute, and reveal nothing about individuals.
+- **Public figures** (`/api/analytics/platform-impact`, platform `/monthly`) are the same for everyone, cached for a minute, and reveal nothing about individuals.
 
 ## Decision: use `material_ui` instead of `package:flutter/material.dart` (2026-11-14)
 Flutter 3.50 deprecates the in-SDK Material library. The mobile app imports `package:material_ui/material_ui.dart` (migrated with `dart fix --apply --code=migrate_design_widgets`). Third-party widget packages that still import the old library may need `MaterialUiCompatibilityBridge` in `MaterialApp.builder`; add it when the first such widget (e.g. flutter_map, fl_chart) is used.

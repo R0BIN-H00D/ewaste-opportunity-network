@@ -191,17 +191,27 @@ class _BodyState extends ConsumerState<_Body> {
         done: 'Thank you for your review');
   }
 
-  Widget _fact(ThemeData theme, String label, String value) => Padding(
-        padding: const EdgeInsets.only(top: 6),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-                width: 110,
-                child: Text(label, style: theme.textTheme.bodyMedium)),
-            Expanded(child: Text(value, style: theme.textTheme.bodyLarge)),
-          ],
-        ),
+  Widget _fact(ThemeData theme, String label, String value, {bool strong = false}) => Column(
+        children: [
+          Divider(height: 1, color: theme.colorScheme.outlineVariant),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 11),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 110, child: Text(label, style: theme.textTheme.bodyMedium)),
+                Expanded(
+                  child: Text(
+                    value,
+                    style: strong
+                        ? theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w800)
+                        : theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       );
 
   @override
@@ -284,8 +294,24 @@ class _BodyState extends ConsumerState<_Body> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Text(orderHint(o), style: theme.textTheme.bodyLarge),
+              const SizedBox(height: 16),
+              _Stepper(status: o.status, color: orderToneColor(context, orderTone(o))),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: orderToneColor(context, orderTone(o)).withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ExcludeSemantics(child: Icon(Icons.info_outline_rounded, size: 20, color: orderToneColor(context, orderTone(o)))),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(orderHint(o), style: theme.textTheme.bodyLarge?.copyWith(fontSize: 14.5))),
+                  ],
+                ),
+              ),
               if (_error != null) ...[
                 const SizedBox(height: 12),
                 MessageBanner(message: _error!, tone: BannerTone.error)
@@ -319,13 +345,20 @@ class _BodyState extends ConsumerState<_Body> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Semantics(
-                  header: true,
-                  child: Text('The order', style: theme.textTheme.titleLarge)),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Icon(Icons.receipt_long_outlined, size: 20, color: theme.colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Expanded(child: Semantics(header: true, child: Text('The order', style: theme.textTheme.titleMedium))),
+                  ],
+                ),
+              ),
               _fact(theme, o.isSellerView ? 'Buyer' : 'Seller', who),
               _fact(theme, 'Quantity', '${o.quantity}'),
               _fact(theme, 'Price each', formatPrice(o.priceAtOrder)),
-              _fact(theme, 'Total', formatPrice(o.total)),
+              _fact(theme, 'Total', formatPrice(o.total), strong: true),
               _fact(theme, 'Payment', labelOf(paymentMethods, o.paymentMethod)),
               if (o.paymentStatus == 'paid_offline')
                 _fact(theme, 'Paid', 'Paid directly to the seller'),
@@ -355,6 +388,45 @@ class _BodyState extends ConsumerState<_Body> {
   }
 }
 
+/// The five steps of an order as icons joined by a line; the steps reached are filled. The status badge and the
+/// sentence under it say the same in words, so this is decoration for screen readers.
+class _Stepper extends StatelessWidget {
+  const _Stepper({required this.status, required this.color});
+
+  final String status;
+  final Color color;
+
+  static const _icons = [Icons.receipt_long_outlined, Icons.check_circle_outline, Icons.inventory_2_outlined, Icons.handshake_outlined, Icons.task_alt_outlined];
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final stage = orderStage(status);
+    final idle = theme.colorScheme.onSurface.withValues(alpha: 0.10);
+    final cancelled = stage < 0;
+    return ExcludeSemantics(
+      child: Row(
+        children: [
+          for (var i = 0; i < 5; i++) ...[
+            if (i > 0)
+              Expanded(child: Container(height: 3, decoration: BoxDecoration(color: !cancelled && i <= stage ? color : idle, borderRadius: BorderRadius.circular(2)))),
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: cancelled ? idle : (i <= stage ? color : idle),
+                boxShadow: !cancelled && i == stage ? [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 3))] : null,
+              ),
+              child: Icon(cancelled ? Icons.close_rounded : _icons[i], size: 19, color: !cancelled && i <= stage ? Colors.white : theme.colorScheme.onSurface.withValues(alpha: 0.4)),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _Timeline extends StatelessWidget {
   const _Timeline({required this.steps, required this.seller});
 
@@ -366,54 +438,62 @@ class _Timeline extends StatelessWidget {
     final theme = Theme.of(context);
     final latestFirst = steps.reversed.toList();
     return GlassContainer(
+      radius: 24,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Semantics(
-              header: true,
-              child: Text('History', style: theme.textTheme.titleLarge)),
-          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                Icon(Icons.history_rounded, size: 20, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Expanded(child: Semantics(header: true, child: Text('History', style: theme.textTheme.titleMedium))),
+              ],
+            ),
+          ),
           for (var i = 0; i < latestFirst.length; i++)
             Semantics(
               label: [
                 '${orderStatusLabel(latestFirst[i].status, seller: seller)}. ${formatDateTime(latestFirst[i].at)}.',
-                if ((latestFirst[i].note ?? '').trim().isNotEmpty)
-                  '${latestFirst[i].note!.trim()}.',
+                if ((latestFirst[i].note ?? '').trim().isNotEmpty) '${latestFirst[i].note!.trim()}.',
               ].join(' '),
               excludeSemantics: true,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
+              child: IntrinsicHeight(
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Icon(
-                          i == 0 ? Icons.radio_button_checked : Icons.circle,
-                          size: i == 0 ? 16 : 10,
-                          color: i == 0
-                              ? theme.colorScheme.primary
-                              : theme.disabledColor),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
+                    // A dot for the step and a line down to the next one.
+                    SizedBox(
+                      width: 22,
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                              orderStatusLabel(latestFirst[i].status,
-                                  seller: seller),
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                  fontWeight: i == 0
-                                      ? FontWeight.w700
-                                      : FontWeight.w500)),
-                          Text(formatDateTime(latestFirst[i].at),
-                              style: theme.textTheme.bodyMedium
-                                  ?.copyWith(fontSize: 12)),
-                          if ((latestFirst[i].note ?? '').trim().isNotEmpty)
-                            Text(latestFirst[i].note!.trim(),
-                                style: theme.textTheme.bodyMedium),
+                          const SizedBox(height: 4),
+                          Container(
+                            width: i == 0 ? 14 : 10,
+                            height: i == 0 ? 14 : 10,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: i == 0 ? theme.colorScheme.primary : theme.colorScheme.onSurface.withValues(alpha: 0.25),
+                              boxShadow: i == 0 ? [BoxShadow(color: theme.colorScheme.primary.withValues(alpha: 0.3), blurRadius: 8)] : null,
+                            ),
+                          ),
+                          if (i < latestFirst.length - 1) Expanded(child: Container(width: 2, margin: const EdgeInsets.symmetric(vertical: 4), color: theme.colorScheme.outlineVariant)),
                         ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(orderStatusLabel(latestFirst[i].status, seller: seller), style: theme.textTheme.bodyLarge?.copyWith(fontWeight: i == 0 ? FontWeight.w800 : FontWeight.w600)),
+                            Text(formatDateTime(latestFirst[i].at), style: theme.textTheme.bodySmall),
+                            if ((latestFirst[i].note ?? '').trim().isNotEmpty) Padding(padding: const EdgeInsets.only(top: 2), child: Text(latestFirst[i].note!.trim(), style: theme.textTheme.bodyMedium)),
+                          ],
+                        ),
                       ),
                     ),
                   ],

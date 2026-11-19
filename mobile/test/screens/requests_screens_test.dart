@@ -64,14 +64,26 @@ void main() {
       expect(find.text('Completed'), findsOneWidget);
     });
 
-    testWidgets('says so when there are none, and "Open" asks only for open ones', (tester) async {
+    testWidgets('applies the selected filter only after showing results', (tester) async {
       final repo = FakeRequestRepository();
       await _pump(tester, const RequestsScreen(), repo);
       expect(find.text('No repair requests yet'), findsOneWidget);
 
+      await _tap(tester, find.text('Filters'));
+      final callsBeforeSelection = repo.listCalls.length;
       await _tap(tester, find.text('Open'));
+      expect(repo.listCalls, hasLength(callsBeforeSelection));
+
+      await _tap(tester, find.text('Show results'));
       expect(repo.listCalls.last.activeOnly, isTrue);
+      expect(find.text('Filters (1)'), findsOneWidget);
       expect(find.text('No open requests'), findsOneWidget);
+
+      await _tap(tester, find.text('Filters (1)'));
+      await _tap(tester, find.text('All'));
+      await _tap(tester, find.text('Show results'));
+      expect(repo.listCalls.last.activeOnly, isFalse);
+      expect(find.text('Filters'), findsOneWidget);
     });
   });
 

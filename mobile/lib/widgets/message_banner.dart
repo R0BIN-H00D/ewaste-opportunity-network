@@ -42,7 +42,7 @@ class MessageBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _color;
+    final color = AppColors.adapt(context, _color);
     return Semantics(
       liveRegion: true,
       child: Container(

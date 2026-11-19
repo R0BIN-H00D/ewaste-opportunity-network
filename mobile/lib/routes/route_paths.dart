@@ -7,6 +7,11 @@ abstract class Routes {
   static const forgotPassword = '/forgot-password';
   static const resetPassword = '/reset-password';
   static const home = '/home';
+  static const admin = '/admin';
+  static const adminToolPattern = '$admin/:tool';
+  static String adminTool(String tool) => '$admin/$tool';
+  static String adminGroup(String group) => '$admin/groups/$group';
+  static const activity = '/activity';
   static const account = '/account';
   static const profile = '/account/profile';
   static const settings = '/account/settings';

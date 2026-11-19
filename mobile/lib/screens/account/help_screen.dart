@@ -7,6 +7,7 @@ import '../../widgets/app_background.dart';
 import '../../widgets/glass_app_bar.dart';
 import '../../widgets/glass_container.dart';
 import '../../widgets/message_banner.dart';
+import '../../widgets/page_banner.dart';
 
 /// Short answers to the common questions, and a form that reaches the support team by email.
 const helpTopics = <(String, String)>[
@@ -82,6 +83,17 @@ class _HelpPageState extends ConsumerState<HelpPage> {
     }
   }
 
+  Widget _heading(ThemeData theme, IconData icon, String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            Expanded(child: Semantics(header: true, child: Text(text, style: theme.textTheme.titleMedium))),
+          ],
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -94,38 +106,36 @@ class _HelpPageState extends ConsumerState<HelpPage> {
           child: ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              Semantics(
-                  header: true,
-                  child: Text('Common questions',
-                      style: theme.textTheme.titleLarge)),
-              const SizedBox(height: 8),
+              const PageBanner(icon: Icons.support_agent_rounded, title: 'We are here to help', subtitle: 'Read the common answers, or write to the support team.'),
+              const SizedBox(height: 20),
+              _heading(theme, Icons.quiz_outlined, 'Common questions'),
               GlassContainer(
-                padding: EdgeInsets.zero,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                radius: 24,
                 child: Material(
                   type: MaterialType.transparency,
                   child: Column(
                     children: [
-                      for (final (q, a) in helpTopics)
+                      for (var i = 0; i < helpTopics.length; i++) ...[
+                        if (i > 0) Divider(height: 1, indent: 16, endIndent: 16, color: theme.colorScheme.outlineVariant),
                         ExpansionTile(
-                          title: Text(q),
-                          childrenPadding:
-                              const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          shape: const Border(),
+                          collapsedShape: const Border(),
+                          tilePadding: const EdgeInsets.symmetric(horizontal: 18),
+                          title: Text(helpTopics[i].$1, style: theme.textTheme.titleSmall),
+                          childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
                           expandedAlignment: Alignment.centerLeft,
-                          children: [
-                            Text(a, style: theme.textTheme.bodyMedium)
-                          ],
+                          children: [Text(helpTopics[i].$2, style: theme.textTheme.bodyMedium)],
                         ),
+                      ],
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
-              Semantics(
-                  header: true,
-                  child:
-                      Text('Write to us', style: theme.textTheme.titleLarge)),
-              const SizedBox(height: 8),
+              const SizedBox(height: 24),
+              _heading(theme, Icons.mail_outline_rounded, 'Write to us'),
               GlassContainer(
+                radius: 24,
                 child: Form(
                   key: _form,
                   child: Column(

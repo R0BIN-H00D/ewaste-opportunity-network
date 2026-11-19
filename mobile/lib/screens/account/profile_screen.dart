@@ -6,8 +6,10 @@ import '../../providers/location_providers.dart';
 import '../../services/location_service.dart';
 import '../../widgets/location_field.dart';
 import '../../models/account.dart';
+import '../../models/user.dart';
 import '../../providers/account_providers.dart';
 import '../../providers/auth_controller.dart';
+import '../../core/theme/app_colors.dart';
 import '../../routes/route_paths.dart';
 import '../../widgets/app_background.dart';
 import '../../widgets/glass_app_bar.dart';
@@ -164,51 +166,130 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
         ),
       );
 
+  /// A card for one group of fields, with an icon and a heading.
+  Widget _section(ThemeData theme, IconData icon, String title, List<Widget> children, {String? hint}) => Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: GlassContainer(
+          radius: 24,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  ExcludeSemantics(
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+                      child: Icon(icon, size: 19, color: theme.colorScheme.primary),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: Semantics(header: true, child: Text(title, style: theme.textTheme.titleMedium))),
+                ],
+              ),
+              if (hint != null) ...[const SizedBox(height: 6), Text(hint, style: theme.textTheme.bodySmall)],
+              const SizedBox(height: 16),
+              ...children,
+            ],
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
-    final email = ref.watch(authControllerProvider).user?.email ?? '';
+    final theme = Theme.of(context);
+    final user = ref.watch(authControllerProvider).user;
+    final email = user?.email ?? '';
+    final shownName = _name.text.trim().isEmpty ? (user?.name ?? '') : _name.text.trim();
+    final initial = shownName.isEmpty ? '?' : shownName.substring(0, 1).toUpperCase();
     return Form(
       key: _form,
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
           if (_error != null) ...[MessageBanner(message: _error!, tone: BannerTone.error), const SizedBox(height: 12)],
-          GlassContainer(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _field(_name, 'Name', maxLength: 80, validator: (v) => (v ?? '').trim().length < 2 ? 'Enter your name' : null),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: TextFormField(initialValue: email, enabled: false, decoration: const InputDecoration(labelText: 'Email', helperText: 'Your email cannot be changed here.')),
+          // Who this is, in the brand colours.
+          ClipRRect(
+            borderRadius: BorderRadius.circular(26),
+            child: DecoratedBox(
+              decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: AppColors.heroGradient)),
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Row(
+                  children: [
+                    ExcludeSemantics(
+                      child: Container(
+                        width: 64,
+                        height: 64,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.16), border: Border.all(color: Colors.white.withValues(alpha: 0.55), width: 2)),
+                        child: Text(initial, style: theme.textTheme.headlineSmall?.copyWith(color: Colors.white)),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Your details', style: theme.textTheme.titleLarge?.copyWith(color: Colors.white)),
+                          const SizedBox(height: 2),
+                          Text(
+                            user == null ? 'Keep them up to date so people can reach you.' : '${user.role.label}. Keep your details up to date so people can reach you.',
+                            style: theme.textTheme.bodySmall?.copyWith(color: Colors.white.withValues(alpha: 0.82)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                _field(
-                  _phone,
-                  'Phone (optional)',
-                  keyboard: TextInputType.phone,
-                  validator: (v) {
-                    final t = (v ?? '').trim();
-                    return t.isEmpty || RegExp(r'^\+?[0-9\s-]{7,15}$').hasMatch(t) ? null : 'Enter a valid phone number';
-                  },
-                ),
-                LocationField(
-                  value: _where,
-                  onChanged: _onWhere,
-                  title: 'Where are you?',
-                  blurb: 'Use your location to fill in your address. Others only see a blurred spot, never your exact address.',
-                ),
-                if (_whereNote != null) Padding(padding: const EdgeInsets.only(top: 8, bottom: 12), child: Text(_whereNote!, style: Theme.of(context).textTheme.bodyMedium)),
-                const SizedBox(height: 12),
-                _field(_area, 'Area or locality', helper: 'Others see only your area and city.', maxLength: 100),
-                _field(_city, 'City', maxLength: 80),
-                _field(_state, 'State', maxLength: 80),
-                _field(_pincode, 'PIN code', keyboard: TextInputType.number, maxLength: 12),
-                _field(_bio, 'About you (optional)', maxLines: 3, maxLength: 500),
-              ],
+              ),
             ),
           ),
           const SizedBox(height: 16),
-          FilledButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Saving…' : 'Save profile')),
+          _section(theme, Icons.badge_outlined, 'About you', [
+            _field(_name, 'Name', maxLength: 80, validator: (v) => (v ?? '').trim().length < 2 ? 'Enter your name' : null),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: TextFormField(initialValue: email, enabled: false, decoration: const InputDecoration(labelText: 'Email', helperText: 'Your email cannot be changed here.', prefixIcon: Icon(Icons.mail_outline_rounded))),
+            ),
+            _field(
+              _phone,
+              'Phone (optional)',
+              keyboard: TextInputType.phone,
+              validator: (v) {
+                final t = (v ?? '').trim();
+                return t.isEmpty || RegExp(r'^\+?[0-9\s-]{7,15}$').hasMatch(t) ? null : 'Enter a valid phone number';
+              },
+            ),
+            _field(_bio, 'About you (optional)', maxLines: 3, maxLength: 500),
+          ]),
+          _section(
+            theme,
+            Icons.place_outlined,
+            'Where you are',
+            [
+              LocationField(
+                value: _where,
+                onChanged: _onWhere,
+                title: 'Where are you?',
+                blurb: 'Use your location to fill in your address. Others only see a blurred spot, never your exact address.',
+              ),
+              if (_whereNote != null) Padding(padding: const EdgeInsets.only(top: 8, bottom: 12), child: Text(_whereNote!, style: theme.textTheme.bodyMedium)),
+              const SizedBox(height: 12),
+              _field(_area, 'Area or locality', helper: 'Others see only your area and city.', maxLength: 100),
+              _field(_city, 'City', maxLength: 80),
+              _field(_state, 'State', maxLength: 80),
+              _field(_pincode, 'PIN code', keyboard: TextInputType.number, maxLength: 12),
+            ],
+          ),
+          const SizedBox(height: 4),
+          FilledButton.icon(
+            onPressed: _saving ? null : _save,
+            icon: const Icon(Icons.check_rounded),
+            label: Text(_saving ? 'Saving…' : 'Save profile'),
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54)),
+          ),
         ],
       ),
     );

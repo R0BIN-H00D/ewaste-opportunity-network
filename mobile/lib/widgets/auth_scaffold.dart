@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import '../core/constants/app_constants.dart';
 import 'app_background.dart';
+import 'brand_mark.dart';
 import 'glass_container.dart';
 
 /// The frame of every signed-out screen: gradient, brand mark, a title and the form inside one glass card.
@@ -31,8 +32,8 @@ class AuthScaffold extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(Icons.recycling, size: 40, color: theme.colorScheme.primary),
-                    const SizedBox(height: 8),
+                    const Center(child: BrandMark(size: 64)),
+                    const SizedBox(height: 16),
                     Semantics(header: true, child: Text(title, style: theme.textTheme.headlineMedium, textAlign: TextAlign.center)),
                     if (subtitle != null) ...[
                       const SizedBox(height: 6),

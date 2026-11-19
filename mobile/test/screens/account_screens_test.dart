@@ -4,6 +4,7 @@ import 'package:ewaste_opportunity/core/theme/app_theme.dart';
 import 'package:ewaste_opportunity/models/account.dart';
 import 'package:ewaste_opportunity/providers/account_providers.dart';
 import 'package:ewaste_opportunity/providers/auth_controller.dart';
+import 'package:ewaste_opportunity/providers/chat_providers.dart';
 import 'package:ewaste_opportunity/providers/core_providers.dart';
 import 'package:ewaste_opportunity/models/geo_place.dart';
 import 'package:ewaste_opportunity/providers/location_providers.dart';
@@ -15,7 +16,10 @@ import 'package:ewaste_opportunity/screens/account/notifications_screen.dart';
 import 'package:ewaste_opportunity/screens/account/payments_screen.dart';
 import 'package:ewaste_opportunity/screens/account/profile_screen.dart';
 import 'package:ewaste_opportunity/screens/account/settings_screen.dart';
+import 'package:ewaste_opportunity/routes/route_paths.dart';
+import 'package:ewaste_opportunity/screens/activity_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -34,6 +38,8 @@ Future<MemoryKeyValueStore> _pump(WidgetTester tester, Widget screen, FakeAccoun
       GoRoute(path: '/', builder: (_, __) => Scaffold(body: openedFrom == null ? screen : Center(child: Text(openedFrom)))),
       GoRoute(path: '/screen', builder: (_, __) => screen),
       GoRoute(path: '/requests/:id', builder: (_, s) => Scaffold(body: Text('request ${s.pathParameters['id']}'))),
+      for (final path in [Routes.notifications, Routes.messages, Routes.help, Routes.learn])
+        GoRoute(path: path, builder: (_, __) => Scaffold(body: Text('Opened $path'))),
     ],
   );
   addTearDown(router.dispose);
@@ -43,6 +49,7 @@ Future<MemoryKeyValueStore> _pump(WidgetTester tester, Widget screen, FakeAccoun
         keyValueStoreProvider.overrideWithValue(store),
         authRepositoryProvider.overrideWithValue(FakeAuthRepository()),
         accountRepositoryProvider.overrideWithValue(account),
+        chatRepositoryProvider.overrideWithValue(FakeChatRepository()..unreadCount = 3),
         requestRepositoryProvider.overrideWithValue(FakeRequestRepository()),
         if (phone != null) locationServiceProvider.overrideWithValue(phone),
         if (geo != null) geoRepositoryProvider.overrideWithValue(geo),
@@ -77,12 +84,49 @@ NotificationItem _note(String id, String title, {bool read = false, String? requ
     );
 
 void main() {
-  testWidgets('the account hub links to everything and shows the unread count', (tester) async {
-    await _pump(tester, const AccountScreen(), FakeAccountRepository(notes: [_note('n1', 'A'), _note('n2', 'B'), _note('n3', 'C', read: true)]));
-    for (final label in ['Notifications', 'Profile', 'Transaction history', 'Settings', 'Help and support', 'Sign out']) {
+  const activityLinks = {
+    'Notifications': Routes.notifications,
+    'Conversations': Routes.messages,
+    'Help & Support': Routes.help,
+  };
+  testWidgets('the account hub shows only account actions', (tester) async {
+    const appInfo = MethodChannel('ewaste/app_info');
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(appInfo, (_) async => '0.1.0');
+    addTearDown(() => messenger.setMockMethodCallHandler(appInfo, null));
+    await _pump(tester, const AccountScreen(), FakeAccountRepository());
+    for (final label in ['Profile', 'Settings', 'Learning centre', 'About', 'Sign out']) {
       expect(find.text(label), findsOneWidget);
     }
-    expect(find.text('2'), findsOneWidget); // unread badge
+    expect(find.text('Version 0.1.0'), findsNothing);
+    await _tap(tester, find.text('About'));
+    expect(find.text('ROBIN · VISMAYA · MEGHANA'), findsOneWidget);
+    expect(find.text('Version 0.1.0'), findsOneWidget);
+    await _tap(tester, find.text('Close'));
+    expect(find.text('Version 0.1.0'), findsNothing);
+    for (final label in activityLinks.keys) {
+      expect(find.text(label), findsNothing);
+    }
+    expect(find.text('Help and support'), findsNothing);
+    expect(find.text('Messages'), findsNothing);
+    expect(find.text('Transaction history'), findsNothing);
+    await _tap(tester, find.text('Learning centre'));
+    expect(find.text('Opened ${Routes.learn}'), findsOneWidget);
+  });
+
+  testWidgets('Messages links to notifications, conversations and support and shows unread counts', (tester) async {
+    await _pump(tester, const ActivityScreen(), FakeAccountRepository(notes: [_note('n1', 'A'), _note('n2', 'B')]));
+    expect(find.text('2'), findsOneWidget);
+    expect(find.text('3'), findsOneWidget);
+    expect(find.text('Messages'), findsOneWidget);
+    for (final link in activityLinks.entries) {
+      final entry = find.text(link.key);
+      final router = GoRouter.of(tester.element(entry));
+      await _tap(tester, entry);
+      expect(find.text('Opened ${link.value}'), findsOneWidget);
+      router.pop();
+      await tester.pumpAndSettle();
+    }
   });
 
   testWidgets('notifications: unread stand out, opening one marks it read and opens its request', (tester) async {

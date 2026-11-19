@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import '../../core/format.dart';
 import '../../core/network/api_exception.dart';
+import '../../core/theme/app_colors.dart';
 import '../../models/user.dart';
 import '../../models/wanted.dart';
 import '../../providers/auth_controller.dart';
@@ -12,15 +13,68 @@ import '../../widgets/glass_app_bar.dart';
 import '../../widgets/glass_container.dart';
 import '../../widgets/message_banner.dart';
 import '../../widgets/message_button.dart';
+import '../../widgets/page_banner.dart';
 import '../../widgets/skeleton.dart';
 import '../../widgets/state_views.dart';
 
-String _summary(WantedRequest w) => [
-      w.categoryName,
-      w.brand,
-      if (w.minCondition != null) '${labelOf(conditions, w.minCondition)} or better',
-      'Qty ${w.quantity}',
-    ].where((v) => (v ?? '').isNotEmpty).join(' · ');
+/// What was asked for, as small labelled pills: the kind of device, brand, worst condition, how many and where.
+List<(IconData, String)> _facts(WantedRequest w) => [
+      if ((w.categoryName ?? '').isNotEmpty) (Icons.category_outlined, w.categoryName!),
+      if ((w.brand ?? '').isNotEmpty) (Icons.sell_outlined, w.brand!),
+      if (w.minCondition != null) (Icons.verified_outlined, '${labelOf(conditions, w.minCondition)} or better'),
+      (Icons.numbers_rounded, 'Qty ${w.quantity}'),
+      if ((w.city ?? '').isNotEmpty) (Icons.place_outlined, w.city!),
+    ];
+
+class _FactPills extends StatelessWidget {
+  const _FactPills(this.request);
+
+  final WantedRequest request;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final (icon, text) in _facts(request))
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(color: theme.colorScheme.onSurface.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(20)),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 14, color: theme.colorScheme.primary),
+                const SizedBox(width: 5),
+                Flexible(child: Text(text, style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurface))),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// The coloured square with the device icon at the left of a card.
+class _DeviceTile extends StatelessWidget {
+  const _DeviceTile({required this.accent});
+
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = AppColors.adapt(context, accent);
+    return ExcludeSemantics(
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(color: tone.withValues(alpha: 0.13), borderRadius: BorderRadius.circular(16)),
+        child: Icon(Icons.devices_other_outlined, size: 24, color: tone),
+      ),
+    );
+  }
+}
 
 /// Wanted devices. A refurbisher sees and manages their own requests; owners and technicians see what refurbishers are
 /// looking for and can accept the ones they can help with.
@@ -66,16 +120,20 @@ class _Board extends ConsumerWidget {
     return RefreshIndicator(
       onRefresh: () async => ref.refresh(wantedBoardProvider.future),
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
         children: [
-          Text('Refurbishers post the devices they are looking for. If you can help, accept the request and they will get in touch.', style: Theme.of(context).textTheme.bodyMedium),
+          const PageBanner(
+            icon: Icons.manage_search_outlined,
+            title: 'Help refurbishers find devices',
+            subtitle: 'Refurbishers post the devices they are looking for. If you can help, accept the request and they will get in touch.',
+          ),
           const SizedBox(height: 16),
           board.when(
             loading: () => const Skeleton(height: 120, radius: 24),
             error: (e, _) => ErrorState(error: e is ApiException ? e : ApiException.from(e), onRetry: () => ref.invalidate(wantedBoardProvider)),
             data: (items) => items.isEmpty
                 ? const EmptyState(icon: Icons.manage_search_outlined, title: 'No requests right now', message: 'When a refurbisher posts a device they are looking for it appears here.')
-                : Column(children: [for (final w in items) Padding(padding: const EdgeInsets.only(bottom: 12), child: _BoardCard(request: w))]),
+                : Column(children: [for (var i = 0; i < items.length; i++) Padding(padding: const EdgeInsets.only(bottom: 12), child: _BoardCard(request: items[i], accent: AppColors.tileAccents[i % AppColors.tileAccents.length]))]),
           ),
         ],
       ),
@@ -104,13 +162,14 @@ class _AcceptDialogState extends State<_AcceptDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
+        icon: Icon(Icons.handshake_outlined, size: 32, color: Theme.of(context).colorScheme.primary),
         title: const Text('Accept this request'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('${widget.request.refurbisherName ?? 'The refurbisher'} is looking for: ${widget.request.title}. They will be told you can help and can message you.'),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             TextField(controller: _message, maxLines: 3, maxLength: 1000, decoration: const InputDecoration(labelText: 'Message (optional)', helperText: 'For example what device you have')),
           ],
         ),
@@ -122,9 +181,10 @@ class _AcceptDialogState extends State<_AcceptDialog> {
 }
 
 class _BoardCard extends ConsumerStatefulWidget {
-  const _BoardCard({required this.request});
+  const _BoardCard({required this.request, required this.accent});
 
   final WantedRequest request;
+  final Color accent;
 
   @override
   ConsumerState<_BoardCard> createState() => _BoardCardState();
@@ -156,22 +216,74 @@ class _BoardCardState extends ConsumerState<_BoardCard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final w = widget.request;
+    final accent = AppColors.adapt(context, widget.accent);
+    final ok = AppColors.adapt(context, AppColors.success);
     return GlassContainer(
+      radius: 24,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(w.title, style: theme.textTheme.titleLarge?.copyWith(fontSize: 16)),
-          const SizedBox(height: 4),
-          Text(_summary(w), style: theme.textTheme.bodyMedium),
-          if ((w.city ?? '').isNotEmpty) Text(w.city!, style: theme.textTheme.bodyMedium),
-          if ((w.notes ?? '').isNotEmpty) ...[const SizedBox(height: 6), Text(w.notes!)],
-          const SizedBox(height: 6),
-          Text('Wanted by ${w.refurbisherName ?? 'a refurbisher'}', style: theme.textTheme.labelSmall),
-          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _DeviceTile(accent: widget.accent),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(w.title, style: theme.textTheme.titleMedium, maxLines: 3, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.storefront_outlined, size: 14, color: theme.textTheme.bodySmall?.color),
+                        const SizedBox(width: 4),
+                        Expanded(child: Text('Wanted by ${w.refurbisherName ?? 'a refurbisher'}', style: theme.textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _FactPills(w),
+          if ((w.notes ?? '').isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14), border: Border(left: BorderSide(color: accent, width: 3))),
+              child: Text(w.notes!, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface)),
+            ),
+          ],
+          const SizedBox(height: 16),
           if (w.hasResponded)
-            const Row(children: [Icon(Icons.check_circle_outline, size: 18), SizedBox(width: 6), Text('Accepted')])
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(color: ok.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(14)),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.check_circle_rounded, size: 20, color: ok),
+                  const SizedBox(width: 8),
+                  Text('Accepted', style: theme.textTheme.labelLarge?.copyWith(color: ok)),
+                ],
+              ),
+            )
           else
-            FilledButton(onPressed: _busy ? null : _accept, child: Text(_busy ? 'Sending…' : 'Accept')),
+            FilledButton(
+              onPressed: _busy ? null : _accept,
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.handshake_outlined, size: 20),
+                  const SizedBox(width: 8),
+                  Flexible(child: Text(_busy ? 'Sending…' : 'Accept')),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -188,9 +300,13 @@ class _MyRequests extends ConsumerWidget {
     return RefreshIndicator(
       onRefresh: () async => ref.refresh(wantedMineProvider.future),
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
         children: [
-          Text('Tell owners what you are looking for. Open requests are visible to them and they can accept the ones they can help with.', style: Theme.of(context).textTheme.bodyMedium),
+          const PageBanner(
+            icon: Icons.campaign_outlined,
+            title: 'Tell owners what you need',
+            subtitle: 'Open requests are visible to owners and technicians, and they can accept the ones they can help with.',
+          ),
           const SizedBox(height: 16),
           mine.when(
             loading: () => const Skeleton(height: 120, radius: 24),
@@ -202,7 +318,7 @@ class _MyRequests extends ConsumerWidget {
                     message: 'Add one to tell owners what you are looking for.',
                     actionLabel: 'New request',
                     onAction: () => _addRequest(context, ref))
-                : Column(children: [for (final w in items) Padding(padding: const EdgeInsets.only(bottom: 12), child: _MineCard(request: w))]),
+                : Column(children: [for (var i = 0; i < items.length; i++) Padding(padding: const EdgeInsets.only(bottom: 12), child: _MineCard(request: items[i], accent: AppColors.tileAccents[i % AppColors.tileAccents.length]))]),
           ),
         ],
       ),
@@ -211,9 +327,10 @@ class _MyRequests extends ConsumerWidget {
 }
 
 class _MineCard extends ConsumerStatefulWidget {
-  const _MineCard({required this.request});
+  const _MineCard({required this.request, required this.accent});
 
   final WantedRequest request;
+  final Color accent;
 
   @override
   ConsumerState<_MineCard> createState() => _MineCardState();
@@ -242,29 +359,81 @@ class _MineCardState extends ConsumerState<_MineCard> {
     final w = widget.request;
     final repo = ref.read(wantedRepositoryProvider);
     return GlassContainer(
+      radius: 24,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: Text(w.title, style: theme.textTheme.titleLarge?.copyWith(fontSize: 16))),
-              Text(w.isOpen ? 'Open' : 'Closed', style: theme.textTheme.labelSmall),
+              _DeviceTile(accent: w.isOpen ? widget.accent : theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+              const SizedBox(width: 14),
+              Expanded(child: Text(w.title, style: theme.textTheme.titleMedium, maxLines: 3, overflow: TextOverflow.ellipsis)),
+              const SizedBox(width: 8),
+              StatusBadge(w.isOpen ? 'Open' : 'Closed', tone: w.isOpen ? BadgeTone.green : BadgeTone.neutral),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(_summary(w), style: theme.textTheme.bodyMedium),
-          if ((w.city ?? '').isNotEmpty) Text(w.city!, style: theme.textTheme.bodyMedium),
-          const SizedBox(height: 8),
+          const SizedBox(height: 14),
+          _FactPills(w),
+          const SizedBox(height: 14),
+          Divider(height: 1, color: theme.colorScheme.outlineVariant),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               if (w.responseCount > 0) AppChip(label: '${w.responseCount} accepted', selected: _showWho, onTap: () => setState(() => _showWho = !_showWho)),
-              AppChip(label: w.isOpen ? 'Close' : 'Reopen', selected: false, onTap: _busy ? () {} : () => _do(() => repo.setStatus(w.id, w.isOpen ? 'closed' : 'open'))),
-              AppChip(label: 'Delete', selected: false, onTap: _busy ? () {} : () => _do(() => repo.delete(w.id))),
+              _CardAction(icon: w.isOpen ? Icons.lock_outline_rounded : Icons.lock_open_rounded, label: w.isOpen ? 'Close' : 'Reopen', onTap: _busy ? null : () => _do(() => repo.setStatus(w.id, w.isOpen ? 'closed' : 'open'))),
+              _CardAction(icon: Icons.delete_outline_rounded, label: 'Delete', danger: true, onTap: _busy ? null : () => _do(() => repo.delete(w.id))),
             ],
           ),
           if (_showWho) _Responders(id: w.id),
         ],
+      ),
+    );
+  }
+}
+
+/// A small outlined action under a card, such as Close or Delete.
+class _CardAction extends StatelessWidget {
+  const _CardAction({required this.icon, required this.label, required this.onTap, this.danger = false});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = danger ? theme.colorScheme.error : theme.colorScheme.onSurface;
+    return Semantics(
+      button: true,
+      enabled: onTap != null,
+      label: label,
+      excludeSemantics: true,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: onTap ?? () {},
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), border: Border.all(color: danger ? color.withValues(alpha: 0.5) : theme.colorScheme.outline)),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 17, color: color),
+                  const SizedBox(width: 6),
+                  Text(label, style: theme.textTheme.labelMedium?.copyWith(color: color, fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -277,6 +446,7 @@ class _Responders extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final who = ref.watch(wantedResponsesProvider(id));
     return who.when(
       loading: () => const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
@@ -284,14 +454,31 @@ class _Responders extends ConsumerWidget {
       data: (items) => Column(
         children: [
           for (final r in items)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(16)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${r.name} (${r.role == 'technician' ? 'technician' : 'device owner'})', style: Theme.of(context).textTheme.titleSmall),
-                  if ((r.message ?? '').isNotEmpty) Text(r.message!),
-                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      ExcludeSemantics(
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.14), shape: BoxShape.circle),
+                          child: Icon(r.role == 'technician' ? Icons.build_rounded : Icons.person_rounded, size: 18, color: theme.colorScheme.primary),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text('${r.name} (${r.role == 'technician' ? 'technician' : 'device owner'})', style: theme.textTheme.titleSmall)),
+                    ],
+                  ),
+                  if ((r.message ?? '').isNotEmpty) ...[const SizedBox(height: 8), Text(r.message!, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface))],
+                  const SizedBox(height: 8),
                   MessageButton(contextType: 'wanted', contextId: r.id),
                 ],
               ),
@@ -351,6 +538,17 @@ class _NewRequestSheetState extends ConsumerState<_NewRequestSheet> {
     }
   }
 
+  Widget _label(ThemeData theme, IconData icon, String text) => Padding(
+        padding: const EdgeInsets.only(top: 18, bottom: 10),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            Expanded(child: Semantics(header: true, child: Text(text, style: theme.textTheme.titleSmall))),
+          ],
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -363,39 +561,58 @@ class _NewRequestSheetState extends ConsumerState<_NewRequestSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('New request', style: theme.textTheme.titleLarge),
-              const SizedBox(height: 4),
-              Text('Tell device owners what you are looking for. Open requests are visible to them.', style: theme.textTheme.bodyMedium),
-              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ExcludeSemantics(
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(16)),
+                      child: Icon(Icons.campaign_outlined, color: theme.colorScheme.primary),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Semantics(header: true, child: Text('New request', style: theme.textTheme.titleLarge)),
+                        const SizedBox(height: 2),
+                        Text('Tell device owners what you are looking for. Open requests are visible to them.', style: theme.textTheme.bodySmall),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
               if (_error != null) ...[MessageBanner(message: _error!, tone: BannerTone.error), const SizedBox(height: 12)],
               TextFormField(
                 controller: _title,
                 maxLength: 120,
-                decoration: const InputDecoration(labelText: 'What are you looking for?', hintText: 'Used laptops, any brand'),
+                decoration: const InputDecoration(labelText: 'What are you looking for?', hintText: 'Used laptops, any brand', prefixIcon: Icon(Icons.search_rounded)),
                 validator: (v) => (v ?? '').trim().length < 3 ? 'Say what you are looking for (at least 3 letters)' : null,
               ),
-              TextFormField(controller: _brand, maxLength: 60, decoration: const InputDecoration(labelText: 'Brand (optional)')),
-              const SizedBox(height: 4),
-              Text('Worst condition you accept (optional)', style: theme.textTheme.titleSmall),
-              const SizedBox(height: 8),
+              TextFormField(controller: _brand, maxLength: 60, decoration: const InputDecoration(labelText: 'Brand (optional)', prefixIcon: Icon(Icons.sell_outlined))),
+              _label(theme, Icons.verified_outlined, 'Worst condition you accept (optional)'),
               Wrap(spacing: 8, runSpacing: 8, children: [
                 for (final (value, label) in conditions) AppChip(label: label, selected: _condition == value, onTap: () => setState(() => _condition = _condition == value ? '' : value)),
               ]),
-              const SizedBox(height: 12),
+              const SizedBox(height: 18),
               TextFormField(
                 controller: _quantity,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'How many?'),
+                decoration: const InputDecoration(labelText: 'How many?', prefixIcon: Icon(Icons.numbers_rounded)),
                 validator: (v) {
                   final n = int.tryParse((v ?? '').trim());
                   return n == null || n < 1 || n > 1000 ? 'Enter a number from 1 to 1000' : null;
                 },
               ),
               const SizedBox(height: 12),
-              TextFormField(controller: _city, maxLength: 80, decoration: const InputDecoration(labelText: 'City (optional)')),
+              TextFormField(controller: _city, maxLength: 80, decoration: const InputDecoration(labelText: 'City (optional)', prefixIcon: Icon(Icons.place_outlined))),
               TextFormField(controller: _notes, maxLines: 3, maxLength: 1000, decoration: const InputDecoration(labelText: 'Notes (optional)')),
               const SizedBox(height: 8),
-              FilledButton(onPressed: _saving ? null : _save, style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)), child: Text(_saving ? 'Saving…' : 'Add request')),
+              FilledButton(onPressed: _saving ? null : _save, style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)), child: Text(_saving ? 'Saving…' : 'Add request')),
             ],
           ),
         ),

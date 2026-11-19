@@ -59,7 +59,18 @@ const _pickups = QuickAction(
 List<QuickAction> actionsFor(UserRole role) => [
       if (role != UserRole.admin) _profile,
       ..._roleActions(role),
-      if (role != UserRole.admin) ...[_pickups, _messages, _notifications, _learn]
+      if (role != UserRole.admin) ...[_pickups, _messages, _notifications],
+      if (role.isProvider) _learn,
+    ];
+
+/// What the role does every day. The home screen shows these as large tiles.
+List<QuickAction> mainActionsFor(UserRole role) => _roleActions(role);
+
+/// The everyday extras every signed-in role has, as compact rows under the main tiles. Profile, Messages and
+/// Notifications are not here: the home header already has them (the avatar, and the two buttons beside it).
+List<QuickAction> moreActionsFor(UserRole role) => [
+      if (role != UserRole.admin) _pickups,
+      if (role.isProvider) _learn,
     ];
 
 List<QuickAction> _roleActions(UserRole role) {
@@ -138,8 +149,8 @@ List<QuickAction> _roleActions(UserRole role) {
         QuickAction(
             icon: Icons.admin_panel_settings_outlined,
             title: 'Administration',
-            subtitle:
-                'Moderation, verification and reports are on the web dashboard'),
+            subtitle: 'Manage users, verification, moderation and reports',
+            route: Routes.admin),
       ];
   }
 }

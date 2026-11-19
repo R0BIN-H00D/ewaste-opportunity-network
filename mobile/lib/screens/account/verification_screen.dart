@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import '../../core/format.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/network/api_exception.dart';
 import '../../models/verification.dart';
 import '../../providers/auth_controller.dart';
@@ -139,6 +140,49 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
     );
   }
 
+  Color _toneColor(String status) => AppColors.adapt(context, _toneBase(status));
+
+  Color _toneBase(String status) {
+    switch (verificationTone(status)) {
+      case BadgeTone.green:
+        return AppColors.success;
+      case BadgeTone.blue:
+        return AppColors.info;
+      case BadgeTone.red:
+        return AppColors.danger;
+      case BadgeTone.amber:
+        return AppColors.warning;
+      case BadgeTone.neutral:
+        return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6);
+    }
+  }
+
+  IconData _statusIcon(String status) {
+    switch (status) {
+      case 'approved':
+        return Icons.verified_rounded;
+      case 'pending':
+        return Icons.hourglass_top_rounded;
+      case 'rejected':
+        return Icons.block_rounded;
+      case 'resubmission_required':
+        return Icons.edit_note_rounded;
+      default:
+        return Icons.upload_file_outlined;
+    }
+  }
+
+  Widget _title(ThemeData theme, IconData icon, String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            Expanded(child: Semantics(header: true, child: Text(text, style: theme.textTheme.titleMedium))),
+          ],
+        ),
+      );
+
   Widget _body(BuildContext context, VerificationStatus v) {
     final theme = Theme.of(context);
     final reason = v.reason?.trim() ?? '';
@@ -152,12 +196,25 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
             children: [
               Row(
                 children: [
+                  ExcludeSemantics(
+                    child: Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(color: _toneColor(v.status).withValues(alpha: 0.14), borderRadius: BorderRadius.circular(15)),
+                      child: Icon(_statusIcon(v.status), size: 24, color: _toneColor(v.status)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(child: Semantics(header: true, child: Text('Your approval', style: theme.textTheme.titleLarge))),
                   StatusBadge(verificationLabels[v.status] ?? v.status, tone: verificationTone(v.status)),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(verificationExplanation(v.status), style: theme.textTheme.bodyLarge),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(color: _toneColor(v.status).withValues(alpha: 0.09), borderRadius: BorderRadius.circular(16)),
+                child: Text(verificationExplanation(v.status), style: theme.textTheme.bodyLarge?.copyWith(fontSize: 14.5)),
+              ),
               if (reason.isNotEmpty && (v.status == 'rejected' || v.status == 'resubmission_required')) ...[
                 const SizedBox(height: 12),
                 MessageBanner(message: 'Reason: $reason', tone: BannerTone.warning),
@@ -171,8 +228,7 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Semantics(header: true, child: Text('Documents you sent', style: theme.textTheme.titleLarge)),
-                const SizedBox(height: 8),
+                _title(theme, Icons.folder_copy_outlined, 'Documents you sent'),
                 for (final doc in v.documents) _DocRow(doc: doc, onRemove: doc.isApproved ? null : () => _remove(doc)),
               ],
             ),
@@ -184,8 +240,7 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Semantics(header: true, child: Text(v.documents.isEmpty ? 'Send documents' : 'Send more documents', style: theme.textTheme.titleLarge)),
-                const SizedBox(height: 12),
+                _title(theme, Icons.upload_file_outlined, v.documents.isEmpty ? 'Send documents' : 'Send more documents'),
                 Text('What kind of document?', style: theme.textTheme.titleSmall),
                 const SizedBox(height: 8),
                 Wrap(
@@ -236,12 +291,14 @@ class _DocRow extends StatelessWidget {
     final tone = doc.status == 'approved' ? BadgeTone.green : (doc.status == 'rejected' ? BadgeTone.red : BadgeTone.blue);
     final label = doc.status == 'approved' ? 'Approved' : (doc.status == 'rejected' ? 'Not accepted' : 'Waiting');
     final reason = doc.reason?.trim() ?? '';
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+      decoration: BoxDecoration(border: Border.all(color: theme.colorScheme.outlineVariant), borderRadius: BorderRadius.circular(16)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(padding: EdgeInsets.only(top: 2), child: Icon(Icons.description_outlined)),
+          ExcludeSemantics(child: Container(width: 40, height: 40, decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)), child: Icon(Icons.description_outlined, size: 21, color: theme.colorScheme.primary))),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

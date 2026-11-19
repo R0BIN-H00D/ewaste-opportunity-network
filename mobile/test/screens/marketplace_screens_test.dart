@@ -88,31 +88,66 @@ void main() {
       expect(find.text('ReNew Devices, Pune'), findsNWidgets(2));
     });
 
-    testWidgets('a condition chip filters, and tapping again clears it',
+    testWidgets(
+        'the filters sit behind one button, and nothing is sent until "Show results"',
         (tester) async {
       final repo = FakeMarketplaceRepository(productPages: {
         1: [sampleProduct()]
       });
       await _pump(tester, const MarketplaceScreen(), repo);
 
-      await _tap(tester, find.widgetWithText(AppChip, 'Excellent'));
-      expect(repo.productQueries.last.condition, 'excellent');
+      // No rows of chips on the page itself.
+      expect(find.widgetWithText(AppChip, 'Excellent'), findsNothing);
+      await _tap(tester, find.byIcon(Icons.tune_rounded));
       await _tap(tester, find.widgetWithText(AppChip, 'Excellent'));
       expect(repo.productQueries.last.condition, '');
+      await _tap(tester, find.text('Show results'));
+      expect(repo.productQueries.last.condition, 'excellent');
     });
 
-    testWidgets('a category chip and a sort order are sent to the server',
+    testWidgets('a switched-on filter shows as a pill that removes it',
         (tester) async {
       final repo = FakeMarketplaceRepository(productPages: {
         1: [sampleProduct()]
       });
       await _pump(tester, const MarketplaceScreen(), repo);
 
+      await _tap(tester, find.byIcon(Icons.tune_rounded));
+      await _tap(tester, find.widgetWithText(AppChip, 'Excellent'));
+      await _tap(tester, find.text('Show results'));
+      expect(find.text('Clear filters'), findsOneWidget);
+
+      await _tap(tester, find.bySemanticsLabel('Remove filter: Excellent'));
+      expect(repo.productQueries.last.condition, '');
+      expect(find.text('Clear filters'), findsNothing);
+    });
+
+    testWidgets('a category and a sort order are sent to the server',
+        (tester) async {
+      final repo = FakeMarketplaceRepository(productPages: {
+        1: [sampleProduct()]
+      });
+      await _pump(tester, const MarketplaceScreen(), repo);
+
+      await _tap(tester, find.byIcon(Icons.tune_rounded));
       await _tap(tester, find.widgetWithText(AppChip, 'Laptops'));
-      expect(repo.productQueries.last.category, 'laptops');
       await _tap(tester, find.widgetWithText(AppChip, 'Price: low to high'));
-      expect(repo.productQueries.last.sort, 'price_asc');
+      await _tap(tester, find.text('Show results'));
       expect(repo.productQueries.last.category, 'laptops');
+      expect(repo.productQueries.last.sort, 'price_asc');
+    });
+
+    testWidgets('"Clear all" in the sheet resets every choice', (tester) async {
+      final repo = FakeMarketplaceRepository(productPages: {
+        1: [sampleProduct()]
+      });
+      await _pump(tester, const MarketplaceScreen(), repo);
+
+      await _tap(tester, find.byIcon(Icons.tune_rounded));
+      await _tap(tester, find.widgetWithText(AppChip, 'Laptops'));
+      await _tap(tester, find.text('Clear all'));
+      await _tap(tester, find.text('Show results'));
+      expect(repo.productQueries.last.category, '');
     });
 
     testWidgets('searching asks for that text after a short pause',

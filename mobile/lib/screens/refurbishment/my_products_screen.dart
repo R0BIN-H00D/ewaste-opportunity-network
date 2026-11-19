@@ -8,6 +8,7 @@ import '../../routes/route_paths.dart';
 import '../../widgets/app_background.dart';
 import '../../widgets/app_chip.dart';
 import '../../widgets/glass_app_bar.dart';
+import '../../widgets/page_banner.dart';
 import '../../widgets/paged_list.dart';
 import '../marketplace/product_card.dart';
 
@@ -26,13 +27,15 @@ class MyProductsScreen extends ConsumerWidget {
     final header = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const PageBanner(icon: Icons.storefront_outlined, title: 'Your products on sale', subtitle: 'List devices, edit them and see what is selling.'),
+        const SizedBox(height: 16),
         FilledButton.icon(
           onPressed: () => context.push(Routes.newProduct),
           icon: const Icon(Icons.add),
           label: const Text('List a product'),
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(children: [
@@ -52,13 +55,16 @@ class MyProductsScreen extends ConsumerWidget {
         children: [
           ProductCard(product: p, onTap: () => context.push(Routes.editProduct(p.id))),
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
-            // A Wrap, not a Row: at a large text size the stock text moves to the next line instead of overflowing.
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+            // A Wrap, not a Row: at a large text size the hint moves to the next line instead of overflowing.
             child: Wrap(
               crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 8,
+              spacing: 10,
               runSpacing: 4,
-              children: [StatusBadge(labelOf(productStatuses, p.status), tone: productStatusTone(p.status)), Text(stockText(p.stock))],
+              children: [
+                StatusBadge(labelOf(productStatuses, p.status), tone: productStatusTone(p.status)),
+                Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.edit_outlined, size: 14, color: Theme.of(context).textTheme.bodySmall?.color), const SizedBox(width: 4), Flexible(child: Text('Tap the card to edit', style: Theme.of(context).textTheme.bodySmall))]),
+              ],
             ),
           ),
         ],

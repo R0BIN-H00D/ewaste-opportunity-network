@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import '../../core/theme/app_colors.dart';
 import '../../models/recycling.dart';
 import '../../widgets/app_chip.dart';
 import '../../widgets/glass_container.dart';
@@ -54,7 +55,7 @@ class CenterCard extends StatelessWidget {
                         const SizedBox(height: 6),
                         Row(
                           children: [
-                            Icon(Icons.star_rounded, size: 16, color: c.hasRating ? Colors.amber.shade700 : theme.disabledColor),
+                            Icon(Icons.star_rounded, size: 16, color: c.hasRating ? AppColors.adapt(context, AppColors.star) : theme.disabledColor),
                             const SizedBox(width: 4),
                             Expanded(child: Text(centerRatingText(c), style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13))),
                           ],

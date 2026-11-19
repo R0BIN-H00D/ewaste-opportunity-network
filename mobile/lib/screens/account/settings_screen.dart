@@ -28,6 +28,33 @@ class SettingsPage extends ConsumerWidget {
       }
     }
 
+    void choose(ThemeMode m) => ref.read(themeModeProvider.notifier).set(m);
+
+    Widget heading(IconData icon, String text) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Expanded(child: Semantics(header: true, child: Text(text, style: theme.textTheme.titleMedium))),
+            ],
+          ),
+        );
+
+    Widget switchRow(IconData icon, bool value, ValueChanged<bool> onChanged, String title, String subtitle) => SwitchListTile(
+          value: value,
+          onChanged: onChanged,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          secondary: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(13)),
+            child: Icon(icon, size: 20, color: theme.colorScheme.primary),
+          ),
+          title: Text(title, style: theme.textTheme.titleSmall),
+          subtitle: Text(subtitle, style: theme.textTheme.bodySmall),
+        );
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: glassAppBar(context, 'Settings'),
@@ -36,32 +63,29 @@ class SettingsPage extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              Semantics(header: true, child: Text('Appearance', style: theme.textTheme.titleLarge)),
-              const SizedBox(height: 8),
+              heading(Icons.palette_outlined, 'Appearance'),
               GlassContainer(
-                child: Material(
-                  type: MaterialType.transparency,
-                  child: RadioGroup<ThemeMode>(
-                    groupValue: mode,
-                    onChanged: (m) {
-                      if (m != null) {
-                        ref.read(themeModeProvider.notifier).set(m);
-                      }
-                    },
-                    child: const Column(
+                radius: 24,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        RadioListTile<ThemeMode>(value: ThemeMode.system, title: Text('Same as the phone')),
-                        RadioListTile<ThemeMode>(value: ThemeMode.light, title: Text('Light')),
-                        RadioListTile<ThemeMode>(value: ThemeMode.dark, title: Text('Dark')),
+                        Expanded(child: _ThemeChoice(icon: Icons.brightness_auto_rounded, label: 'Same as the phone', selected: mode == ThemeMode.system, onTap: () => choose(ThemeMode.system))),
+                        const SizedBox(width: 10),
+                        Expanded(child: _ThemeChoice(icon: Icons.light_mode_rounded, label: 'Light', selected: mode == ThemeMode.light, onTap: () => choose(ThemeMode.light))),
+                        const SizedBox(width: 10),
+                        Expanded(child: _ThemeChoice(icon: Icons.dark_mode_rounded, label: 'Dark', selected: mode == ThemeMode.dark, onTap: () => choose(ThemeMode.dark))),
                       ],
                     ),
-                  ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 20),
-              Semantics(header: true, child: Text('Messages', style: theme.textTheme.titleLarge)),
-              const SizedBox(height: 8),
+              const SizedBox(height: 24),
+              heading(Icons.mark_email_unread_outlined, 'Messages'),
               GlassContainer(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                radius: 24,
                 child: Material(
                   type: MaterialType.transparency,
                   child: Column(
@@ -70,31 +94,82 @@ class SettingsPage extends ConsumerWidget {
                       profile.maybeWhen(
                         data: (OwnProfile p) => Column(
                           children: [
-                            SwitchListTile(
-                              value: p.emailNotifications,
-                              onChanged: (v) => setPref(email: v),
-                              title: const Text('Email updates'),
-                              subtitle: const Text('Quotes, handovers and other changes to your requests.'),
-                            ),
-                            SwitchListTile(
-                              value: p.pushNotifications,
-                              onChanged: (v) => setPref(push: v),
-                              title: const Text('Phone notifications'),
-                              subtitle: const Text('Alerts on this phone when something needs you.'),
-                            ),
+                            switchRow(Icons.alternate_email_rounded, p.emailNotifications, (v) => setPref(email: v), 'Email updates', 'Quotes, handovers and other changes to your requests.'),
+                            Divider(height: 1, indent: 72, endIndent: 16, color: theme.colorScheme.outlineVariant),
+                            switchRow(Icons.notifications_active_outlined, p.pushNotifications, (v) => setPref(push: v), 'Phone notifications', 'Alerts on this phone when something needs you.'),
                           ],
                         ),
                         orElse: () => const Padding(padding: EdgeInsets.all(16), child: LinearProgressIndicator()),
                       ),
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                        child: Text('Updates always appear in Notifications in the app.', style: theme.textTheme.bodyMedium),
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.info_outline_rounded, size: 16, color: theme.textTheme.bodySmall?.color),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text('Updates always appear in Notifications in the app.', style: theme.textTheme.bodySmall)),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One of the three ways to choose the look of the app, as a card with a picture of the idea.
+class _ThemeChoice extends StatelessWidget {
+  const _ThemeChoice({required this.icon, required this.label, required this.selected, required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      excludeSemantics: true,
+      child: Material(
+        color: selected ? scheme.primary.withValues(alpha: 0.12) : Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            constraints: const BoxConstraints(minHeight: 96),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: selected ? scheme.primary : scheme.outline, width: selected ? 2 : 1),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(icon, size: 28, color: selected ? scheme.primary : scheme.onSurface.withValues(alpha: 0.65)),
+                    if (selected) Positioned(right: -8, top: -6, child: Icon(Icons.check_circle_rounded, size: 16, color: scheme.primary)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(label, style: theme.textTheme.labelMedium?.copyWith(color: selected ? scheme.primary : scheme.onSurface, fontWeight: FontWeight.w700), textAlign: TextAlign.center),
+              ],
+            ),
           ),
         ),
       ),

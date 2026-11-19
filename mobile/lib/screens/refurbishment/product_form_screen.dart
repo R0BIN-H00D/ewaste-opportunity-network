@@ -193,6 +193,18 @@ class _FormState extends ConsumerState<_Form> {
     }
   }
 
+  /// A heading with an icon at the top of each group of fields.
+  Widget _sectionTitle(ThemeData theme, IconData icon, String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            Expanded(child: Semantics(header: true, child: Text(text, style: theme.textTheme.titleMedium))),
+          ],
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -206,6 +218,7 @@ class _FormState extends ConsumerState<_Form> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                _sectionTitle(theme, Icons.devices_other_outlined, 'About the device'),
                 if (_fromJob) ...[
                   const MessageBanner(message: 'Made from your finished job. The device is sold as one item and the owner is told it is on sale.', tone: BannerTone.info),
                   const SizedBox(height: 12),
@@ -224,7 +237,15 @@ class _FormState extends ConsumerState<_Form> {
                 AppTextField(controller: _brand, label: 'Brand (optional)', validator: validateBrandOrModel),
                 const SizedBox(height: 12),
                 AppTextField(controller: _model, label: 'Model (optional)', validator: validateBrandOrModel),
-                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          GlassContainer(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _sectionTitle(theme, Icons.fact_check_outlined, 'Condition and price'),
                 DropdownButtonFormField<String>(
                   initialValue: _condition,
                   isExpanded: true,
@@ -251,7 +272,7 @@ class _FormState extends ConsumerState<_Form> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Semantics(header: true, child: Text('Photos', style: theme.textTheme.titleLarge)),
+                _sectionTitle(theme, Icons.photo_camera_outlined, 'Photos'),
                 if (kept.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   SizedBox(

@@ -27,9 +27,9 @@ class AppChip extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
-                color: selected ? scheme.primary.withValues(alpha: 0.12) : Colors.transparent,
+                color: selected ? scheme.primary.withValues(alpha: 0.16) : scheme.surface.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: selected ? scheme.primary : scheme.outline, width: selected ? 2 : 1),
+                border: Border.all(color: selected ? scheme.primary : scheme.outline, width: selected ? 1.6 : 1),
               ),
               // Centre the label without letting the chip grow to the full width of a Wrap.
               child: Center(
@@ -76,15 +76,15 @@ class StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _color(context);
+    final color = AppColors.adapt(context, _color(context));
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
       ),
-      child: Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color, fontSize: 12)),
+      child: Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
     );
   }
 }

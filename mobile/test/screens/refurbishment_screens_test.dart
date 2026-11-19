@@ -85,14 +85,31 @@ void main() {
       expect(find.text('Indiranagar, Bengaluru'), findsNWidgets(2));
     });
 
-    testWidgets('a device chip filters and tapping it again clears it', (tester) async {
+    testWidgets('filters apply together and can be removed or reset without changing search', (tester) async {
       final repo = FakeRefurbishmentRepository(opportunityPages: {1: [sampleRefurbOpportunity()]});
       await _pump(tester, const RefurbOpportunitiesScreen(), refurb: repo);
 
+      await tester.enterText(find.byType(TextField), 'Dell');
+      await tester.pump(const Duration(milliseconds: 450));
+      final callsBeforeFilters = repo.opportunityQueries.length;
+      await _tap(tester, find.text('Filters'));
       await _tap(tester, find.widgetWithText(AppChip, 'Laptops'));
+      await _tap(tester, find.widgetWithText(AppChip, 'Minor damage'));
+      expect(repo.opportunityQueries, hasLength(callsBeforeFilters));
+      await _tap(tester, find.text('Show results'));
       expect(repo.opportunityQueries.last.category, 'laptops');
-      await _tap(tester, find.widgetWithText(AppChip, 'Laptops'));
+      expect(repo.opportunityQueries.last.condition, 'minor_damage');
+      expect(repo.opportunityQueries.last.q, 'Dell');
+      expect(find.text('Filters (2)'), findsOneWidget);
+
+      await _tap(tester, find.byTooltip('Remove device category filter'));
       expect(repo.opportunityQueries.last.category, '');
+      expect(repo.opportunityQueries.last.condition, 'minor_damage');
+      await _tap(tester, find.text('Filters (1)'));
+      await _tap(tester, find.text('Reset'));
+      await _tap(tester, find.text('Show results'));
+      expect(repo.opportunityQueries.last.activeFilters, 0);
+      expect(repo.opportunityQueries.last.q, 'Dell');
     });
 
     testWidgets('offering sends the amount and message, then opens the job', (tester) async {

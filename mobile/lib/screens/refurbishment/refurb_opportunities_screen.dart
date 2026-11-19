@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import '../../core/format.dart';
 import '../../core/network/api_exception.dart';
+import '../../models/listing.dart';
 import '../../models/refurbishment.dart';
 import '../../providers/listings_controller.dart';
 import '../../providers/refurbishment_providers.dart';
@@ -44,10 +45,71 @@ class _RefurbOpportunitiesScreenState extends ConsumerState<RefurbOpportunitiesS
     _debounce = Timer(const Duration(milliseconds: 400), () => _setQuery(text));
   }
 
-  Widget _row(List<Widget> chips) => SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(children: [for (var i = 0; i < chips.length; i++) ...[if (i > 0) const SizedBox(width: 8), chips[i]]]),
-      );
+  Future<void> _openFilters(List<Category> categories) async {
+    FocusScope.of(context).unfocus();
+    final current = ref.read(refurbOpportunityQueryProvider);
+    var category = current.category;
+    var condition = current.condition;
+    final filters = await showModalBottomSheet<({String category, String condition})>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          final textTheme = Theme.of(context).textTheme;
+          return SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: Text('Filter requests', style: textTheme.titleLarge)),
+                      TextButton(
+                        onPressed: category.isEmpty && condition.isEmpty ? null : () => setSheetState(() {
+                          category = '';
+                          condition = '';
+                        }),
+                        child: const Text('Reset'),
+                      ),
+                    ],
+                  ),
+                  if (categories.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Text('Device category', style: textTheme.titleSmall),
+                    const SizedBox(height: 8),
+                    Wrap(spacing: 8, runSpacing: 8, children: [
+                      AppChip(label: 'All devices', selected: category.isEmpty, onTap: () => setSheetState(() => category = '')),
+                      for (final c in categories)
+                        AppChip(label: c.name, selected: category == c.slug, onTap: () => setSheetState(() => category = c.slug)),
+                    ]),
+                  ],
+                  const SizedBox(height: 16),
+                  Text('Condition', style: textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  Wrap(spacing: 8, runSpacing: 8, children: [
+                    AppChip(label: 'Any condition', selected: condition.isEmpty, onTap: () => setSheetState(() => condition = '')),
+                    for (final (value, label) in conditions)
+                      AppChip(label: label, selected: condition == value, onTap: () => setSheetState(() => condition = value)),
+                  ]),
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    onPressed: () => Navigator.of(sheetContext).pop((category: category, condition: condition)),
+                    child: const Text('Show results'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    if (!mounted || filters == null) return;
+    if (filters.category == current.category && filters.condition == current.condition) return;
+    ref.read(refurbOpportunityQueryProvider.notifier).update((q) => q.copyWith(category: filters.category, condition: filters.condition));
+  }
 
   Future<void> _offer(RefurbOpportunity o) async {
     if (o.hasOffered) {
@@ -74,6 +136,8 @@ class _RefurbOpportunitiesScreenState extends ConsumerState<RefurbOpportunitiesS
     final query = ref.watch(refurbOpportunityQueryProvider);
     final notifier = ref.read(refurbOpportunityQueryProvider.notifier);
     final categories = ref.watch(categoriesProvider).valueOrNull ?? const [];
+    final filterCount = query.activeFilters;
+    final categoryName = categories.where((c) => c.slug == query.category).firstOrNull?.name ?? query.category;
 
     final header = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -103,20 +167,31 @@ class _RefurbOpportunitiesScreenState extends ConsumerState<RefurbOpportunitiesS
           ),
         ),
         if (_error != null) ...[const SizedBox(height: 12), MessageBanner(message: _error!, tone: BannerTone.error)],
-        if (categories.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _row([
-            AppChip(label: 'All devices', selected: query.category.isEmpty, onTap: () => notifier.update((q) => q.copyWith(category: ''))),
-            for (final c in categories)
-              AppChip(label: c.name, selected: query.category == c.slug, onTap: () => notifier.update((q) => q.copyWith(category: query.category == c.slug ? '' : c.slug))),
-          ]),
-        ],
         const SizedBox(height: 12),
-        _row([
-          AppChip(label: 'Any condition', selected: query.condition.isEmpty, onTap: () => notifier.update((q) => q.copyWith(condition: ''))),
-          for (final (value, label) in conditions)
-            AppChip(label: label, selected: query.condition == value, onTap: () => notifier.update((q) => q.copyWith(condition: query.condition == value ? '' : value))),
-        ]),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            FilledButton.tonalIcon(
+              onPressed: () => _openFilters(categories),
+              icon: const Icon(Icons.tune_rounded),
+              label: Text(filterCount == 0 ? 'Filters' : 'Filters ($filterCount)'),
+            ),
+            if (query.category.isNotEmpty)
+              InputChip(
+                label: Text(categoryName),
+                deleteButtonTooltipMessage: 'Remove device category filter',
+                onDeleted: () => notifier.update((q) => q.copyWith(category: '')),
+              ),
+            if (query.condition.isNotEmpty)
+              InputChip(
+                label: Text(labelOf(conditions, query.condition)),
+                deleteButtonTooltipMessage: 'Remove condition filter',
+                onDeleted: () => notifier.update((q) => q.copyWith(condition: '')),
+              ),
+          ],
+        ),
       ],
     );
 

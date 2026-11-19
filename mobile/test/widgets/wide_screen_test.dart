@@ -54,13 +54,16 @@ void main() {
       expect(find.text('Home'), findsOneWidget);
     });
 
-    testWidgets('still fills a phone width', (tester) async {
+    testWidgets('is a small bar in the middle of a phone-width screen', (tester) async {
       await _show(
         tester,
         const Size(360, 740),
         Scaffold(extendBody: true, body: const SizedBox.expand(), bottomNavigationBar: GlassNavBar(items: _items, currentIndex: 0, onSelected: (_) {})),
       );
-      expect(tester.getSize(find.descendant(of: find.byType(GlassNavBar), matching: find.byType(GlassContainer))).width, 360 - 32);
+      final bar = find.descendant(of: find.byType(GlassNavBar), matching: find.byType(GlassContainer));
+      expect(tester.getSize(bar).width, GlassNavBar.maxWidth);
+      expect(tester.getSize(bar).height, lessThan(64));
+      expect(tester.getCenter(bar).dx, closeTo(180, 1));
     });
   });
 }

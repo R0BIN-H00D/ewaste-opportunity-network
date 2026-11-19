@@ -1,34 +1,79 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
+import '../models/user.dart';
+import '../providers/auth_controller.dart';
 import '../providers/chat_providers.dart';
+import '../routes/route_paths.dart';
 import '../widgets/app_background.dart';
 import '../widgets/glass_nav_bar.dart';
 
-const _items = [
-  NavItem(icon: Icons.home_outlined, selectedIcon: Icons.home, label: 'Home'),
-  NavItem(icon: Icons.person_outline, selectedIcon: Icons.person, label: 'Account'),
-];
+/// The signed-in navigator and its persistent bottom destinations.
+class AppShell extends ConsumerStatefulWidget {
+  const AppShell({super.key, required this.location, required this.canChangeTab, required this.child});
 
-/// The signed-in app: the current tab with a floating glass bar underneath.
-/// Tabs keep their own state when you switch between them. More tabs are added with each role's screens.
-class AppShell extends ConsumerWidget {
-  const AppShell({super.key, required this.navigationShell});
-
-  final StatefulNavigationShell navigationShell;
+  final String location;
+  final bool Function() canChangeTab;
+  final Widget child;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends ConsumerState<AppShell> {
+  static const _destinations = [Routes.home, Routes.payments, Routes.activity, Routes.account];
+
+  late int _currentIndex = _initialIndex(widget.location);
+
+  int _initialIndex(String path) {
+    final index = _destinations.indexOf(path);
+    if (index >= 0) return index;
+    if (path == Routes.messages ||
+        path.startsWith('${Routes.messages}/') ||
+        path == Routes.notifications ||
+        path == Routes.help) {
+      return 2;
+    }
+    return path.startsWith('${Routes.account}/') ? 3 : 0;
+  }
+
+  @override
+  void didUpdateWidget(covariant AppShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A detail keeps the selection of the tab it was opened from.
+    final index = _destinations.indexOf(widget.location);
+    if (index >= 0) _currentIndex = index;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Keeps the unread badges and the notification list current for as long as the person is in the app.
     ref.watch(liveUpdatesProvider);
-    return Scaffold(
-      extendBody: true,
-      body: AppBackground(child: SafeArea(bottom: false, child: navigationShell)),
+    final isAdmin = ref.watch(authControllerProvider.select((auth) => auth.user?.role == UserRole.admin));
+    final scaffold = Scaffold(
+      backgroundColor: Colors.transparent,
+      body: widget.child,
       bottomNavigationBar: GlassNavBar(
-        items: _items,
-        currentIndex: navigationShell.currentIndex,
-        onSelected: (index) => navigationShell.goBranch(index, initialLocation: index == navigationShell.currentIndex),
+        items: [
+          const NavItem(icon: Icons.home_outlined, selectedIcon: Icons.home, label: 'Home'),
+          if (isAdmin) ...const [
+            NavItem(icon: Icons.verified_user_outlined, selectedIcon: Icons.verified_user, label: 'Verification'),
+            NavItem(icon: Icons.assignment_outlined, selectedIcon: Icons.assignment, label: 'Complaints'),
+          ] else ...const [
+            NavItem(
+                icon: Icons.account_balance_wallet_outlined,
+                selectedIcon: Icons.account_balance_wallet,
+                label: 'Wallet'),
+            NavItem(icon: Icons.inbox_outlined, selectedIcon: Icons.inbox, label: 'Messages'),
+          ],
+          const NavItem(icon: Icons.person_outline, selectedIcon: Icons.person, label: 'Account'),
+        ],
+        currentIndex: _currentIndex,
+        onSelected: (index) {
+          if (widget.canChangeTab()) context.go(_destinations[index]);
+        },
       ),
     );
+    return AppBackground(centerContent: false, child: scaffold);
   }
 }

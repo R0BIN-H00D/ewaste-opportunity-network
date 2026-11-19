@@ -10,6 +10,7 @@ import '../../routes/route_paths.dart';
 import '../../widgets/app_background.dart';
 import '../../widgets/app_chip.dart';
 import '../../widgets/glass_app_bar.dart';
+import '../../widgets/page_banner.dart';
 import '../../widgets/paged_list.dart';
 import 'order_card.dart';
 
@@ -25,17 +26,28 @@ class OrdersScreen extends ConsumerWidget {
     final status = ref.watch(orderStatusFilterProvider);
     final set = ref.read(orderStatusFilterProvider.notifier);
     final isSeller = ref.watch(authControllerProvider.select((s) => s.user?.role == UserRole.refurbisher));
-    final header = SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          AppChip(label: 'All', selected: status.isEmpty, onTap: () => set.state = ''),
-          for (final s in orderFilters) ...[
-            const SizedBox(width: 8),
-            AppChip(label: orderStatusLabel(s, seller: isSeller), selected: status == s, onTap: () => set.state = status == s ? '' : s),
-          ],
-        ],
-      ),
+    final header = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PageBanner(
+          icon: Icons.receipt_long_outlined,
+          title: isSeller ? 'Orders you received' : 'Track your orders',
+          subtitle: isSeller ? 'Confirm, prepare and hand over each one.' : 'See each order from placed to completed.',
+        ),
+        const SizedBox(height: 16),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              AppChip(label: 'All', selected: status.isEmpty, onTap: () => set.state = ''),
+              for (final s in orderFilters) ...[
+                const SizedBox(width: 8),
+                AppChip(label: orderStatusLabel(s, seller: isSeller), selected: status == s, onTap: () => set.state = status == s ? '' : s),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
     return PagedList<Order>(
       provider: ordersProvider,

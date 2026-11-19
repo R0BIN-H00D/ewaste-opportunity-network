@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import '../core/constants/app_constants.dart';
 import '../widgets/app_background.dart';
+import '../widgets/brand_mark.dart';
 
 /// Shown while the app starts: it reads the device's storage and tries to restore the last session.
 /// The router moves on by itself when that is done (to the introduction, the sign-in screen or the home screen).
@@ -16,8 +17,8 @@ class SplashScreen extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.recycling, size: 56, color: theme.colorScheme.primary),
-              const SizedBox(height: 12),
+              const BrandMark(size: 84),
+              const SizedBox(height: 20),
               Text(AppConstants.appName, style: theme.textTheme.headlineMedium),
               const SizedBox(height: 6),
               Text('Give your electronics a second life.', style: theme.textTheme.bodyMedium),

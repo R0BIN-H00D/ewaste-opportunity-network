@@ -55,20 +55,22 @@ void main() {
     expect(recycler['Recycling report'], Routes.recyclingReport);
   });
 
-  test('everyone who can chat has Pickups, Messages and Notifications, then the Learning centre, as the last tiles, and administrators do not', () {
+  test('providers have Learning centre on Home and members access it from Account', () {
     for (final role in UserRole.values.where((r) => r != UserRole.admin)) {
       final titles = [for (final a in actionsFor(role)) a.title];
-      expect(titles.sublist(titles.length - 4), ['My pickups', 'Messages', 'Notifications', 'Learning centre'], reason: role.name);
+      final extras = ['My pickups', 'Messages', 'Notifications', if (role.isProvider) 'Learning centre'];
+      expect(titles.sublist(titles.length - extras.length), extras, reason: role.name);
+      expect(moreActionsFor(role).any((action) => action.route == Routes.learn), role.isProvider);
       expect(titles.where((t) => t == 'Messages'), hasLength(1), reason: role.name);
     }
     expect(actionsFor(UserRole.admin).where((a) => a.title == 'Messages'), isEmpty);
     expect(actionsFor(UserRole.admin).where((a) => a.title == 'Profile'), isEmpty);
   });
 
-  test('administrators are pointed to the web dashboard', () {
+  test('administrators can open the mobile dashboard', () {
     final actions = actionsFor(UserRole.admin);
     expect(actions, hasLength(1));
-    expect(actions.single.subtitle, contains('web'));
+    expect(actions.single.route, Routes.admin);
   });
 
   group('verificationMessage', () {

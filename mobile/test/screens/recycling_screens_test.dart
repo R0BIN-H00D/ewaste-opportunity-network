@@ -3,6 +3,8 @@ import 'package:ewaste_opportunity/core/storage/key_value_store.dart';
 import 'package:ewaste_opportunity/core/theme/app_theme.dart';
 import 'package:ewaste_opportunity/models/listing.dart';
 import 'package:ewaste_opportunity/models/recycling.dart';
+import 'package:ewaste_opportunity/models/user.dart';
+import 'package:ewaste_opportunity/providers/auth_controller.dart';
 import 'package:ewaste_opportunity/providers/core_providers.dart';
 import 'package:ewaste_opportunity/providers/listings_controller.dart';
 import 'package:ewaste_opportunity/providers/photo_providers.dart';
@@ -20,8 +22,8 @@ import 'package:material_ui/material_ui.dart';
 import '../fakes.dart';
 import '../helpers.dart';
 
-Future<void> _pump(WidgetTester tester, Widget screen, FakeRecyclingRepository repo) async {
-  tester.view.physicalSize = const Size(900, 3000);
+Future<void> _pump(WidgetTester tester, Widget screen, FakeRecyclingRepository repo, {bool asCentre = false, double textScale = 1}) async {
+  tester.view.physicalSize = asCentre ? const Size(390, 850) : const Size(900, 3000);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
 
@@ -39,15 +41,29 @@ Future<void> _pump(WidgetTester tester, Widget screen, FakeRecyclingRepository r
     ProviderScope(
       overrides: [
         keyValueStoreProvider.overrideWithValue(MemoryKeyValueStore()),
-        authRepositoryProvider.overrideWithValue(FakeAuthRepository()),
+        authRepositoryProvider.overrideWithValue(FakeAuthRepository(loginResult: asCentre ? sampleMe(role: UserRole.recycler) : null)),
         recyclingRepositoryProvider.overrideWithValue(repo),
         deviceRepositoryProvider.overrideWithValue(FakeDeviceRepository()),
         photoPickerProvider.overrideWithValue(FakePhotoPicker()),
-        categoriesProvider.overrideWith((ref) async => const [Category(id: 'c1', name: 'Phones', slug: 'phones'), Category(id: 'c2', name: 'Laptops', slug: 'laptops')]),
+        categoriesProvider.overrideWith((ref) async =>
+            const [Category(id: 'c1', name: 'Phones', slug: 'phones'), Category(id: 'c2', name: 'Laptops', slug: 'laptops')]),
       ],
-      child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
+      child: MaterialApp.router(
+        theme: AppTheme.light(),
+        routerConfig: router,
+        builder: textScale == 1
+            ? null
+            : (context, child) => MediaQuery(
+                  data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(textScale)),
+                  child: child!,
+                ),
+      ),
     ),
   );
+  if (asCentre) {
+    final ref = ProviderScope.containerOf(tester.element(find.byType(MaterialApp)));
+    await ref.read(authControllerProvider.notifier).signIn(email: 'centre@example.com', password: 'test');
+  }
   await tester.pump(const Duration(milliseconds: 50));
   await tester.pump(const Duration(milliseconds: 50));
 }
@@ -55,6 +71,7 @@ Future<void> _pump(WidgetTester tester, Widget screen, FakeRecyclingRepository r
 /// Taps and lets a dialog, sheet or answer finish (the pulsing skeletons keep `pumpAndSettle` from ever returning).
 Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.ensureVisible(finder);
+  await tester.pump();
   await tester.tap(finder);
   for (var i = 0; i < 8; i++) {
     await tester.pump(const Duration(milliseconds: 100));
@@ -163,7 +180,8 @@ void main() {
     });
 
     testWidgets('shows what the server refused', (tester) async {
-      final repo = FakeRecyclingRepository(centerList: [sampleCenter()])..actionError = const ApiException('This recycling centre is not available', code: 'CENTER_UNAVAILABLE');
+      final repo = FakeRecyclingRepository(centerList: [sampleCenter()])
+        ..actionError = const ApiException('This recycling centre is not available', code: 'CENTER_UNAVAILABLE');
       await _pump(tester, const RecycleScreen(centerId: 'ce1'), repo);
 
       await _tap(tester, find.widgetWithText(AppChip, 'Phones'));
@@ -176,7 +194,8 @@ void main() {
     });
 
     testWidgets('a centre that lists no categories cannot take a request yet', (tester) async {
-      final bare = RecyclingCenter.fromJson(const {'_id': 'ce1', 'name': 'Bare Centre', 'city': 'Bengaluru', 'authorized': true, 'acceptedCategories': <Object>[]});
+      final bare = RecyclingCenter.fromJson(
+          const {'_id': 'ce1', 'name': 'Bare Centre', 'city': 'Bengaluru', 'authorized': true, 'acceptedCategories': <Object>[]});
       await _pump(tester, const RecycleScreen(centerId: 'ce1'), FakeRecyclingRepository(centerList: [bare]));
       expect(find.textContaining('has not listed what it accepts'), findsOneWidget);
     });
@@ -205,18 +224,43 @@ void main() {
       expect(find.text('Nothing here'), findsOneWidget);
     });
 
-    testWidgets('a centre sees its own wording and the sender\'s name', (tester) async {
+    testWidgets('the centre queue shows each request and opens its details', (tester) async {
       final repo = FakeRecyclingRepository(pages: {
         1: [sampleRecycling(role: 'center')],
       });
-      await _pump(tester, const RecyclingRequestsScreen(), repo);
+      await _pump(tester, const RecyclingRequestsScreen(), repo, asCentre: true, textScale: 2);
 
+      expect(find.text('Collection queue'), findsOneWidget);
+      expect(find.text('1 request'), findsOneWidget);
       expect(find.text('Asha'), findsOneWidget);
       expect(find.text('New request'), findsOneWidget);
+      expect(find.text('12 MG Road, Indiranagar'), findsNothing);
+      await _tap(tester, find.text('Asha'));
+      expect(find.text('request page rr1'), findsOneWidget);
+    });
+
+    testWidgets('the centre applies a status when submitting filters and can clear it from the empty state', (tester) async {
+      final repo = FakeRecyclingRepository();
+      await _pump(tester, const RecyclingRequestsScreen(), repo, asCentre: true);
+      await _tap(tester, find.text('Filters'));
+      final beforeSelection = repo.listCalls.length;
+      await _tap(tester, find.widgetWithText(ChoiceChip, 'Processed'));
+      expect(repo.listCalls, hasLength(beforeSelection));
+      await _tap(tester, find.text('Show results'));
+      expect(repo.listCalls.last.status, 'processed');
+      expect(find.text('Filters (1)'), findsOneWidget);
+      expect(find.text('No matching requests'), findsOneWidget);
+      await _tap(tester, find.text('Clear filter'));
+      expect(repo.listCalls.last.status, '');
     });
 
     testWidgets('tapping a request opens it', (tester) async {
-      await _pump(tester, const RecyclingRequestsScreen(), FakeRecyclingRepository(pages: {1: [sampleRecycling(id: 'zz')]}));
+      await _pump(
+          tester,
+          const RecyclingRequestsScreen(),
+          FakeRecyclingRepository(pages: {
+            1: [sampleRecycling(id: 'zz')]
+          }));
       await _tap(tester, find.text('GreenCycle Recyclers'));
       expect(find.text('request page zz'), findsOneWidget);
     });
@@ -235,7 +279,8 @@ void main() {
     });
 
     testWidgets('cancelling asks for an optional reason and shows the result', (tester) async {
-      final repo = FakeRecyclingRepository(current: sampleRecycling(actions: ['cancel']))..result = sampleRecycling(status: 'cancelled', cancelReason: 'Changed my mind');
+      final repo = FakeRecyclingRepository(current: sampleRecycling(actions: ['cancel']))
+        ..result = sampleRecycling(status: 'cancelled', cancelReason: 'Changed my mind');
       await _pump(tester, const RecyclingDetailsScreen(id: 'rr1'), repo);
 
       await _tap(tester, find.text('Cancel request'));
@@ -250,7 +295,10 @@ void main() {
 
     testWidgets('handing over needs the data-protection checklist ticked first', (tester) async {
       final repo = FakeRecyclingRepository(
-        current: sampleRecycling(status: 'pickup_scheduled', actions: ['confirm_handover', 'cancel'], pickup: {'date': '2026-11-20T10:00:00.000Z', 'timeSlot': 'Morning'}),
+        current: sampleRecycling(
+            status: 'pickup_scheduled',
+            actions: ['confirm_handover', 'cancel'],
+            pickup: {'date': '2026-11-20T10:00:00.000Z', 'timeSlot': 'Morning'}),
       );
       await _pump(tester, const RecyclingDetailsScreen(id: 'rr1'), repo);
       expect(find.text('Time slot'), findsOneWidget);
@@ -290,14 +338,16 @@ void main() {
     });
 
     testWidgets('a declined request shows why', (tester) async {
-      await _pump(tester, const RecyclingDetailsScreen(id: 'rr1'), FakeRecyclingRepository(current: sampleRecycling(status: 'rejected', cancelReason: 'We do not take phones')));
+      await _pump(tester, const RecyclingDetailsScreen(id: 'rr1'),
+          FakeRecyclingRepository(current: sampleRecycling(status: 'rejected', cancelReason: 'We do not take phones')));
       expect(find.text('Reason: We do not take phones'), findsOneWidget);
       expect(find.textContaining('declined this request'), findsOneWidget);
     });
 
     testWidgets('if the other side changed it first, says so and shows the new state', (tester) async {
       final repo = FakeRecyclingRepository(current: sampleRecycling(actions: ['cancel']))
-        ..actionError = const ApiException('This request was just changed. Reload the page and try again.', code: 'STALE_STATE', failure: ApiFailure.conflict);
+        ..actionError = const ApiException('This request was just changed. Reload the page and try again.',
+            code: 'STALE_STATE', failure: ApiFailure.conflict);
       await _pump(tester, const RecyclingDetailsScreen(id: 'rr1'), repo);
 
       await _tap(tester, find.text('Cancel request'));
@@ -338,7 +388,8 @@ void main() {
     });
 
     testWidgets('collecting the devices is confirmed without the sender\'s checklist', (tester) async {
-      final repo = FakeRecyclingRepository(current: sampleRecycling(role: 'center', status: 'pickup_scheduled', actions: ['confirm_handover', 'cancel']));
+      final repo = FakeRecyclingRepository(
+          current: sampleRecycling(role: 'center', status: 'pickup_scheduled', actions: ['confirm_handover', 'cancel']));
       await _pump(tester, const RecyclingDetailsScreen(id: 'rr1'), repo);
 
       await _tap(tester, find.text('Confirm the handover'));
@@ -348,7 +399,8 @@ void main() {
     });
 
     testWidgets('recording materials sends measured and estimated weights apart', (tester) async {
-      final repo = FakeRecyclingRepository(current: sampleRecycling(role: 'center', status: 'received_at_center', actions: ['record_materials']));
+      final repo =
+          FakeRecyclingRepository(current: sampleRecycling(role: 'center', status: 'received_at_center', actions: ['record_materials']));
       await _pump(tester, const RecyclingDetailsScreen(id: 'rr1'), repo);
 
       await _tap(tester, find.text('Record recovered materials'));
@@ -368,7 +420,8 @@ void main() {
     });
 
     testWidgets('a weight that is not a number is refused in the form', (tester) async {
-      final repo = FakeRecyclingRepository(current: sampleRecycling(role: 'center', status: 'received_at_center', actions: ['record_materials']));
+      final repo =
+          FakeRecyclingRepository(current: sampleRecycling(role: 'center', status: 'received_at_center', actions: ['record_materials']));
       await _pump(tester, const RecyclingDetailsScreen(id: 'rr1'), repo);
 
       await _tap(tester, find.text('Record recovered materials'));
@@ -379,7 +432,10 @@ void main() {
     });
 
     testWidgets('processing needs the materials first, and completing asks for a check', (tester) async {
-      final done = sampleRecycling(role: 'center', status: 'processed', actions: ['record_materials', 'complete'], materials: [
+      final done = sampleRecycling(role: 'center', status: 'processed', actions: [
+        'record_materials',
+        'complete'
+      ], materials: [
         {'type': 'copper', 'actualKg': 4.5, 'estimatedKg': null},
       ]);
       final repo = FakeRecyclingRepository(current: done);
@@ -387,7 +443,8 @@ void main() {
 
       expect(find.text('Edit recovered materials'), findsOneWidget);
       await _tap(tester, find.text('Complete the request'));
-      expect(find.descendant(of: find.byType(AlertDialog), matching: find.textContaining('become the sender\'s verified impact')), findsOneWidget);
+      expect(find.descendant(of: find.byType(AlertDialog), matching: find.textContaining('become the sender\'s verified impact')),
+          findsOneWidget);
       await _tap(tester, _inDialog('Complete'));
       expect(repo.calls, ['complete']);
     });
@@ -402,4 +459,3 @@ void main() {
     });
   });
 }
-

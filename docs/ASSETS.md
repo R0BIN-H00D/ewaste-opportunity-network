@@ -32,6 +32,7 @@ Every drawing in the app is original work, written as SVG in code, so there is n
 | Spot illustrations: devices, search, recycle, inbox, map, tools, gift, learn | `web/src/components/art/Illustrations.jsx`, shown by `EmptyState` | Drawn for this project | Project code |
 | Landing hero and background layers | CSS and SVG in `web/src/components/landing/` | Drawn for this project | Project code |
 | Favicon | `web/public/favicon.svg` | Drawn for this project | Project code |
+| Mobile app logo (the robot-bin mascot): the launcher icon and the logo on the splash and sign-in screens | `mobile/android/app/src/main/res/mipmap-*/ic_launcher*.png`, `mobile/assets/images/logo.png` | Supplied by the project owner (cut out of its background and resized for each icon size) | Project asset |
 
 How the illustrations are built: each is 160 by 120, uses `currentColor` at different strengths (so one drawing works on light and dark), takes the lime and mint accents from the palette, carries `aria-hidden` (they are decoration) and is a few hundred bytes. Because they are vector there is no WebP or AVIF version to make; photographs, if ever added, must be added as WebP or AVIF with their licence in the table above.
 

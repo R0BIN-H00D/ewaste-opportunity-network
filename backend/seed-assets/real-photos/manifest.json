@@ -1,0 +1,362 @@
+{
+  "hp-pavilion-15": {
+    "file": "hp-pavilion-15.jpg",
+    "shows": "HP Pavilion 15 laptop",
+    "sources": [
+      {
+        "title": "HP Pavilion 15 cs3095nr.jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:HP_Pavilion_15_cs3095nr.jpg",
+        "license": "CC BY-SA 4.0",
+        "author": "Dienthoaiquangcao62"
+      }
+    ]
+  },
+  "samsung-galaxy-j7": {
+    "file": "samsung-galaxy-j7.jpg",
+    "shows": "Samsung Galaxy J7, front",
+    "sources": [
+      {
+        "title": "Samsung Galaxy J7 (Black) - Front.jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:Samsung_Galaxy_J7_(Black)_-_Front.jpg",
+        "license": "CC BY-SA 4.0",
+        "author": "Beamish4"
+      }
+    ]
+  },
+  "dell-monitor": {
+    "file": "dell-monitor.jpg",
+    "shows": "Dell widescreen LCD monitor (a Dell monitor of the same kind, not the exact P2219H / P2419H)",
+    "sources": [
+      {
+        "title": "Dell Computer Monitor.png",
+        "page": "https://commons.wikimedia.org/wiki/File:Dell_Computer_Monitor.png",
+        "license": "CC BY-SA 4.0",
+        "author": "IT Photography"
+      }
+    ]
+  },
+  "logitech-k270": {
+    "file": "logitech-k270.jpg",
+    "shows": "Logitech K270 wireless keyboard (the keyboard of the MK270 set)",
+    "sources": [
+      {
+        "title": "Clavier sans fil Logitech K270.jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:Clavier_sans_fil_Logitech_K270.jpg",
+        "license": "CC BY-SA 4.0",
+        "author": "Julien Sinan"
+      }
+    ]
+  },
+  "keyboard-mouse": {
+    "file": "keyboard-mouse.jpg",
+    "shows": "Wireless keyboard and mouse set (a generic set)",
+    "sources": [
+      {
+        "title": "Wireless computer keyboard with mouse an USB receiver.jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:Wireless_computer_keyboard_with_mouse_an_USB_receiver.jpg",
+        "license": "CC BY-SA 4.0",
+        "author": "Andreas Schwarzkopf"
+      }
+    ]
+  },
+  "thinkpad-t450": {
+    "file": "thinkpad-t450.jpg",
+    "shows": "Lenovo ThinkPad T450s (the slim sibling of the T450)",
+    "sources": [
+      {
+        "title": "T450s (slim version of T450).jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:T450s_(slim_version_of_T450).jpg",
+        "license": "CC BY-SA 4.0",
+        "author": "Satellite TV Lover"
+      }
+    ]
+  },
+  "dell-inspiron-15": {
+    "file": "dell-inspiron-15.jpg",
+    "shows": "Dell Inspiron 6400 (an older Dell Inspiron 15-inch laptop, not the exact 3511)",
+    "sources": [
+      {
+        "title": "Dell Inspiron 6400 (open).jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:Dell_Inspiron_6400_(open).jpg",
+        "license": "CC BY 2.0",
+        "author": "Kansir"
+      }
+    ]
+  },
+  "lenovo-ideapad": {
+    "file": "lenovo-ideapad.jpg",
+    "shows": "Lenovo IdeaPad 110 (a Lenovo IdeaPad of the same family, not the exact S145)",
+    "sources": [
+      {
+        "title": "Lenovo IdeaPad 110.jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:Lenovo_IdeaPad_110.jpg",
+        "license": "CC BY-SA 3.0",
+        "author": "EEIM"
+      }
+    ]
+  },
+  "iphone-8": {
+    "file": "iphone-8.jpg",
+    "shows": "Apple iPhone 8 (with an iPhone 8 Plus)",
+    "sources": [
+      {
+        "title": "IPhone 8 silver and iPhone 8 Plus gold.jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:IPhone_8_silver_and_iPhone_8_Plus_gold.jpg",
+        "license": "CC0",
+        "author": "Tinh tế Photo"
+      }
+    ]
+  },
+  "nokia-105": {
+    "file": "nokia-105.jpg",
+    "shows": "Nokia 105",
+    "sources": [
+      {
+        "title": "2013 Nokia 105 - 04.jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:2013_Nokia_105_-_04.jpg",
+        "license": "CC BY 3.0",
+        "author": "Alessandro Antonelli"
+      }
+    ]
+  },
+  "galaxy-tab-a-10": {
+    "file": "galaxy-tab-a-10.jpg",
+    "shows": "Samsung Galaxy Tab A 10.1 (2016)",
+    "sources": [
+      {
+        "title": "Samsung Galaxy Tab A 10.1 (2016) верхнее меню.jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:Samsung_Galaxy_Tab_A_10.1_(2016)_%D0%B2%D0%B5%D1%80%D1%85%D0%BD%D0%B5%D0%B5_%D0%BC%D0%B5%D0%BD%D1%8E.jpg",
+        "license": "CC BY-SA 4.0",
+        "author": "Alekc2m"
+      }
+    ]
+  },
+  "router": {
+    "file": "router.jpg",
+    "shows": "TP-Link Wi-Fi router (a generic router)",
+    "sources": [
+      {
+        "title": "TP-Link TL-WR740N router HS5.jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:TP-Link_TL-WR740N_router_HS5.jpg",
+        "license": "CC BY 4.0",
+        "author": "Hayden Schiff"
+      }
+    ]
+  },
+  "canon-pixma": {
+    "file": "canon-pixma.jpg",
+    "shows": "Canon PIXMA multifunction inkjet printer (a PIXMA of the same family, not the exact G3010)",
+    "sources": [
+      {
+        "title": "Canon PIXMA TS 3480 Multifunction ink-jet Printer (4).jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:Canon_PIXMA_TS_3480_Multifunction_ink-jet_Printer_(4).jpg",
+        "license": "CC BY-SA 4.0",
+        "author": "Dinkun Chen"
+      }
+    ]
+  },
+  "dell-optiplex-3020": {
+    "file": "dell-optiplex-3020.jpg",
+    "shows": "Dell OptiPlex 3020",
+    "sources": [
+      {
+        "title": "Dell OptiPlex 3020 001.jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:Dell_OptiPlex_3020_001.jpg",
+        "license": "CC BY-SA 4.0",
+        "author": "Miguel Durán, Museo8bits"
+      }
+    ]
+  },
+  "lg-monitor": {
+    "file": "lg-monitor.jpg",
+    "shows": "LG L194WT 19-inch LCD monitor (an LG monitor of the same size, not the exact 19M38A)",
+    "sources": [
+      {
+        "title": "LG L194WT-SF LCD monitor.jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:LG_L194WT-SF_LCD_monitor.jpg",
+        "license": "CC BY-SA 2.0",
+        "author": "florisla from Mechelen, Belgium"
+      }
+    ]
+  },
+  "hp-pavilion-14": {
+    "file": "hp-pavilion-14.jpg",
+    "shows": "HP Pavilion 14 laptop",
+    "sources": [
+      {
+        "title": "HP Pavilion 14-q030sg-0989.jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:HP_Pavilion_14-q030sg-0989.jpg",
+        "license": "CC BY-SA 4.0",
+        "author": "Raimond Spekking"
+      }
+    ]
+  },
+  "galaxy-a12": {
+    "file": "galaxy-a12.jpg",
+    "shows": "Samsung Galaxy A12, back",
+    "sources": [
+      {
+        "title": "Samsung A12 back view.png",
+        "page": "https://commons.wikimedia.org/wiki/File:Samsung_A12_back_view.png",
+        "license": "CC BY-SA 4.0",
+        "author": "Bralyn Fuller"
+      }
+    ]
+  },
+  "acer-aspire-5": {
+    "file": "acer-aspire-5.jpg",
+    "shows": "Acer Aspire A515-51 (an Aspire 5 model)",
+    "sources": [
+      {
+        "title": "Acer Aspire A515-51.jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:Acer_Aspire_A515-51.jpg",
+        "license": "CC BY-SA 4.0",
+        "author": "Woofstarcat"
+      }
+    ]
+  },
+  "dell-optiplex-7010": {
+    "file": "dell-optiplex-7010.jpg",
+    "shows": "Dell OptiPlex 9020 (the next model after the 7010, same design)",
+    "sources": [
+      {
+        "title": "Dell OptiPlex 9020 Desktop (14246675643).png",
+        "page": "https://commons.wikimedia.org/wiki/File:Dell_OptiPlex_9020_Desktop_(14246675643).png",
+        "license": "CC BY 2.0",
+        "author": "Azriena Azman"
+      }
+    ]
+  },
+  "thinkpad-t440": {
+    "file": "thinkpad-t440.jpg",
+    "shows": "Lenovo ThinkPad T440",
+    "sources": [
+      {
+        "title": "Lenovo ThinkPad T440.jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:Lenovo_ThinkPad_T440.jpg",
+        "license": "CC BY-SA 3.0",
+        "author": "Jojhnjoy"
+      }
+    ]
+  },
+  "samsung-monitor": {
+    "file": "samsung-monitor.jpg",
+    "shows": "Samsung SyncMaster LCD monitor (a Samsung monitor, not the exact S22E310)",
+    "sources": [
+      {
+        "title": "Samsung SyncMaster 400tft at the Kringloopwinkel Snuffelshop, Heiligerlee (2018).jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:Samsung_SyncMaster_400tft_at_the_Kringloopwinkel_Snuffelshop,_Heiligerlee_(2018).jpg",
+        "license": "CC BY-SA 4.0",
+        "author": "Donald Trung Quoc Don (Chữ Hán: 徵國單) - Wikimedia Commons.(Want to use this image"
+      }
+    ]
+  },
+  "ipad-air-2": {
+    "file": "ipad-air-2.jpg",
+    "shows": "Apple iPad Air 2",
+    "sources": [
+      {
+        "title": "IPad Air 2 Wikipedia.png",
+        "page": "https://commons.wikimedia.org/wiki/File:IPad_Air_2_Wikipedia.png",
+        "license": "CC BY 3.0",
+        "author": "Netspy"
+      }
+    ]
+  },
+  "hp-laserjet-1020": {
+    "file": "hp-laserjet-1020.jpg",
+    "shows": "HP LaserJet 1020 printer",
+    "sources": [
+      {
+        "title": "HP LaserJet 1020 printer.jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:HP_LaserJet_1020_printer.jpg",
+        "license": "CC BY-SA 3.0",
+        "author": "Joydeep"
+      }
+    ]
+  },
+  "hp-laserjet-1018": {
+    "file": "hp-laserjet-1018.jpg",
+    "shows": "HP LaserJet 1020 printer (the LaserJet 1018 looks the same)",
+    "sources": [
+      {
+        "title": "HP LaserJet 1020 printer 0.jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:HP_LaserJet_1020_printer_0.jpg",
+        "license": "CC BY-SA 3.0",
+        "author": "Joydeep"
+      }
+    ]
+  },
+  "thinkpad-x230": {
+    "file": "thinkpad-x230.jpg",
+    "shows": "Lenovo ThinkPad X230",
+    "sources": [
+      {
+        "title": "ThinkPad X230-9671.jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:ThinkPad_X230-9671.jpg",
+        "license": "CC BY-SA 4.0",
+        "author": "Raimond Spekking"
+      }
+    ]
+  },
+  "iphone-7": {
+    "file": "iphone-7.jpg",
+    "shows": "Apple iPhone 7 (with an iPhone 7 Plus)",
+    "sources": [
+      {
+        "title": "IPhone 7 and iPhone 7 Plus.jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:IPhone_7_and_iPhone_7_Plus.jpg",
+        "license": "CC BY 2.0",
+        "author": "Maurizio Pesce from Milan, Italia"
+      }
+    ]
+  },
+  "galaxy-tab-a-8": {
+    "file": "galaxy-tab-a-8.jpg",
+    "shows": "Samsung Galaxy Tab (an 8-inch class Samsung tablet, not the exact Tab A 8.0)",
+    "sources": [
+      {
+        "title": "Samsung galaxy tab 2.jpeg",
+        "page": "https://commons.wikimedia.org/wiki/File:Samsung_galaxy_tab_2.jpeg",
+        "license": "CC BY-SA 3.0",
+        "author": "User:Sreesankarlp"
+      }
+    ]
+  },
+  "acer-veriton": {
+    "file": "acer-veriton.jpg",
+    "shows": "Acer Veriton S480G desktop",
+    "sources": [
+      {
+        "title": "Acer Veriton S480G.jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:Acer_Veriton_S480G.jpg",
+        "license": "CC BY-SA 4.0",
+        "author": "Alexsidr117"
+      }
+    ]
+  },
+  "android-phones": {
+    "file": "android-phones.jpg",
+    "shows": "Three Android phones side by side (Samsung Galaxy J7, Galaxy S, Galaxy A12), made from three photos",
+    "sources": [
+      {
+        "title": "Samsung Galaxy J7 (Black) - Front.jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:Samsung_Galaxy_J7_(Black)_-_Front.jpg",
+        "license": "CC BY-SA 4.0",
+        "author": "Beamish4"
+      },
+      {
+        "title": "Samsung Galaxy S (Metallic Black) - Front.jpg",
+        "page": "https://commons.wikimedia.org/wiki/File:Samsung_Galaxy_S_(Metallic_Black)_-_Front.jpg",
+        "license": "CC BY-SA 4.0",
+        "author": "Beamish4"
+      },
+      {
+        "title": "Samsung A12 back view.png",
+        "page": "https://commons.wikimedia.org/wiki/File:Samsung_A12_back_view.png",
+        "license": "CC BY-SA 4.0",
+        "author": "Bralyn Fuller"
+      }
+    ]
+  }
+}

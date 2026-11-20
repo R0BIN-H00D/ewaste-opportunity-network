@@ -13,6 +13,7 @@
     "seed": "node src/seed.js",
     "seed:demo": "node src/seedDemo.js",
     "seed:photos": "node src/seedPhotos.js",
+    "seed:realphotos": "node src/seedRealPhotos.js",
     "dev:approve": "node src/devApprove.js",
     "test": "jest --runInBand",
     "lint": "eslint ."

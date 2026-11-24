@@ -29,6 +29,7 @@ import 'package:ewaste_opportunity/services/device_repository.dart';
 import 'package:ewaste_opportunity/services/donation_repository.dart';
 import 'package:ewaste_opportunity/services/location_service.dart';
 import 'package:ewaste_opportunity/services/marketplace_repository.dart';
+import 'package:ewaste_opportunity/services/razorpay_checkout.dart';
 import 'package:ewaste_opportunity/services/refurbishment_repository.dart';
 import 'package:ewaste_opportunity/services/photo_picker.dart';
 import 'package:ewaste_opportunity/services/recycling_repository.dart';
@@ -671,8 +672,10 @@ ServiceRequest sampleRequest(
         String status = 'request_submitted',
         List<String> actions = const [],
         bool onSite = false,
-        bool quote = false}) =>
+        bool quote = false,
+        bool paid = false}) =>
     ServiceRequest.fromJson(requestJson(
+        paid: paid,
         id: id,
         status: status,
         actions: actions,
@@ -771,6 +774,18 @@ class FakeRequestRepository extends RequestRepository {
           {required bool accept, String? reason, bool cancel = false}) async =>
       _done(
           '${accept ? 'approve' : 'decline'}:$quotationId:${reason ?? ''}:${cancel ? 'cancel' : 'again'}');
+
+  @override
+  Future<PaymentSession> startPayment(String id) async {
+    final e = actionError;
+    if (e != null) throw e;
+    calls.add('startPayment:$id');
+    return const PaymentSession(keyId: 'rzp_test_x', gatewayOrderId: 'order_1', amount: 250000, currency: 'INR', description: 'Repair service');
+  }
+
+  @override
+  Future<ServiceRequest> verifyPayment(String id, PaymentProof proof) async =>
+      _done('verifyPayment:$id:${proof.paymentId}');
 
   @override
   Future<ServiceRequest> cancel(String id, {String? reason}) async =>
@@ -1050,14 +1065,14 @@ Product sampleProduct(
         String title = 'Refurbished ThinkPad',
         int stock = 3,
         String status = 'active',
-        bool isMine = false}) =>
-    Product.fromJson(productJson(
-        id: id,
-        title: title,
-        detail: true,
-        stock: stock,
-        status: status,
-        isMine: isMine));
+        bool isMine = false,
+        Map<String, String>? conditionDetails,
+        String? conditionNote}) =>
+    Product.fromJson({
+      ...productJson(id: id, title: title, detail: true, stock: stock, status: status, isMine: isMine),
+      if (conditionDetails != null) 'conditionDetails': conditionDetails,
+      if (conditionNote != null) 'conditionNote': conditionNote,
+    });
 
 Order sampleOrder({
   String id = 'o1',
@@ -1068,6 +1083,7 @@ Order sampleOrder({
   bool reviewed = false,
   String? cancelReason,
   String paymentStatus = 'pending',
+  String paymentMethod = 'cod',
 }) =>
     Order.fromJson(orderJson(
         id: id,
@@ -1077,7 +1093,23 @@ Order sampleOrder({
         canReview: canReview,
         reviewed: reviewed,
         cancelReason: cancelReason,
-        paymentStatus: paymentStatus));
+        paymentStatus: paymentStatus,
+        paymentMethod: paymentMethod));
+
+/// Stands in for the Razorpay window: answers with [proof], or throws [error] (for example [PaymentCancelled]).
+class FakePaymentLauncher implements PaymentLauncher {
+  FakePaymentLauncher({this.proof, this.error});
+  final PaymentProof? proof;
+  final Object? error;
+  int opened = 0;
+
+  @override
+  Future<PaymentProof> pay(PaymentSession session, {String? name, String? email}) async {
+    opened++;
+    if (error != null) throw error!;
+    return proof!;
+  }
+}
 
 /// A [MarketplaceRepository] that never touches the network. Every action records itself in [calls] and answers with [result].
 class FakeMarketplaceRepository extends MarketplaceRepository {
@@ -1143,6 +1175,20 @@ class FakeMarketplaceRepository extends MarketplaceRepository {
     calls.add(
         'place:$productId:$quantity:$paymentMethod:$deliveryArea:$deliveryCity:$deliveryPincode:${notes ?? ''}');
     return sampleOrder(id: 'o-new');
+  }
+
+  @override
+  Future<PaymentSession> startPayment(String id) async {
+    final e = actionError;
+    if (e != null) throw e;
+    calls.add('startPayment:$id');
+    return const PaymentSession(keyId: 'rzp_test_x', gatewayOrderId: 'order_1', amount: 4999800, currency: 'INR', description: 'ThinkPad');
+  }
+
+  @override
+  Future<Order> verifyPayment(String id, PaymentProof proof) async {
+    calls.add('verifyPayment:$id:${proof.paymentId}');
+    return result ?? current;
   }
 
   /// The seller's own products, by page.

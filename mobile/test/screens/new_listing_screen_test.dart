@@ -1,7 +1,13 @@
+import 'dart:convert';
 import 'package:ewaste_opportunity/core/network/api_exception.dart';
 import 'package:ewaste_opportunity/core/storage/key_value_store.dart';
+import 'package:ewaste_opportunity/widgets/app_chip.dart';
 import 'package:ewaste_opportunity/core/theme/app_theme.dart';
+import 'package:ewaste_opportunity/models/ai_result.dart';
 import 'package:ewaste_opportunity/models/listing.dart';
+import 'package:ewaste_opportunity/models/user.dart';
+import 'package:ewaste_opportunity/providers/ai_providers.dart';
+import 'package:ewaste_opportunity/providers/auth_controller.dart';
 import 'package:ewaste_opportunity/providers/core_providers.dart';
 import 'package:ewaste_opportunity/providers/listings_controller.dart';
 import 'package:ewaste_opportunity/providers/location_providers.dart';
@@ -16,6 +22,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import '../fakes.dart';
 import '../helpers.dart';
+import '../widgets/ai_cards_test.dart' show FakeAiRepository, resultJson;
 
 const _good = PickedPhoto(
     path: '/none/front.jpg',
@@ -30,10 +37,28 @@ const _huge = PickedPhoto(
     mime: 'image/jpeg',
     bytes: 6 * 1024 * 1024);
 
+/// A signed-in person whose profile has a phone number.
+class _SignedInWithPhone extends AuthController {
+  _SignedInWithPhone(this.phone);
+
+  final String phone;
+
+  @override
+  AuthState build() {
+    final user = sampleMe().user;
+    return AuthState(
+      status: AuthStatus.authenticated,
+      me: Me(user: AppUser(id: user.id, name: user.name, email: user.email, role: user.role, status: user.status, emailVerified: user.emailVerified, phone: phone)),
+    );
+  }
+}
+
 Future<void> _pump(
     WidgetTester tester, FakeDeviceRepository repo, FakePhotoPicker picker,
     {FakeLocationService? phone,
-    FakeGeoRepository? geo}) async {
+    FakeGeoRepository? geo,
+    FakeAiRepository? ai,
+    String? profilePhone}) async {
   tester.view.physicalSize = const Size(900, 2600);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -57,6 +82,8 @@ Future<void> _pump(
       overrides: [
         keyValueStoreProvider.overrideWithValue(MemoryKeyValueStore()),
         authRepositoryProvider.overrideWithValue(FakeAuthRepository()),
+        aiRepositoryProvider.overrideWithValue(ai ?? FakeAiRepository()),
+        if (profilePhone != null) authControllerProvider.overrideWith(() => _SignedInWithPhone(profilePhone)),
         deviceRepositoryProvider.overrideWithValue(repo),
         photoPickerProvider.overrideWithValue(picker),
         geoRepositoryProvider.overrideWithValue(geo ?? FakeGeoRepository()),
@@ -69,8 +96,17 @@ Future<void> _pump(
 }
 
 Future<void> _tap(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
   await tester.tap(finder);
   await tester.pump(const Duration(milliseconds: 100));
+}
+
+/// Answers the four parts a new listing needs, with whichever of them the chosen category has (battery, screen, ports and buttons, water damage).
+Future<void> _answerRequiredParts(WidgetTester tester) async {
+  for (final label in ['Holds charge well', 'No damage', 'All work', 'None']) {
+    final f = find.text(label);
+    if (f.evaluate().isNotEmpty) await _tap(tester, f.first);
+  }
 }
 
 FakeDeviceRepository _repo() => FakeDeviceRepository(categoryList: const [
@@ -79,11 +115,10 @@ FakeDeviceRepository _repo() => FakeDeviceRepository(categoryList: const [
     ]);
 
 Future<void> _goToDeviceStep(WidgetTester tester) async {
-  // A photo is needed before the device step; add one when the test has not.
+  // The whole form is on one page. A photo is needed to publish; add one when the test has not.
   if (find.text('0 of 6 photos').evaluate().isNotEmpty) {
     await _tap(tester, find.text('Gallery'));
   }
-  await _tap(tester, find.widgetWithText(FilledButton, 'Next'));
 }
 
 /// The details a device needs besides its name (brand, model and year bought).
@@ -144,16 +179,218 @@ void main() {
     expect(find.text('0 of 6 photos'), findsOneWidget);
   });
 
-  testWidgets('photos: the first step will not move on without a photo',
-      (tester) async {
-    await _pump(tester, _repo(), FakePhotoPicker(gallery: [_good]));
-    await _tap(tester, find.widgetWithText(FilledButton, 'Next'));
+  testWidgets('photos: publishing needs a photo, and says so', (tester) async {
+    final repo = _repo();
+    await _pump(tester, repo, FakePhotoPicker(gallery: [_good]));
+    await _tap(tester, find.widgetWithText(FilledButton, 'Publish listing'));
     expect(find.text('Add at least one photo of the device.'), findsOneWidget);
-    expect(find.text('The device'), findsNothing);
+    expect(repo.created, isEmpty);
 
     await _tap(tester, find.text('Gallery'));
-    await _tap(tester, find.widgetWithText(FilledButton, 'Next'));
-    expect(find.text('The device'), findsOneWidget);
+    expect(find.text('Add at least one photo of the device.'), findsNothing);
+  });
+
+  testWidgets('everything is on one page: photos, the device and what you want, with no Next button', (tester) async {
+    await _pump(tester, _repo(), FakePhotoPicker(gallery: [_good]));
+    for (final title in ['Add photos', 'The basics', 'Age', 'Condition', 'Price', 'Handover', 'Where is it?', 'Protect your data']) {
+      expect(find.text(title, skipOffstage: false), findsWidgets, reason: title);
+    }
+    expect(find.widgetWithText(FilledButton, 'Next'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, 'Back'), findsNothing);
+    expect(find.text('Publish listing'), findsOneWidget);
+  });
+
+  testWidgets('a small AI help button sits under the photos and opens the AI card only when pressed', (tester) async {
+    await _pump(tester, _repo(), FakePhotoPicker(gallery: [_good]));
+    expect(find.text('Let AI help fill this in'), findsNothing);
+    final photosBottom = tester.getBottomLeft(find.text('Gallery')).dy;
+    final aiTop = tester.getTopLeft(find.widgetWithText(OutlinedButton, 'AI help')).dy;
+    final basicsTop = tester.getTopLeft(find.text('The basics')).dy;
+    expect(aiTop, greaterThan(photosBottom)); // under the photo buttons
+    expect(aiTop, lessThan(basicsTop)); // above the details
+
+    await _tap(tester, find.text('AI help'));
+    expect(find.text('Let AI help fill this in'), findsOneWidget);
+    expect(find.text('Hide AI help'), findsOneWidget);
+    await _tap(tester, find.text('Hide AI help'));
+    expect(find.text('Let AI help fill this in'), findsNothing);
+  });
+
+  testWidgets('the device step has no description box and no suggestions', (tester) async {
+    await _pump(tester, _repo(), FakePhotoPicker(gallery: [_good]));
+    await _goToDeviceStep(tester);
+    expect(find.widgetWithText(TextFormField, 'Description'), findsNothing);
+    expect(find.text('Not sure what to write? Tap to add:'), findsNothing);
+  });
+
+  group('the condition of each part', () {
+    FakeDeviceRepository partsRepo() => FakeDeviceRepository(categoryList: const [
+          Category(id: 'c1', name: 'Smartphone', slug: 'smartphone'),
+          Category(id: 'c2', name: 'Keyboard', slug: 'keyboard'),
+        ]);
+    Future<void> toDeviceStep(WidgetTester tester, FakeDeviceRepository repo) async {
+      await _pump(tester, repo, FakePhotoPicker(gallery: [_good]));
+      await _goToDeviceStep(tester);
+      await tester.pump(const Duration(milliseconds: 300)); // the categories load
+    }
+
+    testWidgets('asks for battery, screen, ports and buttons and water damage, and folds the rest behind Show more', (tester) async {
+      await toDeviceStep(tester, partsRepo());
+      expect(find.text('Battery *'), findsNothing); // no category yet
+      await _tap(tester, find.text('Smartphone'));
+      for (final part in ['Battery *', 'Screen *', 'Ports and buttons *', 'Water damage *']) {
+        expect(find.text(part), findsOneWidget);
+      }
+      expect(find.text('Camera'), findsNothing);
+      expect(find.text('Does it turn on?'), findsNothing);
+
+      await _tap(tester, find.text('Show more (5)'));
+      for (final part in ['Does it turn on?', 'Body and casing', 'Charging', 'Speaker and microphone', 'Camera']) {
+        expect(find.text(part), findsOneWidget);
+      }
+      await _tap(tester, find.text('Show fewer details'));
+      expect(find.text('Camera'), findsNothing);
+    });
+
+    testWidgets('shows only the parts that fit the category', (tester) async {
+      await toDeviceStep(tester, partsRepo());
+      await _tap(tester, find.text('Keyboard'));
+      expect(find.text('Ports and buttons *'), findsOneWidget);
+      expect(find.text('Water damage *'), findsOneWidget);
+      expect(find.text('Battery *'), findsNothing);
+      expect(find.text('Screen *'), findsNothing);
+      expect(find.text('Show more (1)'), findsOneWidget); // just the body
+    });
+
+    testWidgets('will not go on until the four are answered, and says which are missing', (tester) async {
+      await toDeviceStep(tester, partsRepo());
+      await tester.enterText(find.widgetWithText(TextFormField, 'Device name'), 'Old phone');
+      await _fillRest(tester);
+      await _tap(tester, find.text('Smartphone'));
+      await _tap(tester, find.text('Minor damage'));
+      await _tap(tester, find.text('Drains quickly'));
+      await _tap(tester, find.widgetWithText(FilledButton, 'Publish listing'));
+
+      expect(find.text('Choose the screen condition'), findsOneWidget);
+      expect(find.text('Choose the ports and buttons condition'), findsOneWidget);
+      expect(find.text('Choose the water damage condition'), findsOneWidget);
+      expect(find.text('Choose the battery condition'), findsNothing);
+
+      await _tap(tester, find.text('Light scratches'));
+      expect(find.text('Choose the screen condition'), findsNothing); // the message goes once it is answered
+    });
+
+    testWidgets('tapping the chosen answer again takes it back', (tester) async {
+      await toDeviceStep(tester, partsRepo());
+      await _tap(tester, find.text('Smartphone'));
+      await _tap(tester, find.text('Drains quickly'));
+      expect(find.textContaining('Based on your answers we suggest: Minor damage'), findsOneWidget);
+      await _tap(tester, find.text('Drains quickly'));
+      expect(find.textContaining('we suggest'), findsNothing);
+    });
+
+    testWidgets('suggests an overall condition and applies it only when asked', (tester) async {
+      await toDeviceStep(tester, partsRepo());
+      await _tap(tester, find.text('Smartphone'));
+      expect(find.textContaining('we suggest'), findsNothing);
+
+      await _tap(tester, find.text('Cracked'));
+      expect(find.textContaining('Based on your answers we suggest: Major damage'), findsOneWidget);
+      expect(tester.widgetList<AppChip>(find.widgetWithText(AppChip, 'Major damage')).single.selected, isFalse); // not applied by itself
+
+      await _tap(tester, find.text('Use this'));
+      expect(tester.widgetList<AppChip>(find.widgetWithText(AppChip, 'Major damage')).single.selected, isTrue);
+      expect(find.textContaining('we suggest'), findsNothing);
+    });
+
+    testWidgets('sends the answers that were given, including a part from Show more', (tester) async {
+      final repo = partsRepo();
+      await toDeviceStep(tester, repo);
+      await tester.enterText(find.widgetWithText(TextFormField, 'Device name'), 'Old phone');
+      await _fillRest(tester);
+      await _tap(tester, find.text('Smartphone'));
+      await _tap(tester, find.text('Drains quickly'));
+      await _tap(tester, find.text('Light scratches'));
+      await _tap(tester, find.text('All work'));
+      await _tap(tester, find.text('None'));
+      await _tap(tester, find.text('Show more (5)'));
+      await _tap(tester, find.text('Faulty').last); // the camera
+      await _tap(tester, find.text('Minor damage'));
+      await _tap(tester, find.text('Repair'));
+      await _fillPlace(tester);
+      await _tap(tester, find.text('Save as draft'));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(repo.created.single.conditionDetails, {'battery': 'drains_fast', 'screen': 'scratched', 'ports': 'all_work', 'water': 'none', 'camera': 'faulty'});
+      expect(jsonDecode(repo.created.single.toFields()['conditionDetails']!), {'battery': 'drains_fast', 'screen': 'scratched', 'ports': 'all_work', 'water': 'none', 'camera': 'faulty'});
+    });
+
+    testWidgets('sends only the answers for the chosen category', (tester) async {
+      final repo = partsRepo();
+      await toDeviceStep(tester, repo);
+      await tester.enterText(find.widgetWithText(TextFormField, 'Device name'), 'Old keyboard');
+      await _fillRest(tester);
+      await _tap(tester, find.text('Smartphone'));
+      await _tap(tester, find.text('Drains quickly'));
+      await _tap(tester, find.text('Cracked')); // a screen answer...
+      await _tap(tester, find.text('Keyboard')); // ...that does not belong to a keyboard
+      await _tap(tester, find.text('All work'));
+      await _tap(tester, find.text('None'));
+      await _tap(tester, find.text('Minor damage'));
+      await _tap(tester, find.text('Repair'));
+      await _fillPlace(tester);
+      await _tap(tester, find.text('Save as draft'));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(repo.created.single.conditionDetails, {'ports': 'all_work', 'water': 'none'}); // no battery or screen for a keyboard
+    });
+  });
+
+  group('the price and the phone number', () {
+    Future<void> toPriceStep(WidgetTester tester, FakeDeviceRepository repo, {FakeAiRepository? ai, String? phone}) async {
+      await _pump(tester, repo, FakePhotoPicker(gallery: [_good]), ai: ai, profilePhone: phone);
+      await _goToDeviceStep(tester);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.enterText(find.widgetWithText(TextFormField, 'Device name'), 'Galaxy A12');
+      await _fillRest(tester);
+      await _tap(tester, find.text('Phones'));
+      await _tap(tester, find.text('Minor damage'));
+      await _answerRequiredParts(tester);
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+
+    testWidgets('shows the price the AI expects and fills it in on request', (tester) async {
+      final ai = FakeAiRepository(result: AiResult.fromJson({...resultJson(), 'estimate': {'resale': {'min': 8000, 'max': 12000}}}));
+      await toPriceStep(tester, _repo(), ai: ai);
+      expect(ai.analyzed, isEmpty); // nothing is sent until the person asks
+      await _tap(tester, find.text('Ask the AI'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.textContaining('AI expects about'), findsOneWidget);
+      expect(find.textContaining('8,000'), findsWidgets);
+      expect(ai.analyzed.single.photos, 1);
+      expect(ai.analyzed.single.text, contains('Galaxy A12'));
+      await _tap(tester, find.text('Use ₹10,000'));
+      expect(tester.widget<TextFormField>(find.widgetWithText(TextFormField, 'Asking price in ₹ (optional, 0 for free)')).controller!.text, '10000');
+    });
+
+    testWidgets('falls back to the plain hint when the AI has no price, and can be asked again', (tester) async {
+      final ai = FakeAiRepository(result: AiResult.fromJson({...resultJson(), 'estimate': {'resale': null, 'repair': null}}));
+      await toPriceStep(tester, _repo(), ai: ai);
+      await _tap(tester, find.text('Ask the AI'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.textContaining('could not suggest a price'), findsOneWidget);
+      expect(find.text('Ask the AI'), findsOneWidget);
+    });
+
+    testWidgets('fills the phone number from the profile', (tester) async {
+      await toPriceStep(tester, _repo(), ai: FakeAiRepository(), phone: '+91 98765-43210');
+      expect(tester.widget<TextFormField>(find.widgetWithText(TextFormField, 'Your phone number')).controller!.text, '9876543210');
+    });
+
+    testWidgets('leaves it empty when the profile has none or not a mobile number', (tester) async {
+      await toPriceStep(tester, _repo(), ai: FakeAiRepository(), phone: '12345');
+      expect(tester.widget<TextFormField>(find.widgetWithText(TextFormField, 'Your phone number')).controller!.text, isEmpty);
+    });
   });
 
   testWidgets('the last step will not go on until all three data-protection boxes are ticked', (tester) async {
@@ -164,7 +401,7 @@ void main() {
     await _fillRest(tester);
     await _tap(tester, find.text('Phones'));
     await _tap(tester, find.text('Minor damage'));
-    await _tap(tester, find.widgetWithText(FilledButton, 'Next'));
+    await _answerRequiredParts(tester);
     await _tap(tester, find.text('Repair'));
     // Everything else is filled in; only the boxes are missing.
     await tester.enterText(find.widgetWithText(TextFormField, 'City'), 'Bengaluru');
@@ -203,7 +440,7 @@ void main() {
     await _fillRest(tester);
     await _tap(tester, find.text('Phones'));
     await _tap(tester, find.text('Minor damage'));
-    await _tap(tester, find.widgetWithText(FilledButton, 'Next'));
+    await _answerRequiredParts(tester);
     await _tap(tester, find.text('Repair'));
     await _tap(tester, find.widgetWithText(FilledButton, 'Publish listing'));
     expect(find.text('Enter the city'), findsOneWidget);
@@ -229,13 +466,12 @@ void main() {
   });
 
   testWidgets(
-      'the device step will not move on without a name, a category and a condition',
+      'publishing needs a name, a category, a condition and the rest, and says what is missing',
       (tester) async {
     await _pump(tester, _repo(), FakePhotoPicker(gallery: [_good]));
     await _goToDeviceStep(tester);
-    expect(find.text('The device'), findsOneWidget);
+    await _tap(tester, find.widgetWithText(FilledButton, 'Publish listing'));
 
-    await _tap(tester, find.widgetWithText(FilledButton, 'Next'));
 
     expect(find.textContaining('Give the device a name'), findsOneWidget);
     expect(find.text('Choose a category'), findsOneWidget);
@@ -244,7 +480,7 @@ void main() {
     expect(find.textContaining('Enter the model'), findsOneWidget);
     expect(find.text('Enter the year this model came out'), findsOneWidget);
     expect(find.text('Enter the year it was bought'), findsOneWidget);
-    expect(find.text('What you want'), findsNothing);
+    expect(find.text('Choose what you want to do with it'), findsOneWidget);
   });
 
   testWidgets(
@@ -261,10 +497,9 @@ void main() {
     await _fillRest(tester);
     await _tap(tester, find.text('Phones'));
     await _tap(tester, find.text('Minor damage'));
-    await _tap(tester, find.widgetWithText(FilledButton, 'Next'));
-    expect(find.text('What you want'), findsOneWidget);
+    await _answerRequiredParts(tester);
 
-    // The last step needs a service.
+    // A service is needed too.
     await _fillPlace(tester);
     await _tap(tester, find.widgetWithText(FilledButton, 'Publish listing'));
     expect(find.text('Choose what you want to do with it'), findsOneWidget);
@@ -300,7 +535,7 @@ void main() {
     await _fillRest(tester);
     await _tap(tester, find.text('Laptops'));
     await _tap(tester, find.text('Not working'));
-    await _tap(tester, find.widgetWithText(FilledButton, 'Next'));
+    await _answerRequiredParts(tester);
     await _tap(tester, find.text('Recycling'));
     await _fillPlace(tester);
     await _tap(tester, find.text('Save as draft'));
@@ -310,7 +545,7 @@ void main() {
     expect(repo.created.single.toFields()['status'], 'draft');
   });
 
-  testWidgets('a server error on a field takes the person back to that step',
+  testWidgets('a server error on a field shows on that field',
       (tester) async {
     final repo = _repo()
       ..createError = const ApiException('Validation failed',
@@ -325,29 +560,26 @@ void main() {
     await _fillRest(tester);
     await _tap(tester, find.text('Phones'));
     await _tap(tester, find.text('Fully working'));
-    await _tap(tester, find.widgetWithText(FilledButton, 'Next'));
+    await _answerRequiredParts(tester);
     await _tap(tester, find.text('Refurbishment'));
     await _fillPlace(tester);
     await _tap(tester, find.widgetWithText(FilledButton, 'Publish listing'));
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('The device'), findsOneWidget);
     expect(find.text('That name is not allowed'), findsOneWidget);
     expect(find.text('Please fix the highlighted fields.'), findsOneWidget);
   });
 
-  testWidgets('Back keeps what was typed', (tester) async {
+  testWidgets('what was typed stays while scrolling through the page', (tester) async {
     await _pump(tester, _repo(), FakePhotoPicker(gallery: [_good]));
     await _goToDeviceStep(tester);
-    await tester.enterText(
-        find.widgetWithText(TextFormField, 'Device name'), 'Kept name');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Device name'), 'Kept name');
     await _fillRest(tester);
     await _tap(tester, find.text('Phones'));
-    await _tap(tester, find.text('Fully working'));
-    await _tap(tester, find.widgetWithText(FilledButton, 'Next'));
-
-    await _tap(tester, find.widgetWithText(OutlinedButton, 'Back'));
-
+    await _answerRequiredParts(tester);
+    await _tap(tester, find.widgetWithText(FilledButton, 'Publish listing')); // scrolls to the first thing still missing
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.ensureVisible(find.widgetWithText(TextFormField, 'Device name'));
     expect(find.text('Kept name'), findsOneWidget);
   });
 
@@ -359,15 +591,15 @@ void main() {
     await _fillRest(tester);
       await _tap(tester, find.text('Laptops'));
       await _tap(tester, find.text('Not working'));
-      await _tap(tester, find.widgetWithText(FilledButton, 'Next'));
+      await _answerRequiredParts(tester);
     }
 
     Finder field(String label) => find.widgetWithText(TextFormField, label);
     String text(WidgetTester tester, String label) =>
         tester.widget<TextFormField>(field(label)).controller!.text;
     Future<void> useMyLocation(WidgetTester tester) async {
-      await tester.ensureVisible(find.text('Use my location'));
-      await _tap(tester, find.text('Use my location'));
+      await tester.ensureVisible(find.text('Detect my current location'));
+      await _tap(tester, find.text('Detect my current location'));
       await tester.pump(const Duration(milliseconds: 200));
     }
 

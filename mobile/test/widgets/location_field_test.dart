@@ -1,4 +1,5 @@
 import 'package:ewaste_opportunity/core/theme/app_theme.dart';
+import 'package:ewaste_opportunity/models/geo_place.dart';
 import 'package:ewaste_opportunity/models/listing.dart';
 import 'package:ewaste_opportunity/providers/listings_controller.dart';
 import 'package:ewaste_opportunity/providers/location_providers.dart';
@@ -13,13 +14,32 @@ import '../fakes.dart';
 
 const _bengaluru = GeoPoint(12.9716, 77.5946);
 
-Future<void> _pumpField(WidgetTester tester, FakeLocationService phone, {GeoPoint? value, required ValueChanged<GeoPoint?> onChanged}) async {
+Future<void> _pumpField(WidgetTester tester, FakeLocationService phone, {GeoPoint? value, required ValueChanged<GeoPoint?> onChanged, void Function(GeoPoint, GeoPlace?)? onDetected, FakeGeoRepository? geo}) async {
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [locationServiceProvider.overrideWithValue(phone)],
-      child: MaterialApp(theme: AppTheme.light(), home: Scaffold(body: SingleChildScrollView(child: LocationField(value: value, onChanged: onChanged)))),
+      overrides: [locationServiceProvider.overrideWithValue(phone), geoRepositoryProvider.overrideWithValue(geo ?? FakeGeoRepository())],
+      child: MaterialApp(theme: AppTheme.light(), home: Scaffold(body: SingleChildScrollView(child: LocationField(value: value, onChanged: onChanged, onDetected: onDetected)))),
     ),
   );
+}
+
+/// A phone whose GPS is off at first and comes on once the person has been to the settings.
+class _GpsComesOn implements LocationService {
+  bool on = false;
+  int asked = 0;
+  int switchOpened = 0;
+
+  @override
+  Future<LocationResult> current() async {
+    asked++;
+    return on ? const LocationResult.found(_bengaluru) : const LocationResult.failed(LocationProblem.serviceOff);
+  }
+
+  @override
+  Future<void> openAppSettings() async {}
+
+  @override
+  Future<void> openLocationSettings() async => switchOpened++;
 }
 
 /// Opens the Browse filter sheet. What it returns when closed lands in [chosen].
@@ -53,16 +73,31 @@ Future<_Sheet> _openSheet(WidgetTester tester, FakeLocationService phone, {Listi
 
 void main() {
   group('LocationField', () {
-    testWidgets('"Use my location" hands the position to the screen', (tester) async {
+    testWidgets('"Detect my current location" hands the position and the address to the screen', (tester) async {
       final phone = FakeLocationService.at(_bengaluru);
       GeoPoint? got;
-      await _pumpField(tester, phone, onChanged: (p) => got = p);
+      GeoPlace? gotPlace;
+      await _pumpField(tester, phone, onChanged: (_) {}, onDetected: (p, place) {
+        got = p;
+        gotPlace = place;
+      });
 
-      await tester.tap(find.text('Use my location'));
+      await tester.tap(find.text('Detect my current location'));
       await tester.pumpAndSettle();
 
       expect(got, _bengaluru);
+      expect(gotPlace?.area, 'Indiranagar');
+      expect(gotPlace?.city, 'Bengaluru');
       expect(phone.asked, 1);
+      expect(find.text('Location detected: Indiranagar, Bengaluru'), findsOneWidget);
+    });
+
+    testWidgets('without a handler for the address, the position goes to onChanged', (tester) async {
+      GeoPoint? got;
+      await _pumpField(tester, FakeLocationService.at(_bengaluru), onChanged: (p) => got = p);
+      await tester.tap(find.text('Detect my current location'));
+      await tester.pumpAndSettle();
+      expect(got, _bengaluru);
     });
 
     testWidgets('a saved position is shown and can be removed', (tester) async {
@@ -74,18 +109,87 @@ void main() {
       expect(got, isNull);
     });
 
-    testWidgets('refused once: explains, keeps the form usable and offers another try', (tester) async {
+    testWidgets('GPS off: an alert asks to turn it on, and the phone\'s location switch opens', (tester) async {
+      final phone = FakeLocationService.failing(LocationProblem.serviceOff);
+      GeoPoint? got;
+      await _pumpField(tester, phone, onChanged: (p) => got = p);
+
+      await tester.tap(find.text('Detect my current location'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.text('Turn on GPS'), findsNWidgets(2)); // the alert's title and its button
+      expect(find.textContaining('Location is switched off on your phone'), findsOneWidget);
+      expect(got, isNull);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Turn on GPS'));
+      await tester.pumpAndSettle();
+      expect(phone.locationSettingsOpened, 1);
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    testWidgets('GPS off: after the person turns it on and comes back, it detects by itself', (tester) async {
+      final phone = _GpsComesOn();
+      GeoPoint? got;
+      GeoPlace? gotPlace;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [locationServiceProvider.overrideWithValue(phone), geoRepositoryProvider.overrideWithValue(FakeGeoRepository())],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: LocationField(value: null, onChanged: (_) {}, onDetected: (p, place) {
+                  got = p;
+                  gotPlace = place;
+                }),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Detect my current location'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Turn on GPS'));
+      await tester.pumpAndSettle();
+      expect(phone.switchOpened, 1);
+      expect(got, isNull);
+
+      // The person switches GPS on in the settings and returns to the app.
+      phone.on = true;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      expect(phone.asked, 2);
+      expect(got, _bengaluru);
+      expect(gotPlace?.city, 'Bengaluru');
+    });
+
+    testWidgets('GPS off: "Not now" closes the alert and opens nothing', (tester) async {
+      final phone = FakeLocationService.failing(LocationProblem.serviceOff);
+      await _pumpField(tester, phone, onChanged: (_) {});
+
+      await tester.tap(find.text('Detect my current location'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Not now'));
+      await tester.pumpAndSettle();
+
+      expect(phone.locationSettingsOpened, 0);
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    testWidgets('refused once: explains and offers another try', (tester) async {
       final phone = FakeLocationService.failing(LocationProblem.denied);
       GeoPoint? got;
       await _pumpField(tester, phone, onChanged: (p) => got = p);
 
-      await tester.tap(find.text('Use my location'));
+      await tester.tap(find.text('Detect my current location'));
       await tester.pumpAndSettle();
-
-      expect(find.textContaining('Location was not allowed'), findsOneWidget);
-      expect(find.textContaining('city and area'), findsOneWidget);
+      expect(find.textContaining('needs permission'), findsOneWidget);
       expect(got, isNull);
-      await tester.tap(find.text('Try again'));
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
       await tester.pumpAndSettle();
       expect(phone.asked, 2);
     });
@@ -94,32 +198,36 @@ void main() {
       final phone = FakeLocationService.failing(LocationProblem.deniedForever);
       await _pumpField(tester, phone, onChanged: (_) {});
 
-      await tester.tap(find.text('Use my location'));
+      await tester.tap(find.text('Detect my current location'));
       await tester.pumpAndSettle();
       expect(find.textContaining('blocked for this app'), findsOneWidget);
 
-      await tester.tap(find.text('Open settings'));
-      expect(phone.appSettingsOpened, 1);
-    });
-
-    testWidgets('location switched off: the way out is the location switch', (tester) async {
-      final phone = FakeLocationService.failing(LocationProblem.serviceOff);
-      await _pumpField(tester, phone, onChanged: (_) {});
-
-      await tester.tap(find.text('Use my location'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Open settings'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('switched off'), findsOneWidget);
-
-      await tester.tap(find.text('Turn on'));
-      expect(phone.locationSettingsOpened, 1);
+      expect(phone.appSettingsOpened, 1);
     });
 
     testWidgets('no signal: says the phone could not find itself', (tester) async {
       await _pumpField(tester, FakeLocationService.failing(LocationProblem.unavailable), onChanged: (_) {});
 
-      await tester.tap(find.text('Use my location'));
+      await tester.tap(find.text('Detect my current location'));
       await tester.pumpAndSettle();
       expect(find.textContaining('could not find where it is'), findsOneWidget);
+    });
+
+    testWidgets('when the address lookup is out of reach the spot is still kept and the person is told to type', (tester) async {
+      GeoPoint? got;
+      GeoPlace? gotPlace = const GeoPlace(area: 'x');
+      await _pumpField(tester, FakeLocationService.at(_bengaluru), geo: FakeGeoRepository(place: null), onChanged: (_) {}, onDetected: (p, place) {
+        got = p;
+        gotPlace = place;
+      });
+      await tester.tap(find.text('Detect my current location'));
+      await tester.pumpAndSettle();
+
+      expect(got, _bengaluru);
+      expect(gotPlace, isNull);
+      expect(find.textContaining('could not look up the address'), findsOneWidget);
     });
   });
 

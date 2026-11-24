@@ -7,6 +7,7 @@ import '../../models/marketplace.dart';
 import '../../providers/marketplace_providers.dart';
 import '../../routes/route_paths.dart';
 import '../../services/marketplace_repository.dart';
+import '../../services/razorpay_checkout.dart';
 import '../../widgets/app_background.dart';
 import '../../widgets/app_chip.dart';
 import '../../widgets/glass_app_bar.dart';
@@ -142,6 +143,36 @@ class _BodyState extends ConsumerState<_Body> {
     }
   }
 
+  /// Online demo payment: start on the server, open the payment window, then let the server check the result.
+  Future<void> _pay() async {
+    final launcher = ref.read(paymentLauncherProvider);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await ref.read(orderProvider(o.id).notifier).run((repo) async {
+        final session = await repo.startPayment(o.id);
+        try {
+          final proof = await launcher.pay(session);
+          return await repo.verifyPayment(o.id, proof);
+        } on PaymentCancelled {
+          return o; // closed the window: nothing changes
+        }
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment received')));
+      }
+    } on PaymentFailed catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.fieldErrors.values.isNotEmpty ? e.fieldErrors.values.first : e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _confirm() =>
       _act((repo) => repo.confirm(o.id), done: 'Order confirmed');
   Future<void> _ready() =>
@@ -237,6 +268,8 @@ class _BodyState extends ConsumerState<_Body> {
         );
 
     final buttons = <Widget>[
+      if (o.can('pay'))
+        button('Pay ${formatPrice(o.total)}', Icons.payment_rounded, _pay, primary: true),
       if (o.can('confirm'))
         button('Confirm order', Icons.check_circle_outline, _confirm,
             primary: true),
@@ -362,6 +395,12 @@ class _BodyState extends ConsumerState<_Body> {
               _fact(theme, 'Payment', labelOf(paymentMethods, o.paymentMethod)),
               if (o.paymentStatus == 'paid_offline')
                 _fact(theme, 'Paid', 'Paid directly to the seller'),
+              if (o.paymentStatus == 'paid_online')
+                _fact(theme, 'Paid', 'Paid online'),
+              if (o.paymentStatus == 'refunded')
+                _fact(theme, 'Paid', 'Refunded'),
+              if (o.paymentStatus == 'refund_pending')
+                _fact(theme, 'Paid', 'Refund pending'),
               if ((o.deliveryArea ?? '').trim().isNotEmpty)
                 _fact(
                     theme,

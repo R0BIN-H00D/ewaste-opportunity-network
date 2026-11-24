@@ -2,13 +2,13 @@
 const router = require('express').Router();
 const { authenticate } = require('../middleware/auth');
 const validate = require('../middleware/validate');
-const { authLimiter } = require('../middleware/rateLimit');
+const { authLimiter, loginLimiter } = require('../middleware/rateLimit');
 const v = require('../validators/auth.validators');
 const ctrl = require('../controllers/auth.controller');
 
 // Credential-style endpoints get the strict limiter; refresh/me/logout are called routinely so they do not.
 router.post('/register', authLimiter, validate({ body: v.registerBody }), ctrl.register);
-router.post('/login', authLimiter, validate({ body: v.loginBody }), ctrl.login);
+router.post('/login', loginLimiter, validate({ body: v.loginBody }), ctrl.login);
 router.post('/forgot-password', authLimiter, validate({ body: v.forgotBody }), ctrl.forgotPassword);
 router.post('/reset-password', authLimiter, validate({ body: v.resetBody }), ctrl.resetPassword);
 router.post('/verify-email', authLimiter, validate({ body: v.verifyEmailBody }), ctrl.verifyEmail);

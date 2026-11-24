@@ -12,6 +12,8 @@ const CANCELLABLE = [
   'request_submitted', 'technician_assigned', 'device_collection_pending', 'device_collected',
   'diagnosis_in_progress', 'quotation_submitted', 'customer_approval_pending',
 ];
+// After the customer approved the quotation and until they confirm the work, they may pay it online (optional).
+const PAYABLE = ['repair_in_progress', 'repair_completed', 'device_delivery_pending', 'device_delivered'];
 const FINAL = ['service_completed', 'rejected', 'cancelled'];
 const ACTIVE = (status) => !FINAL.includes(status);
 
@@ -72,7 +74,7 @@ function availableActions(request, role, { invited = false } = {}) {
     }
     if (s === 'device_collected') out.push('start_diagnosis');
     if (s === 'diagnosis_in_progress') out.push('add_progress', 'submit_quotation');
-    if (s === 'repair_in_progress') out.push('add_progress', 'revise_quotation', 'complete_repair');
+    if (s === 'repair_in_progress') out.push('add_progress', ...(request.payment?.status === 'paid_online' ? [] : ['revise_quotation']), 'complete_repair');
     if (s === 'repair_completed' && !request.onSite) out.push('start_delivery');
     if (s === 'device_delivery_pending' && !handover.delivery?.byProvider) out.push('confirm_handover');
   }
@@ -83,6 +85,7 @@ function availableActions(request, role, { invited = false } = {}) {
       if (!handover.collect?.byOwner) out.push('confirm_handover');
     }
     if (s === 'customer_approval_pending') out.push('approve_quotation', 'reject_quotation');
+    if (PAYABLE.includes(s) && request.activeQuotation?.status === 'accepted' && request.activeQuotation?.amount >= 1 && request.payment?.status !== 'paid_online') out.push('pay');
     if (s === 'device_delivery_pending' && !handover.delivery?.byOwner) out.push('confirm_handover');
     if (s === 'device_delivered' || (s === 'repair_completed' && request.onSite)) out.push('confirm_completion');
     if (CANCELLABLE.includes(s)) out.push('cancel');
@@ -92,4 +95,4 @@ function availableActions(request, role, { invited = false } = {}) {
   return out;
 }
 
-module.exports = { TRANSITIONS, CANCELLABLE, FINAL, ACTIVE, ACTORS: { CUSTOMER, TECHNICIAN, ADMIN, SYSTEM }, checkTransition, assertTransition, availableActions, label };
+module.exports = { PAYABLE, TRANSITIONS, CANCELLABLE, FINAL, ACTIVE, ACTORS: { CUSTOMER, TECHNICIAN, ADMIN, SYSTEM }, checkTransition, assertTransition, availableActions, label };

@@ -97,8 +97,8 @@ export default function ProfileSection() {
         <TextField label="State" autoComplete="address-level1" error={errors.state?.message} {...register('state')} />
         <TextField label="Pincode" autoComplete="postal-code" inputMode="numeric" error={errors.pincode?.message} {...register('pincode')} />
 
-        <div className="space-y-2 sm:col-span-2">
-          <p className="text-sm font-medium text-ink dark:text-white">Location</p>
+        <div className="space-y-2 rounded-2xl bg-black/[0.03] p-4 dark:bg-white/5 sm:col-span-2">
+          <p className="text-sm font-semibold text-ink dark:text-white">Location</p>
           <p className="text-sm text-ink-muted dark:text-[#9FB2A7]">{loc ? `Saved point: ${loc.lat}, ${loc.lng}` : 'No location set. It is used to find nearby technicians and centres.'}</p>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="btn btn-glass" onClick={useMyLocation} disabled={locating}><MapPin size={16} aria-hidden /> {locating ? 'Finding your location…' : 'Use my current location'}</button>
@@ -108,7 +108,7 @@ export default function ProfileSection() {
           {geoNote && <p role="status" className="text-sm text-ink dark:text-[#E8F1EB]">{geoNote}</p>}
         </div>
 
-        <div className="sm:col-span-2">
+        <div className="mt-1 flex justify-end border-t border-black/5 pt-5 dark:border-white/10 sm:col-span-2">
           <button type="submit" className="btn btn-primary" disabled={save.saving}>{save.saving ? 'Saving…' : 'Save profile'}</button>
         </div>
       </form>

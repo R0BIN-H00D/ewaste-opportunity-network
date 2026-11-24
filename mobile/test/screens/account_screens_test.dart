@@ -27,7 +27,7 @@ import '../fakes.dart';
 import '../helpers.dart';
 
 /// Pumps [screen] for a signed-in member, with [account] answering every account call. Returns the store for theme checks.
-Future<MemoryKeyValueStore> _pump(WidgetTester tester, Widget screen, FakeAccountRepository account, {String? openedFrom, FakeLocationService? phone, FakeGeoRepository? geo}) async {
+Future<MemoryKeyValueStore> _pump(WidgetTester tester, Widget screen, FakeAccountRepository account, {String? openedFrom, FakeLocationService? phone, FakeGeoRepository? geo, FakeAuthRepository? auth}) async {
   tester.view.physicalSize = const Size(900, 2400);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -47,7 +47,7 @@ Future<MemoryKeyValueStore> _pump(WidgetTester tester, Widget screen, FakeAccoun
     ProviderScope(
       overrides: [
         keyValueStoreProvider.overrideWithValue(store),
-        authRepositoryProvider.overrideWithValue(FakeAuthRepository()),
+        authRepositoryProvider.overrideWithValue(auth ?? FakeAuthRepository()),
         accountRepositoryProvider.overrideWithValue(account),
         chatRepositoryProvider.overrideWithValue(FakeChatRepository()..unreadCount = 3),
         requestRepositoryProvider.overrideWithValue(FakeRequestRepository()),
@@ -190,28 +190,95 @@ void main() {
     expect(find.text('start'), findsOneWidget); // back where it was opened from
   });
 
-  testWidgets('profile: "Use my current location" fills in the area, city, state and pincode', (tester) async {
+  testWidgets('profile: "Detect my current location" fills in the area, city, state and pincode', (tester) async {
     final repo = FakeAccountRepository(profileResult: const OwnProfile());
     final geo = FakeGeoRepository(place: const GeoPlace(area: 'Indiranagar', city: 'Bengaluru', state: 'Karnataka', postcode: '560038'));
     await _pump(tester, const ProfilePage(), repo, phone: FakeLocationService.at(const GeoPoint(12.9716, 77.5946)), geo: geo);
 
-    await _tap(tester, find.text('Use my location'));
+    await _tap(tester, find.text('Detect my current location'));
     String text(String label) => tester.widget<TextFormField>(find.widgetWithText(TextFormField, label)).controller!.text;
     expect(geo.asked.single, (12.9716, 77.5946));
     expect(text('Area or locality'), 'Indiranagar');
     expect(text('City'), 'Bengaluru');
     expect(text('State'), 'Karnataka');
     expect(text('PIN code'), '560038');
-    expect(find.textContaining('Area, city, state and pincode are filled in'), findsOneWidget);
+    expect(find.text('Location detected: Indiranagar, Bengaluru'), findsOneWidget);
   });
 
   testWidgets('profile: when the address lookup fails it keeps the point and asks the person to type', (tester) async {
     final repo = FakeAccountRepository(profileResult: const OwnProfile());
     final geo = FakeGeoRepository()..error = const ApiException('Address search is unavailable', failure: ApiFailure.server, statusCode: 503);
     await _pump(tester, const ProfilePage(), repo, phone: FakeLocationService.at(const GeoPoint(12.9716, 77.5946)), geo: geo);
-    await _tap(tester, find.text('Use my location'));
-    expect(find.textContaining('could not look up the address'), findsOneWidget);
+    await _tap(tester, find.text('Detect my current location'));
+    expect(find.textContaining('could not look up the address'), findsWidgets);
     expect(tester.widget<TextFormField>(find.widgetWithText(TextFormField, 'City')).controller!.text, isEmpty);
+  });
+
+  group('email verification on the profile', () {
+    FakeAuthRepository unverified() => FakeAuthRepository(loginResult: sampleMe(emailVerified: false))..meResult = sampleMe();
+
+    testWidgets('a verified person sees that, and no button', (tester) async {
+      await _pump(tester, const ProfilePage(), FakeAccountRepository());
+      expect(find.text('asha@example.com is verified.'), findsOneWidget);
+      expect(find.text('Verify my email'), findsNothing);
+    });
+
+    testWidgets('sends nothing until the button is pressed, then asks for the code', (tester) async {
+      final auth = unverified();
+      await _pump(tester, const ProfilePage(), FakeAccountRepository(), auth: auth);
+      expect(find.textContaining('asha@example.com is not verified yet'), findsOneWidget);
+      expect(auth.resends, 0);
+      expect(find.widgetWithText(TextField, 'Verification code'), findsNothing);
+
+      await _tap(tester, find.text('Verify my email'));
+      expect(auth.resends, 1);
+      expect(find.widgetWithText(TextField, 'Verification code'), findsOneWidget);
+      expect(find.textContaining('We sent a 6-digit code to asha@example.com'), findsOneWidget);
+    });
+
+    testWidgets('confirms the email with the code and shows it as verified', (tester) async {
+      final auth = unverified();
+      await _pump(tester, const ProfilePage(), FakeAccountRepository(), auth: auth);
+      await _tap(tester, find.text('Verify my email'));
+
+      await tester.enterText(find.widgetWithText(TextField, 'Verification code'), '12');
+      await _tap(tester, find.widgetWithText(FilledButton, 'Verify'));
+      expect(find.text('Enter the 6-digit code from your email.'), findsOneWidget);
+      expect(auth.codes, isEmpty);
+
+      await tester.enterText(find.widgetWithText(TextField, 'Verification code'), '482913');
+      await _tap(tester, find.widgetWithText(FilledButton, 'Verify'));
+      expect(auth.codes, ['482913']);
+      expect(find.text('asha@example.com is verified.'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Verification code'), findsNothing);
+    });
+
+    testWidgets('says when the code is wrong and keeps the box', (tester) async {
+      final auth = unverified()..codeError = const ApiException('That code is not right. 4 tries left.');
+      await _pump(tester, const ProfilePage(), FakeAccountRepository(), auth: auth);
+      await _tap(tester, find.text('Verify my email'));
+      await tester.enterText(find.widgetWithText(TextField, 'Verification code'), '000000');
+      await _tap(tester, find.widgetWithText(FilledButton, 'Verify'));
+      expect(find.text('That code is not right. 4 tries left.'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Verification code'), findsOneWidget);
+    });
+
+    testWidgets('can send a new code', (tester) async {
+      final auth = unverified();
+      await _pump(tester, const ProfilePage(), FakeAccountRepository(), auth: auth);
+      await _tap(tester, find.text('Verify my email'));
+      await _tap(tester, find.text('Send a new code'));
+      expect(auth.resends, 2);
+    });
+
+    testWidgets('says so, and offers no code box, when the server has no email service', (tester) async {
+      final auth = unverified()..delivery = 'console';
+      await _pump(tester, const ProfilePage(), FakeAccountRepository(), auth: auth);
+      await _tap(tester, find.text('Verify my email'));
+      expect(find.textContaining('no email service set up'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Verification code'), findsNothing);
+      expect(find.text('Verify my email'), findsOneWidget); // the person can try again later
+    });
   });
 
   testWidgets('settings: the theme applies at once, is kept on the phone and copied to the profile', (tester) async {

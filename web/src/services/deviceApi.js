@@ -25,8 +25,8 @@ const progress = (cb) => (cb ? { timeout: 120000, onUploadProgress: (e) => e.tot
 function toForm(values, photos) {
   const form = new FormData();
   for (const [key, value] of Object.entries(values || {})) {
-    if (value === undefined || value === null || value === '') continue;
-    form.append(key, Array.isArray(value) ? JSON.stringify(value) : value);
+    if (value === undefined || value === null || (value === '' && key !== 'conditionNote')) continue; // an empty condition note clears it
+    form.append(key, typeof value === 'object' ? JSON.stringify(value) : value); // lists and the condition details travel as JSON
   }
   photos.forEach((file) => form.append('photos', file));
   return form;

@@ -8,7 +8,7 @@ const ApiError = require('../utils/ApiError');
 const { makePoint, withinRadius } = require('../utils/geo');
 const { parsePagination, buildMeta } = require('../utils/pagination');
 const { serializeListing } = require('../serializers/listing');
-const { MAX_DEVICE_PHOTOS } = require('../config/constants');
+const { MAX_DEVICE_PHOTOS, requiredPartsForCategory } = require('../config/constants');
 
 const POPULATE = [
   { path: 'device', select: 'name brand model modelYear purchaseYear ageYears photos specs' },
@@ -32,6 +32,14 @@ async function resolveCategory(idOrSlug) {
   return cat;
 }
 
+/** Keeps only the parts that were answered; nothing answered means nothing stored. */
+function cleanDetails(details) {
+  const kept = Object.fromEntries(Object.entries(details || {}).filter(([, v]) => v));
+  return Object.keys(kept).length ? kept : undefined;
+}
+
+const PART_NAMES = { battery: 'battery', screen: 'screen', ports: 'ports and buttons', water: 'water damage' };
+
 async function fetchForViewer(id, viewer) {
   const doc = await DeviceListing.findById(id).populate(POPULATE).lean();
   return doc ? serializeListing(doc, viewer) : null;
@@ -43,6 +51,13 @@ async function createListing(user, input, files = []) {
     throw ApiError.validation([{ field: 'photos', message: 'At least one photo is required to publish a listing (or save it as a draft)' }]);
   }
   const category = await resolveCategory(input.category);
+  if (status === 'listed') {
+    // Battery, screen, ports and water damage must be answered, for the categories that have them.
+    const missing = requiredPartsForCategory(category.slug).filter((part) => !input.conditionDetails?.[part]);
+    if (missing.length) {
+      throw ApiError.validation(missing.map((part) => ({ field: 'conditionDetails', message: `Choose the ${PART_NAMES[part]} condition` })));
+    }
+  }
   const stored = await storage.saveMany(files, { folder: `devices/${user.id}` });
 
   try {
@@ -65,6 +80,8 @@ async function createListing(user, input, files = []) {
       model: input.model,
       condition: input.condition,
       description: input.description,
+      conditionNote: input.conditionNote || undefined,
+      conditionDetails: cleanDetails(input.conditionDetails),
       preferredService: input.preferredService,
       expectedPrice: input.expectedPrice,
       pickupPreference: input.pickupPreference,
@@ -186,6 +203,8 @@ async function updateListing(id, user, input, files = []) {
   for (const f of ['condition', 'description', 'preferredService', 'expectedPrice', 'pickupPreference', 'addressArea', 'city', 'agentPhone']) {
     if (input[f] !== undefined) listing[f] = input[f];
   }
+  if (input.conditionNote !== undefined) listing.conditionNote = input.conditionNote || undefined; // an empty note clears it
+  if (input.conditionDetails !== undefined) listing.conditionDetails = cleanDetails(input.conditionDetails); // {} clears them
   if (input.lat !== undefined) listing.location = makePoint(input.lng, input.lat);
   listing.status = nextStatus;
 

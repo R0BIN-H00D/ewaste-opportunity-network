@@ -9,8 +9,12 @@ const schema = baseSchema({
   quantity: { type: Number, default: 1, min: 1 },
   priceAtOrder: { type: Number, required: true, min: 0 },
   status: { type: String, enum: ORDER_STATUS, default: 'placed' },
-  paymentMethod: { type: String, enum: ['cod', 'offline'], default: 'cod' }, // no gateway (BR-10)
-  paymentStatus: { type: String, enum: ['unpaid', 'paid_offline', 'confirmed'], default: 'unpaid' },
+  paymentMethod: { type: String, enum: ['cod', 'offline', 'online'], default: 'cod' }, // online = Razorpay TEST mode (demo, no real money)
+  paymentStatus: { type: String, enum: ['unpaid', 'paid_offline', 'confirmed', 'paid_online', 'refunded', 'refund_pending'], default: 'unpaid' },
+  gatewayOrderId: { type: String, maxlength: 100 },
+  gatewayPaymentId: { type: String, maxlength: 100 },
+  gatewayRefundId: { type: String, maxlength: 100 },
+  paidAt: Date,
   deliveryArea: String,
   deliveryCity: String,
   deliveryPincode: String,

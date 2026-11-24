@@ -33,8 +33,24 @@ const schema = z.object({
   UPLOAD_DIR: z.string().optional().default(''),
   CONTACT_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900000),
-  RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
+  RATE_LIMIT_MAX: z.coerce.number().int().positive().optional(), // default: 300 in production, 3000 while developing (see below)
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
+  // Demo payments: Razorpay TEST mode only (keys start with rzp_test_). Empty = online payment is switched off.
+  RAZORPAY_KEY_ID: z.string().optional().default(''),
+  RAZORPAY_KEY_SECRET: z.string().optional().default(''),
+  // Free AI (Google Gemini free tier). Off unless GEMINI_ENABLED=true and a key is set; rule-based answers are used otherwise.
+  GEMINI_ENABLED: z.preprocess((v) => String(v ?? 'false').toLowerCase() === 'true', z.boolean()),
+  GEMINI_API_KEY: z.string().optional().default(''),
+  GEMINI_MODEL: z.string().default('gemini-flash-lite-latest'),
+  GEMINI_FALLBACK_MODEL: z.string().default('gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3-flash-preview'), // comma-separated, tried in order
+  GEMINI_ATTEMPTS: z.coerce.number().int().min(1).max(12).default(10), // most tries in all (each one on the next model)
+  GEMINI_BUDGET_MS: z.coerce.number().int().min(1000).default(48000), // the most time one AI call may take in all
+  GEMINI_TRY_TIMEOUT_MS: z.coerce.number().int().min(1000).default(18000), // the most one try may wait for an answer
+  GEMINI_CACHE_TTL_MS: z.coerce.number().int().min(0).default(3600000), // how long a good answer is remembered (0 = never)
+  GEMINI_RETRY_MS: z.coerce.number().int().min(0).default(1500),
+  GEMINI_DAILY_LIMIT: z.coerce.number().int().positive().default(200),
+  UPLOAD_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(60),
+  AI_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(30),
   ADMIN_SEED_EMAIL: z.string().optional().default(''),
   ADMIN_SEED_PASSWORD: z.string().optional().default(''),
 });
@@ -60,6 +76,9 @@ if (env.NODE_ENV === 'production') {
 }
 
 env.isProd = env.NODE_ENV === 'production';
+// While developing, the web app, the phone, the tests and the background refreshes all come from one address and share one
+// allowance, so it is generous; a real deployment keeps the tight default.
+env.RATE_LIMIT_MAX = env.RATE_LIMIT_MAX ?? (env.isProd ? 300 : 3000);
 env.uploadDir = path.resolve(env.UPLOAD_DIR || path.join(__dirname, '..', '..', 'uploads'));
 env.isTest = env.NODE_ENV === 'test';
 env.corsOrigins = env.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean);

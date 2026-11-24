@@ -27,7 +27,10 @@ describe('a limiter set low', () => {
     let last;
     for (let i = 0; i < 5; i += 1) { last = await request(app).post('/try'); statuses.push(last.status); }
     expect(statuses).toEqual([200, 200, 200, 429, 429]);
-    expect(last.body).toEqual({ success: false, message: 'Too many requests, please try again later.', code: 'RATE_LIMITED' });
+    expect(last.body).toMatchObject({ success: false, code: 'RATE_LIMITED' });
+    expect(last.body.message).toMatch(/^Too many requests\. Please wait about (a minute|\d+ minutes) and try again\.$/);
+    expect(last.body.retryAfterSeconds).toBeGreaterThan(0);
+    expect(last.body.retryAfterSeconds).toBeLessThanOrEqual(60);
     expect(last.headers['ratelimit-limit'] || last.headers['ratelimit-policy']).toBeDefined();
     expect(last.headers['retry-after']).toBeDefined();
   });
@@ -41,6 +44,42 @@ describe('a limiter set low', () => {
     await from('10.0.0.1'); await from('10.0.0.1');
     expect((await from('10.0.0.1')).status).toBe(429);
     expect((await from('10.0.0.2')).status).toBe(200);
+  });
+
+  it('says how long to wait, in minutes, when the wait is longer than one', async () => {
+    const { authLimiter } = build({ AUTH_RATE_LIMIT_MAX: '1', RATE_LIMIT_WINDOW_MS: '600000' });
+    const app = appWith(authLimiter);
+    await request(app).post('/try');
+    const res = await request(app).post('/try');
+    expect(res.status).toBe(429);
+    expect(res.body.message).toMatch(/Please wait about (9|10) minutes and try again/);
+    expect(res.body.retryAfterSeconds).toBeGreaterThan(500);
+  });
+
+  it('counts only the failed sign-ins, so a person who signs in again and again is never locked out', async () => {
+    const { loginLimiter } = build({ AUTH_RATE_LIMIT_MAX: '2', RATE_LIMIT_WINDOW_MS: '60000' });
+    const app = express();
+    app.post('/login', loginLimiter, (req, res) => res.status(req.query.ok === '1' ? 200 : 401).json({}));
+    for (let i = 0; i < 6; i += 1) expect((await request(app).post('/login?ok=1')).status).toBe(200); // successes are free
+    expect((await request(app).post('/login?ok=0')).status).toBe(401);
+    expect((await request(app).post('/login?ok=0')).status).toBe(401);
+    expect((await request(app).post('/login?ok=0')).status).toBe(429); // the third failure is refused
+  });
+
+  it('does not count the background checks against the general allowance', async () => {
+    const { globalLimiter } = build({ RATE_LIMIT_MAX: '2', RATE_LIMIT_WINDOW_MS: '60000' });
+    const app = express();
+    app.use(globalLimiter);
+    app.get('/api/chat/unread-count', (_req, res) => res.json({ n: 0 }));
+    app.get('/api/health', (_req, res) => res.json({ ok: true }));
+    app.get('/api/things', (_req, res) => res.json({ ok: true }));
+    for (let i = 0; i < 6; i += 1) {
+      expect((await request(app).get('/api/chat/unread-count')).status).toBe(200);
+      expect((await request(app).get('/api/health')).status).toBe(200);
+    }
+    expect((await request(app).get('/api/things')).status).toBe(200);
+    expect((await request(app).get('/api/things')).status).toBe(200);
+    expect((await request(app).get('/api/things')).status).toBe(429); // real requests still count
   });
 
   it('the contact form has its own, tighter allowance', async () => {
@@ -68,7 +107,7 @@ describe('the routes that need a limiter have one', () => {
   const handlersOf = (key) => routes.find((r) => r.key === key)?.handlers || [];
 
   it.each([
-    ['POST /api/auth/login', 'authLimiter'], ['POST /api/auth/register', 'authLimiter'], ['POST /api/auth/forgot-password', 'authLimiter'],
+    ['POST /api/auth/login', 'loginLimiter'], ['POST /api/auth/register', 'authLimiter'], ['POST /api/auth/forgot-password', 'authLimiter'],
     ['POST /api/auth/reset-password', 'authLimiter'], ['POST /api/auth/verify-email', 'authLimiter'], ['POST /api/contact', 'contactLimiter'],
   ])('%s is limited by %s', (key, name) => {
     expect(handlersOf(key)).toContain(limiters[name]);

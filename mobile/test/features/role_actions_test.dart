@@ -22,7 +22,7 @@ void main() {
       'Profile', 'My devices', 'My repairs', 'Marketplace', 'Orders', 'Wanted devices', 'My pickups'
     ]);
     expect(titles(UserRole.technician).take(4).toList(), ['Profile', 'Find repair requests', 'My repair jobs', 'Wanted devices']);
-    expect(titles(UserRole.refurbisher).take(4).toList(), ['Profile', 'Requests', 'Refurbished products', 'Orders']);
+    expect(titles(UserRole.refurbisher).take(5).toList(), ['Profile', 'Requests', 'My requests', 'Refurbished products', 'Orders']);
     expect(titles(UserRole.recycler).take(3).toList(), ['Profile', 'Recycling requests', 'Recycling report']);
     // What was taken out of the web menus is not on the phone either.
     for (final r in [UserRole.user, UserRole.technician, UserRole.refurbisher, UserRole.recycler]) {
@@ -48,6 +48,9 @@ void main() {
     expect(tech['Wanted devices'], Routes.wanted);
     final refurbisher = routes(UserRole.refurbisher);
     expect(refurbisher['Requests'], Routes.refurbOpportunities);
+    expect(refurbisher['My requests'], Routes.wanted);
+    final titles = [for (final a in actionsFor(UserRole.refurbisher)) a.title];
+    expect(titles.indexOf('My requests'), titles.indexOf('Requests') + 1); // just below Requests
     expect(refurbisher['Refurbished products'], Routes.myProducts);
     expect(refurbisher['Orders'], Routes.orders);
     final recycler = routes(UserRole.recycler);

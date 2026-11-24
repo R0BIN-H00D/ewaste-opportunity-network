@@ -1,3 +1,4 @@
+import 'dart:convert';
 import '../core/listing_validation.dart';
 
 /// What a person fills in to list a device. Empty optional values are left out of what is sent.
@@ -12,6 +13,7 @@ class ListingInput {
     this.modelYear = '',
     this.purchaseYear = '',
     this.description = '',
+    this.conditionDetails = const {},
     this.expectedPrice = '',
     this.pickupPreference = '',
     this.addressArea = '',
@@ -33,6 +35,9 @@ class ListingInput {
   final String modelYear;
   final String purchaseYear;
   final String description;
+
+  /// How each part is doing (`battery` -> `drains_fast`, ...). Only answered parts; empty means nothing to say.
+  final Map<String, String> conditionDetails;
   final String expectedPrice;
   final String pickupPreference;
   final String addressArea;
@@ -65,6 +70,8 @@ class ListingInput {
     add('modelYear', modelYear);
     add('purchaseYear', purchaseYear);
     add('description', description);
+    final answered = {for (final e in conditionDetails.entries) if (e.value.isNotEmpty) e.key: e.value};
+    if (answered.isNotEmpty) fields['conditionDetails'] = jsonEncode(answered);
     add('expectedPrice', expectedPrice.replaceAll(',', ''));
     add('pickupPreference', pickupPreference);
     add('addressArea', addressArea);

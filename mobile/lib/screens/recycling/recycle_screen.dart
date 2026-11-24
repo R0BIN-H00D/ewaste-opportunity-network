@@ -9,6 +9,7 @@ import '../../providers/recycling_providers.dart';
 import '../../providers/technicians_controller.dart';
 import '../../routes/route_paths.dart';
 import '../../services/photo_picker.dart';
+import '../../widgets/detect_location_button.dart';
 import '../../widgets/app_background.dart';
 import '../../widgets/app_chip.dart';
 import '../../widgets/app_text_field.dart';
@@ -184,6 +185,15 @@ class _RecycleScreenState extends ConsumerState<RecycleScreen> {
                   const SizedBox(height: 20),
                   Semantics(header: true, child: Text('Where should they collect from?', style: theme.textTheme.titleLarge)),
                   const SizedBox(height: 8),
+                  DetectLocationButton(onDetected: (_, place) {
+                    if (place == null) return;
+                    setState(() {
+                      if (place.area.isNotEmpty) _area.text = place.area;
+                      // The full address is the person's own to finish (house number, landmark): only start it when it is empty.
+                      if (_address.text.trim().isEmpty && place.label.isNotEmpty) _address.text = place.label;
+                    });
+                  }),
+                  const SizedBox(height: 12),
                   AppTextField(controller: _area, label: 'Area or locality', icon: Icons.place_outlined, validator: validatePickupArea, serverError: _serverErrors['pickupAddressArea']),
                   const SizedBox(height: 12),
                   AppTextField(

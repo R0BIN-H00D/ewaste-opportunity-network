@@ -1,6 +1,7 @@
 'use strict';
 const { z, objectId, optNum, optStr, blankToUndefined, pageQuery } = require('./common');
 const { PRODUCT_CONDITIONS } = require('../config/constants');
+const { conditionDetails } = require('./device.validators');
 
 const MAX_PRODUCT_PHOTOS = 8;
 const SORTS = ['newest', 'price_asc', 'price_desc', 'rating'];
@@ -31,6 +32,8 @@ const fields = {
   specs,
   condition: z.enum(PRODUCT_CONDITIONS), // the disclosed grade is required (BR-11)
   refurbishmentInfo: z.string().trim().min(10, 'Say what was repaired, replaced or tested (at least 10 characters)').max(2000),
+  conditionDetails, // optional; '{}' on an edit clears it
+  conditionNote: z.string().trim().max(1000, 'Keep the notes under 1000 characters').optional(), // optional; empty on an edit clears it
   price: z.coerce.number().min(0).max(10000000),
   stock: z.preprocess(blankToUndefined, z.coerce.number().int().min(0).max(999).optional()),
 };

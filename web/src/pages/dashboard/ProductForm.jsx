@@ -13,10 +13,13 @@ import { useSave } from '../../hooks/useSave';
 import { marketApi } from '../../services/marketplaceApi';
 import { refurbApi } from '../../services/refurbishmentApi';
 import { PRODUCT_CONDITIONS, parseSpecs, specsToText } from '../../lib/marketplace';
+import { partsFor } from '../../lib/devices';
 import { applyFieldErrors, friendlyMessage } from '../../utils/errors';
 
-const EMPTY = { title: '', category: '', brand: '', model: '', condition: '', refurbishmentInfo: '', price: '', stock: '1', specs: '', status: 'active' };
-const FIELDS = ['title', 'category', 'brand', 'model', 'condition', 'refurbishmentInfo', 'price', 'stock', 'specs', 'status', 'photos'];
+const EMPTY = { title: '', category: '', brand: '', model: '', condition: '', refurbishmentInfo: '', price: '', stock: '1', specs: '', status: 'active', conditionDetails: {}, conditionNote: '' };
+// The parts a buyer looks at first; the rest sit behind "Show more" in the form, as on the device page.
+const MAIN_PARTS = ['power', 'battery', 'screen', 'body'];
+const FIELDS = ['title', 'category', 'brand', 'model', 'condition', 'refurbishmentInfo', 'price', 'stock', 'specs', 'status', 'photos', 'conditionDetails', 'conditionNote'];
 
 function validate(v, photoCount) {
   const e = {};
@@ -30,6 +33,7 @@ function validate(v, photoCount) {
   if (!Number.isInteger(stock) || stock < 0 || stock > 999) e.stock = 'Enter a whole number from 0 to 999.';
   const { error } = parseSpecs(v.specs);
   if (error) e.specs = error;
+  if (v.conditionNote.length > 1000) e.conditionNote = 'Keep the notes under 1000 characters.';
   if (photoCount === 0) e.photos = 'Add at least one photo of the product.';
   return e;
 }
@@ -41,17 +45,23 @@ function Form({ product, job, jobPhotos }) {
   const fromJob = Boolean(job) || Boolean(product?.refurbishmentJob);
   const save = useSave();
   const [values, setValues] = useState(() => (product
-    ? { title: product.title, category: product.category?.slug || '', brand: product.brand || '', model: product.model || '', condition: product.condition, refurbishmentInfo: product.refurbishmentInfo, price: String(product.price), stock: String(product.stock), specs: specsToText(product.specs), status: product.status === 'hidden' ? 'hidden' : 'active' }
+    ? { title: product.title, category: product.category?.slug || '', brand: product.brand || '', model: product.model || '', condition: product.condition, refurbishmentInfo: product.refurbishmentInfo, price: String(product.price), stock: String(product.stock), specs: specsToText(product.specs), status: product.status === 'hidden' ? 'hidden' : 'active', conditionDetails: { ...(product.conditionDetails || {}) }, conditionNote: product.conditionNote || '' }
     : job
       ? { ...EMPTY, title: job.listing?.title || '', category: job.listing?.category?.slug || '', brand: job.listing?.brand || '', model: job.listing?.model || '' }
       : EMPTY));
   const [files, setFiles] = useState([]);
   const [removed, setRemoved] = useState([]);
   const [errors, setErrors] = useState({});
+  const parts = partsFor(values.category);
+  const mainParts = parts.filter((p) => MAIN_PARTS.includes(p.key));
+  const moreParts = parts.filter((p) => !MAIN_PARTS.includes(p.key));
+  const [showMore, setShowMore] = useState(() => Boolean(product && moreParts.some((p) => product.conditionDetails?.[p.key])));
   const existing = product?.photos || [];
   const usable = existing.filter((p) => !removed.includes(p.publicId)).length + files.length + (!editing && files.length === 0 ? jobPhotos.length : 0);
 
   const set = (name) => (e) => { setValues((v) => ({ ...v, [name]: e.target.value })); setErrors((er) => ({ ...er, [name]: undefined })); };
+
+  const setPart = (key) => (e) => setValues((v) => ({ ...v, conditionDetails: { ...v.conditionDetails, [key]: e.target.value } }));
 
   const submit = async (e) => {
     e.preventDefault();
@@ -69,6 +79,11 @@ function Form({ product, job, jobPhotos }) {
     if (values.model.trim()) form.append('model', values.model.trim());
     const { specs } = parseSpecs(values.specs);
     if (Object.keys(specs).length) form.append('specs', JSON.stringify(specs));
+    // Only the parts asked about for this category that were answered; on an edit an empty set clears the old answers.
+    const asked = parts.map((p) => p.key);
+    const answered = Object.fromEntries(Object.entries(values.conditionDetails).filter(([k, a]) => a && asked.includes(k)));
+    if (Object.keys(answered).length || editing) form.append('conditionDetails', JSON.stringify(answered));
+    if (values.conditionNote.trim() || editing) form.append('conditionNote', values.conditionNote.trim());
     if (!fromJob) form.append('stock', values.stock);
     if (editing) {
       if (fromJob) form.append('stock', values.stock);
@@ -111,6 +126,25 @@ function Form({ product, job, jobPhotos }) {
             <option value="hidden">Hidden</option>
           </TextField>
         )}
+      </GlassCard>
+
+      <GlassCard as="section" aria-label="Condition of each part" className="space-y-4">
+        <div>
+          <h2 className="text-lg font-bold text-ink dark:text-white">Condition of each part (optional)</h2>
+          <p className="text-sm text-ink-muted dark:text-[#9FB2A7]">Buyers see these in “About this device” on the product page: the working condition, battery, screen, scratches and more. The more you say, the more buyers trust the listing.</p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {[...mainParts, ...(showMore ? moreParts : [])].map((p) => (
+            <TextField key={p.key} as="select" label={p.label} value={values.conditionDetails[p.key] || ''} onChange={setPart(p.key)}>
+              <option value="">Not stated</option>
+              {p.options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </TextField>
+          ))}
+        </div>
+        {moreParts.length > 0 && (
+          <button type="button" className="btn btn-glass" aria-expanded={showMore} onClick={() => setShowMore((s) => !s)}>{showMore ? 'Show fewer details' : `Show more (${moreParts.length})`}</button>
+        )}
+        <TextField as="textarea" rows={3} label="Other notes (optional)" value={values.conditionNote} onChange={set('conditionNote')} error={errors.conditionNote} maxLength={1000} hint="Anything else a buyer should know: accessories, marks, warranty." />
       </GlassCard>
 
       <GlassCard className="space-y-3">

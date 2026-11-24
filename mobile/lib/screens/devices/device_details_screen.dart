@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
+import '../../core/condition_parts.dart';
 import '../../core/format.dart';
 import '../../core/network/api_exception.dart';
 import '../../models/listing.dart';
@@ -9,6 +10,7 @@ import '../../routes/route_paths.dart';
 import '../../widgets/app_background.dart';
 import '../../widgets/glass_app_bar.dart';
 import '../../widgets/app_chip.dart';
+import '../../widgets/ai_cards.dart';
 import '../../widgets/glass_container.dart';
 import '../../widgets/message_button.dart';
 import '../../widgets/listing_photo.dart';
@@ -106,6 +108,7 @@ class _BodyState extends ConsumerState<_Body> {
     final theme = Theme.of(context);
     final facts = <(String, String)>[
       ('Condition', labelOf(conditions, l.condition)),
+      ...conditionRows(l.conditionDetails),
       ('Wanted', labelOf(services, l.preferredService)),
       if (l.pickupPreference != null) ('Handover', labelOf(pickups, l.pickupPreference)),
       if (l.categoryName != null) ('Category', l.categoryName!),
@@ -184,6 +187,10 @@ class _BodyState extends ConsumerState<_Body> {
         if (!l.isOwner && l.isLive) ...[
           const SizedBox(height: 16),
           MessageButton(contextType: 'enquiry', contextId: l.id, label: 'Ask ${l.ownerName ?? 'the owner'} a question'),
+        ],
+        if (l.isOwner && l.isLive) ...[
+          const SizedBox(height: 16),
+          SmartMatchesCard(listingId: l.id, service: l.preferredService),
         ],
         if (l.isOwner) ...[
           const SizedBox(height: 16),

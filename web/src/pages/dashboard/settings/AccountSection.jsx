@@ -32,8 +32,8 @@ export default function AccountSection() {
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="grid gap-4 sm:grid-cols-2">
         <TextField label="Full name" autoComplete="name" error={errors.name?.message} {...register('name')} />
         <TextField label="Phone" type="tel" autoComplete="tel" inputMode="tel" error={errors.phone?.message} {...register('phone')} />
-        <TextField label="Email" value={user.email} readOnly disabled hint={user.emailVerified ? 'Verified' : 'Not verified yet'} onChange={() => {}} />
-        <div className="sm:col-span-2">
+        <TextField className="sm:col-span-2" label="Email" value={user.email} readOnly disabled hint={user.emailVerified ? 'Verified' : 'Not verified yet. Use “Verify my email” below.'} onChange={() => {}} />
+        <div className="mt-1 flex justify-end border-t border-black/5 pt-5 dark:border-white/10 sm:col-span-2">
           <button type="submit" className="btn btn-primary" disabled={save.saving}>{save.saving ? 'Saving…' : 'Save account'}</button>
         </div>
       </form>

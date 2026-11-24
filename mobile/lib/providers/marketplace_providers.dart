@@ -4,12 +4,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/marketplace.dart';
 import '../models/page_result.dart';
 import '../services/marketplace_repository.dart';
+import '../services/razorpay_checkout.dart';
 import 'auth_controller.dart';
 import 'core_providers.dart';
 import 'paged.dart';
 import 'technicians_controller.dart' show requestPollIntervalProvider;
 
 final marketplaceRepositoryProvider = Provider<MarketplaceRepository>((ref) => MarketplaceRepository(ref.watch(apiClientProvider)));
+
+/// Opens the payment window. Tests replace it so no real window is needed.
+final paymentLauncherProvider = Provider<PaymentLauncher>((ref) => RazorpayLauncher());
 
 /// The shop's current search, category, condition and sort. Changing it reloads the list.
 final productQueryProvider = StateProvider<ProductQuery>((ref) => const ProductQuery());

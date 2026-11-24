@@ -345,7 +345,7 @@ Server-side enforcement is mandatory (NFR-SEC-03); hiding UI is not access contr
 | BR-06 | Actual and estimated quantities are stored and displayed separately. |
 | BR-08 | Exact addresses are visible only to the counterparty of an accepted request, and only until completion. |
 | BR-09 | Suspended accounts cannot log in, transact, or appear in listings; their data is retained. |
-| BR-10 | Payments are recorded offline; the platform never processes money. |
+| BR-10 | Payments are recorded offline; the platform never processes real money. The only online payment is a demo through the Razorpay gateway in test mode (no real money). |
 | BR-11 | Refurbished products must show condition and a "Refurbished" label. |
 | BR-12 | Handover requires acknowledgement of the data-protection checklist. |
 | BR-13 | All admin actions are audit-logged. |

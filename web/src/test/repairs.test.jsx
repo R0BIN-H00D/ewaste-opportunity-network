@@ -3,6 +3,7 @@ import { setAccessToken } from '../services/api';
 import { categoryApi, deviceApi } from '../services/deviceApi';
 import { requestApi, reviewApi, technicianApi, transactionApi } from '../services/repairApi';
 import { _resetCategoriesCache } from '../hooks/useCategories';
+import { openCheckout } from '../lib/razorpay';
 import { journeySteps, statusLabel } from '../lib/requests';
 import { TECH, USER, anonymous, renderApp, signedIn } from './helpers';
 
@@ -18,9 +19,10 @@ vi.mock('../services/repairApi', () => ({
   transactionApi: { list: vi.fn(), summary: vi.fn(), confirm: vi.fn() },
   requestApi: {
     create: vi.fn(), list: vi.fn(), get: vi.fn(), setStatus: vi.fn(), quote: vi.fn(), quotations: vi.fn(), decide: vi.fn(),
-    progress: vi.fn(), pickup: vi.fn(), handover: vi.fn(), confirmCompletion: vi.fn(), cancel: vi.fn(),
+    progress: vi.fn(), pickup: vi.fn(), handover: vi.fn(), confirmCompletion: vi.fn(), cancel: vi.fn(), startPayment: vi.fn(), verifyPayment: vi.fn(),
   },
 }));
+vi.mock('../lib/razorpay', () => ({ openCheckout: vi.fn(), loadCheckout: vi.fn() }));
 vi.mock('../services/api', async (importOriginal) => ({
   ...(await importOriginal()),
   getHealth: () => Promise.resolve({ success: true, data: { db: 'connected' } }),
@@ -207,21 +209,67 @@ describe('requests list', () => {
     expect(requestApi.list.mock.calls[0][0]).toMatchObject({ as: 'customer', active: 'true' });
   });
 
-  it('shows technicians their jobs, the open board and an availability control', async () => {
+  it('gives a technician a page of open requests with an availability control, and no status or "Your turn" tags on the cards', async () => {
     technicianApi.setAvailability.mockResolvedValue({ availability: { status: 'limited' } });
-    renderApp('/dashboard/requests', signedIn(TECHNICIAN_USER));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Repair requests and jobs' })).toBeInTheDocument();
-    expect(requestApi.list.mock.calls[0][0]).toMatchObject({ as: 'board' }); // technicians land on the open requests
-    fireEvent.click(screen.getByRole('tab', { name: 'My jobs' }));
-    await waitFor(() => expect(requestApi.list.mock.calls.at(-1)[0]).toMatchObject({ as: 'technician', active: 'true' }));
+    requestApi.list.mockResolvedValue(page([request({ actions: ['accept'], status: 'request_submitted' })]));
+    renderApp('/dashboard/find-requests', signedIn(TECHNICIAN_USER));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Find repair requests' })).toBeInTheDocument();
+    expect(requestApi.list.mock.calls[0][0]).toMatchObject({ as: 'board' });
+    await screen.findByRole('link', { name: 'Open request for Dell Inspiron 15' });
+    expect(screen.queryByText('Waiting for technician')).not.toBeInTheDocument();
+    expect(screen.queryByText('Your turn')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument(); // the jobs are on their own page now
     fireEvent.change(screen.getByLabelText('Your availability'), { target: { value: 'limited' } });
     await waitFor(() => expect(technicianApi.setAvailability).toHaveBeenCalledWith('limited'));
     expect(await screen.findByText('Availability updated')).toBeInTheDocument();
   });
 
+  it('has a Filters button on the open requests page that narrows them by type, city and on-site', async () => {
+    requestApi.list.mockResolvedValue(page([
+      request({ _id: 'a', listing: { _id: 'l1', title: 'Dell laptop', city: 'Bengaluru', category: { name: 'Laptops' } } }),
+      request({ _id: 'b', onSite: true, listing: { _id: 'l2', title: 'iPhone 8', city: 'Chennai', category: { name: 'Smartphones' } } }),
+    ]));
+    renderApp('/dashboard/find-requests', signedIn(TECHNICIAN_USER));
+    await screen.findByText('Dell laptop');
+    expect(screen.queryByRole('region', { name: 'Filters' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Filters/ }));
+    fireEvent.change(screen.getByLabelText('Device type'), { target: { value: 'Smartphones' } });
+    expect(screen.queryByText('Dell laptop')).not.toBeInTheDocument();
+    expect(screen.getByText('iPhone 8')).toBeInTheDocument();
+    expect(screen.getByText('Showing 1 of 2 requests')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Clear all filters/ }));
+    fireEvent.change(screen.getByLabelText('City'), { target: { value: 'Bengaluru' } });
+    expect(screen.queryByText('iPhone 8')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Clear all filters/ }));
+    fireEvent.click(screen.getByLabelText('On-site repairs only'));
+    expect(screen.getByText('iPhone 8')).toBeInTheDocument();
+    expect(screen.queryByText('Dell laptop')).not.toBeInTheDocument();
+  });
+
+  it('gives a technician their accepted jobs on a page of their own', async () => {
+    requestApi.list.mockResolvedValue(page([request({ status: 'repair_in_progress', actions: [] })]));
+    renderApp('/dashboard/my-jobs', signedIn(TECHNICIAN_USER));
+    expect(await screen.findByRole('heading', { level: 1, name: 'My repair jobs' })).toBeInTheDocument();
+    expect(requestApi.list.mock.calls[0][0]).toMatchObject({ as: 'technician', active: 'true' });
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument(); // no box of tabs: the choice is in Filters
+    expect(screen.queryByLabelText('Your availability')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Filters/ }));
+    fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'all' } });
+    await waitFor(() => expect(requestApi.list.mock.calls.at(-1)[0]).toMatchObject({ as: 'technician' }));
+    expect(requestApi.list.mock.calls.at(-1)[0]).not.toHaveProperty('active');
+    expect(within(screen.getByLabelText('Show')).queryByRole('option', { name: 'My own requests' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Clear all filters/ }));
+    await waitFor(() => expect(requestApi.list.mock.calls.at(-1)[0]).toMatchObject({ as: 'technician', active: 'true' }));
+  });
+
+  it('sends a technician who opens the old repairs address to the open requests page', async () => {
+    renderApp('/dashboard/requests', signedIn(TECHNICIAN_USER));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Find repair requests' })).toBeInTheDocument();
+  });
+
   it('tells an unverified technician why they see no jobs', async () => {
     requestApi.list.mockRejectedValue(apiError('Your account must be verified by an administrator first', 'NOT_VERIFIED', 403));
-    renderApp('/dashboard/requests', signedIn(TECH));
+    renderApp('/dashboard/find-requests', signedIn(TECHNICIAN_USER)); // the server is the final word, even if the page thought they were verified
     expect(await screen.findByText('Your account is waiting for verification')).toBeInTheDocument();
   });
 
@@ -292,6 +340,41 @@ describe('request details: customer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirm pickup' }));
     expect(await screen.findByText('Choose a date and time in the future.')).toBeInTheDocument();
     expect(requestApi.pickup).not.toHaveBeenCalled();
+  });
+
+  describe('paying the approved quote online', () => {
+    const session = { keyId: 'rzp_test_x', gatewayOrderId: 'order_1', amount: 80000, currency: 'INR', description: 'Repair service', testMode: true };
+    const rz = { razorpay_order_id: 'order_1', razorpay_payment_id: 'pay_1', razorpay_signature: 'sig' };
+    const inProgress = (over = {}) => request({ status: 'repair_in_progress', activeQuotation: quotation({ status: 'accepted' }), actions: ['pay', 'cancel'], ...over });
+
+    it('opens the payment window, verifies it and shows the request as paid', async () => {
+      requestApi.get.mockResolvedValue(inProgress());
+      requestApi.startPayment.mockResolvedValue(session);
+      openCheckout.mockResolvedValue(rz);
+      requestApi.verifyPayment.mockResolvedValue(inProgress({ actions: ['cancel'], payment: { status: 'paid_online', amount: 800 } }));
+      renderApp('/dashboard/requests/r1', signedIn(USER));
+      fireEvent.click(await screen.findByRole('button', { name: /^Pay ₹/ }));
+      await waitFor(() => expect(requestApi.verifyPayment).toHaveBeenCalledWith('r1', rz));
+      expect((await screen.findAllByText(/Paid online/)).length).toBeGreaterThan(0);
+      expect(screen.queryByRole('button', { name: /^Pay ₹/ })).not.toBeInTheDocument();
+    });
+
+    it('does not verify anything when the payment window is closed', async () => {
+      requestApi.get.mockResolvedValue(inProgress());
+      requestApi.startPayment.mockResolvedValue(session);
+      openCheckout.mockRejectedValue(Object.assign(new Error('closed'), { cancelled: true }));
+      renderApp('/dashboard/requests/r1', signedIn(USER));
+      fireEvent.click(await screen.findByRole('button', { name: /^Pay ₹/ }));
+      await waitFor(() => expect(openCheckout).toHaveBeenCalled());
+      expect(requestApi.verifyPayment).not.toHaveBeenCalled();
+    });
+
+    it('shows no Pay box without the pay action', async () => {
+      requestApi.get.mockResolvedValue(inProgress({ actions: ['cancel'] }));
+      renderApp('/dashboard/requests/r1', signedIn(USER));
+      await screen.findByRole('button', { name: 'Cancel this request' });
+      expect(screen.queryByRole('button', { name: /^Pay ₹/ })).not.toBeInTheDocument();
+    });
   });
 
   it('confirms completion once the device is back', async () => {

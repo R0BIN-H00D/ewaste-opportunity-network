@@ -40,6 +40,9 @@ import '../screens/refurbishment/product_form_screen.dart';
 import '../screens/refurbishment/refurb_job_details_screen.dart';
 import '../screens/refurbishment/refurb_jobs_screen.dart';
 import '../screens/refurbishment/refurb_opportunities_screen.dart';
+import '../models/refurbishment.dart';
+import '../models/wanted.dart';
+import '../screens/refurbishment/refurb_offer_screen.dart';
 import '../screens/wanted/wanted_screens.dart';
 import '../screens/recycling/recycle_screen.dart';
 import '../screens/recycling/recycling_details_screen.dart';
@@ -55,7 +58,6 @@ import '../screens/auth/register_screen.dart';
 import '../screens/auth/reset_password_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/onboarding_screen.dart';
-import '../providers/technicians_controller.dart';
 import '../screens/requests/jobs_screen.dart';
 import '../screens/requests/request_details_screen.dart';
 import '../screens/requests/requests_screen.dart';
@@ -68,6 +70,9 @@ import 'route_paths.dart';
 
 export 'route_paths.dart';
 
+/// What a provider who is not verified yet may open. Everything else sends them to the verification screen.
+const lockedAllowed = [Routes.verification, Routes.profile, Routes.account, Routes.settings, Routes.help];
+
 /// Where to send a person who is at [location], or `null` to leave them there. A plain function so it can be tested.
 String? redirectFor({
   required bool booted,
@@ -75,6 +80,7 @@ String? redirectFor({
   required bool onboardingSeen,
   required String location,
   bool welcome = false, // just signed up: the first screen is their profile
+  bool locked = false, // a provider whose documents are not approved yet
 }) {
   // While the app starts up (reading storage, restoring the session) only the splash screen is shown.
   if (!booted || auth == AuthStatus.unknown) {
@@ -83,6 +89,8 @@ String? redirectFor({
 
   final isPublic = publicRoutes.contains(location);
   if (auth == AuthStatus.authenticated) {
+    // Until an administrator approves them, a provider can only open the verification, profile, account and help screens.
+    if (locked) return lockedAllowed.contains(location) ? null : Routes.verification;
     return (location == Routes.splash || isPublic) ? (welcome ? Routes.profile : Routes.home) : null;
   }
 
@@ -111,6 +119,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       onboardingSeen: ref.read(onboardingProvider),
       location: state.matchedLocation,
       welcome: ref.read(authControllerProvider).justRegistered,
+      locked: ref.read(authControllerProvider).me?.isLocked ?? false,
     ),
     routes: [
       GoRoute(path: Routes.splash, builder: (_, __) => const SplashScreen()),
@@ -207,13 +216,14 @@ final routerProvider = Provider<GoRouter>((ref) {
                 technicianId: state.uri.queryParameters['technician']),
           ),
           GoRoute(path: Routes.requests, builder: (_, __) => const RequestsPage()),
+          // The old "/jobs?tab=..." address goes to whichever of the two pages it meant.
           GoRoute(
             path: Routes.jobs,
-            builder: (_, state) => JobsPage(
-                initial: JobsFilter.values.firstWhere(
-                    (f) => f.name == state.uri.queryParameters['tab'],
-                    orElse: () => JobsFilter.board)),
+            redirect: (_, state) => const ['active', 'all'].contains(state.uri.queryParameters['tab']) ? Routes.jobsActive : Routes.jobsBoard,
+            builder: (_, __) => const SizedBox.shrink(),
           ),
+          GoRoute(path: Routes.jobsBoard, builder: (_, __) => const FindRequestsPage()),
+          GoRoute(path: Routes.jobsActive, builder: (_, __) => const MyJobsPage()),
           GoRoute(
               path: Routes.requestPattern,
               builder: (_, state) =>
@@ -246,6 +256,16 @@ final routerProvider = Provider<GoRouter>((ref) {
               redirect: (_, __) => ref.read(authControllerProvider).user?.role == UserRole.recycler ? null : Routes.home,
               builder: (_, __) => const RecyclingReportScreen()),
           GoRoute(path: Routes.wanted, builder: (_, __) => const WantedPage()),
+          GoRoute(
+            path: Routes.wantedAcceptPattern,
+            redirect: (_, state) => state.extra is WantedRequest ? null : Routes.wanted,
+            builder: (_, state) => WantedAcceptScreen(request: state.extra! as WantedRequest),
+          ),
+          GoRoute(
+            path: Routes.refurbOfferPattern,
+            redirect: (_, state) => state.extra is RefurbOpportunity ? null : Routes.refurbOpportunities,
+            builder: (_, state) => RefurbOfferScreen(opportunity: state.extra! as RefurbOpportunity),
+          ),
           GoRoute(
               path: Routes.refurbOpportunities,
               builder: (_, __) => const RefurbOpportunitiesPage()),

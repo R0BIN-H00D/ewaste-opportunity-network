@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Send } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import GlassCard from '../glass/GlassCard';
 import ErrorState from '../ui/ErrorState';
 import PageLoader from '../ui/PageLoader';
 import { chatApi } from '../../services/chatApi';
@@ -208,47 +207,53 @@ export default function ChatThread({ conversationId }) {
 
   const lastSeenId = [...state.messages].reverse().find((m) => m.sender === me && m.read)?._id;
 
+  const other = convo?.other?.name || 'Message';
+
   return (
-    <GlassCard className="flex h-[70vh] min-h-[420px] flex-col p-0">
-      <header className="flex items-center gap-3 border-b border-black/10 p-3 dark:border-white/10">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <header className="flex items-center gap-3 border-b border-black/5 px-4 py-3.5 dark:border-white/10 sm:px-6">
         <Link to="/dashboard/messages" className="btn btn-glass md:hidden" aria-label="Back to all conversations"><ArrowLeft size={16} aria-hidden /></Link>
+        <span aria-hidden className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary font-bold text-white dark:bg-primary-tint dark:text-canvas-dark">{other.slice(0, 1).toUpperCase()}</span>
         <div className="min-w-0">
-          <h2 className="truncate font-bold text-ink dark:text-white">{convo?.other?.name || 'Message'}</h2>
-          <p className="text-xs text-ink-muted dark:text-[#9FB2A7]" aria-live="polite">
+          <h2 className="truncate text-base font-bold text-ink dark:text-white">{other}</h2>
+          <p className={`text-xs ${otherTyping ? 'font-semibold text-primary dark:text-primary-tint' : 'text-ink-muted dark:text-[#9FB2A7]'}`} aria-live="polite">
             {otherTyping ? 'typing...' : convo ? contextLabel(convo.contextType) : ''}
           </p>
         </div>
       </header>
 
-      <div className="flex-1 space-y-1 overflow-y-auto p-3" onScroll={onScroll} role="log" aria-label="Messages">
+      <div className="min-h-0 flex-1 space-y-1 overflow-y-auto bg-black/[0.02] px-4 py-4 dark:bg-black/20 sm:px-6" onScroll={onScroll} role="log" aria-label="Messages">
         {state.hasMore && (
-          <div className="text-center">
+          <div className="pb-2 text-center">
             <button type="button" className="btn btn-glass" onClick={loadOlder} disabled={state.loadingOlder}>{state.loadingOlder ? 'Loading...' : 'Show older messages'}</button>
           </div>
         )}
-        {state.messages.length === 0 && <p className="py-10 text-center text-sm text-ink-muted dark:text-[#9FB2A7]">No messages yet. Say hello.</p>}
+        {state.messages.length === 0 && <p className="py-16 text-center text-sm text-ink-muted dark:text-[#9FB2A7]">No messages yet. Say hello.</p>}
         {state.messages.map((m, i) => {
           const mine = m.sender === me;
           const previous = state.messages[i - 1];
+          const grouped = previous && previous.sender === m.sender && sameDay(previous.createdAt, m.createdAt);
           return (
-            <div key={m._id}>
-              {(!previous || !sameDay(previous.createdAt, m.createdAt)) && <p className="py-2 text-center text-xs text-ink-muted dark:text-[#9FB2A7]">{dayLabel(m.createdAt)}</p>}
+            <div key={m._id} className={grouped ? '' : 'pt-2'}>
+              {(!previous || !sameDay(previous.createdAt, m.createdAt)) && (
+                <p className="py-3 text-center"><span className="rounded-full bg-black/5 px-3 py-1 text-xs font-medium text-ink-muted dark:bg-white/10 dark:text-[#9FB2A7]">{dayLabel(m.createdAt)}</span></p>
+              )}
               <div className={`flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
                 <p
-                  className={`max-w-[80%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm ${
-                    mine ? 'rounded-br-sm bg-primary text-white dark:bg-primary-tint dark:text-canvas-dark' : 'rounded-bl-sm bg-black/5 text-ink dark:bg-white/10 dark:text-white'
+                  className={`max-w-[78%] whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm sm:max-w-[65%] ${
+                    mine ? 'rounded-br-md bg-primary text-white dark:bg-primary-tint dark:text-canvas-dark' : 'rounded-bl-md bg-white text-ink dark:bg-white/10 dark:text-white'
                   } ${m.pending ? 'opacity-60' : ''}`}
                 >
                   {m.text}
                 </p>
                 {m.failed ? (
-                  <span className="mt-0.5 flex items-center gap-2 text-xs text-danger" role="alert">
+                  <span className="mt-1 flex items-center gap-2 text-xs text-danger" role="alert">
                     Not sent
                     <button type="button" className="underline" onClick={() => retry(m._id)}>Try again</button>
                     <button type="button" className="underline" onClick={() => discard(m._id)}>Delete</button>
                   </span>
                 ) : (
-                  <span className="mt-0.5 text-xs text-ink-muted dark:text-[#9FB2A7]">
+                  <span className="mt-1 px-1 text-[11px] text-ink-muted dark:text-[#9FB2A7]">
                     {m.pending ? 'Sending...' : clockTime(m.createdAt)}
                     {m._id === lastSeenId ? ' · Seen' : ''}
                   </span>
@@ -260,11 +265,11 @@ export default function ChatThread({ conversationId }) {
         <div ref={bottom} />
       </div>
 
-      <form className="flex items-end gap-2 border-t border-black/10 p-3 dark:border-white/10" onSubmit={(e) => { e.preventDefault(); send(); }}>
+      <form className="flex items-end gap-3 border-t border-black/5 px-4 py-3.5 dark:border-white/10 sm:px-6" onSubmit={(e) => { e.preventDefault(); send(); }}>
         <label className="sr-only" htmlFor="chat-box">Write a message</label>
         <textarea
           id="chat-box"
-          className="input min-h-[44px] flex-1 resize-none"
+          className="max-h-32 min-h-[48px] flex-1 resize-none rounded-3xl border border-black/10 bg-white px-5 py-3 text-sm text-ink outline-none transition placeholder:text-ink-muted focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-white/10 dark:text-white"
           rows={1}
           maxLength={MAX}
           placeholder="Write a message"
@@ -272,10 +277,10 @@ export default function ChatThread({ conversationId }) {
           onChange={onChange}
           onKeyDown={onKeyDown}
         />
-        <button type="submit" className="btn btn-primary min-h-[44px]" disabled={!text.trim()} aria-label="Send">
-          <Send size={16} aria-hidden />
+        <button type="submit" className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary text-white shadow-md transition hover:scale-105 disabled:opacity-40 disabled:hover:scale-100 dark:bg-primary-tint dark:text-canvas-dark" disabled={!text.trim()} aria-label="Send">
+          <Send size={18} aria-hidden />
         </button>
       </form>
-    </GlassCard>
+    </div>
   );
 }

@@ -117,7 +117,7 @@ Location format (GeoJSON): `{ type: "Point", coordinates: [lng, lat] }` with `2d
 | **RefurbishmentJobs** *(added)* | `listing, refurbisher, offer{amount,status}, status(offered|accepted|collected|assessment|in_progress|testing|ready_to_list|listed|cancelled), beforePhotos[], afterPhotos[], workLog[], product(ref)` | |
 | **MarketplaceProducts** | `seller(ref refurbisher), refurbishmentJob, title, category, brand, model, specs{}, condition, refurbishmentInfo, price, stock, photos[], status(active|sold|hidden|removed), isRefurbished:true, ratingAvg` | Text index; `category+price+status` |
 | **Orders** | `product, buyer, seller, quantity, priceAtOrder, status(placed|confirmed|ready|delivered|completed|cancelled), paymentMethod(cod|offline), paymentStatus(unpaid|paid_offline|confirmed), deliveryArea, notes, statusHistory[]` | |
-| **Transactions** | `type(repair|order|refurb_purchase|donation|recycling), refType, refId, payer, payee, amount, method(cod|offline), reference, status(recorded|confirmed|disputed), confirmedBy` | Records only; platform handles no money (BR-10) |
+| **Transactions** | `type(repair|order|refurb_purchase|donation|recycling), refType, refId, payer, payee, amount, method(cod|offline|online), reference, status(recorded|confirmed|disputed), confirmedBy` | Records only; platform handles no money (BR-10) |
 | **RecyclingRecords** | `request{...}, listing, requester, center, categories[], status, pickup, handover{byUser,byCenter,at}, receivedAt, materials[{type, actualKg, estimatedKg, measuredBy, measuredAt}], reportNotes` | `actual*` and `estimated*` always separate fields (BR-06) |
 
 ### A.3.6 Communication & trust

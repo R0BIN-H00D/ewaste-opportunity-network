@@ -153,6 +153,8 @@ async function createProduct(user, input, files = []) {
       specs: input.specs || {},
       condition: input.condition,
       refurbishmentInfo: input.refurbishmentInfo,
+      conditionDetails: cleanDetails(input.conditionDetails),
+      conditionNote: input.conditionNote || undefined,
       price: input.price,
       stock: job ? 1 : input.stock ?? 1,
       photos: [...shared, ...stored.map(storage.toPhoto)],
@@ -175,6 +177,12 @@ async function createProduct(user, input, files = []) {
   return fetchView(product._id, user);
 }
 
+/** Keeps only the parts that were answered; nothing answered means nothing stored. */
+function cleanDetails(details) {
+  const kept = Object.fromEntries(Object.entries(details || {}).filter(([, v]) => v));
+  return Object.keys(kept).length ? kept : undefined;
+}
+
 async function updateProduct(id, user, input, files = []) {
   const product = await loadMutable(id, user);
 
@@ -187,6 +195,8 @@ async function updateProduct(id, user, input, files = []) {
   for (const f of ['title', 'brand', 'model', 'specs', 'condition', 'refurbishmentInfo', 'price', 'stock']) {
     if (input[f] !== undefined) product[f] = input[f];
   }
+  if (input.conditionDetails !== undefined) product.conditionDetails = cleanDetails(input.conditionDetails); // {} clears them
+  if (input.conditionNote !== undefined) product.conditionNote = input.conditionNote || undefined; // an empty note clears it
   // Stock and status stay consistent: nothing in stock means sold, and restocking a sold item puts it back on sale.
   if (product.stock === 0) product.status = 'sold';
   else if (product.status === 'sold') product.status = 'active';

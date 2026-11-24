@@ -1,36 +1,38 @@
 import { useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, MessageCircle, ShoppingBag, Wrench } from 'lucide-react';
+import { Link, useLocation, useParams } from 'react-router-dom';
+import { ArrowLeft, Cpu, MessageCircle, Route, ShoppingBag, Wrench } from 'lucide-react';
 import GlassCard from '../../components/glass/GlassCard';
 import Alert from '../../components/ui/Alert';
 import Badge from '../../components/ui/Badge';
 import ErrorState from '../../components/ui/ErrorState';
-import Modal from '../../components/ui/Modal';
 import Skeleton from '../../components/ui/Skeleton';
 import TextField from '../../components/ui/TextField';
 import { ProductBadges, SellerLine } from '../../components/marketplace/ProductCard';
+import AboutDevice from '../../components/marketplace/AboutDevice';
 import { useFetch } from '../../hooks/useFetch';
 import { useSave } from '../../hooks/useSave';
 import { useAuth } from '../../hooks/useAuth';
 import { assetUrl } from '../../services/api';
-import { marketApi, orderApi } from '../../services/marketplaceApi';
+import { marketApi } from '../../services/marketplaceApi';
 import { useMarketplaceBase } from '../../hooks/useMarketplaceBase';
-import { PAYMENT_METHODS } from '../../lib/marketplace';
 import { formatMoney } from '../../lib/requests';
-import { applyFieldErrors, friendlyMessage } from '../../utils/errors';
+import { friendlyMessage } from '../../utils/errors';
 
 function Gallery({ photos = [], title }) {
   const [at, setAt] = useState(0);
-  if (!photos.length) return <div className="grid aspect-[4/3] place-items-center rounded-3xl bg-primary/5 text-sm text-ink-muted" role="img" aria-label="No photo">No photo</div>;
+  // On a wide screen the picture grows to the height of the buy card beside it, so the two edges line up.
+  if (!photos.length) return <div className="grid aspect-[4/3] place-items-center rounded-[2rem] bg-primary/5 text-sm text-ink-muted lg:aspect-auto lg:min-h-[26rem]" role="img" aria-label="No photo">No photo</div>;
   const main = photos[Math.min(at, photos.length - 1)];
   return (
-    <div className="space-y-2">
-      <img src={assetUrl(main.url)} alt={title} className="aspect-[4/3] w-full rounded-3xl object-cover" />
+    <div className="flex h-full flex-col gap-3">
+      <div className="relative flex-1 overflow-hidden rounded-[2rem] bg-white/60 shadow-xl ring-1 ring-black/5 dark:bg-white/5 dark:ring-white/10 lg:min-h-[26rem]">
+        <img src={assetUrl(main.url)} alt={title} className="aspect-[4/3] w-full object-cover lg:absolute lg:inset-0 lg:aspect-auto lg:h-full" />
+      </div>
       {photos.length > 1 && (
-        <ul className="flex flex-wrap gap-2" aria-label="Product photos">
+        <ul className="flex flex-wrap gap-2.5" aria-label="Product photos">
           {photos.map((p, i) => (
             <li key={p.publicId || p.url}>
-              <button type="button" onClick={() => setAt(i)} aria-label={`Show photo ${i + 1}`} aria-current={i === at ? 'true' : undefined} className={`overflow-hidden rounded-xl border-2 ${i === at ? 'border-primary dark:border-primary-tint' : 'border-transparent'}`}>
+              <button type="button" onClick={() => setAt(i)} aria-label={`Show photo ${i + 1}`} aria-current={i === at ? 'true' : undefined} className={`overflow-hidden rounded-2xl ring-2 transition ${i === at ? 'ring-primary dark:ring-primary-tint' : 'opacity-70 ring-transparent hover:opacity-100'}`}>
                 <img src={assetUrl(p.url)} alt="" className="h-16 w-20 object-cover" />
               </button>
             </li>
@@ -38,86 +40,6 @@ function Gallery({ photos = [], title }) {
         </ul>
       )}
     </div>
-  );
-}
-
-/** Same rules as the server, so people are told straight away what to fix. */
-export function validateDelivery({ deliveryArea, deliveryCity, deliveryPincode }) {
-  const errors = {};
-  const area = deliveryArea.trim();
-  const city = deliveryCity.trim();
-  if (area.length < 3 || !/[A-Za-z]/.test(area)) errors.deliveryArea = 'Enter the area or locality to deliver to.';
-  if (city.length < 2 || !/^[A-Za-z][A-Za-z .'-]*$/.test(city)) errors.deliveryCity = 'Enter the city (letters only).';
-  if (!/^[1-9][0-9]{5}$/.test(deliveryPincode.trim())) errors.deliveryPincode = 'Enter a valid 6-digit pincode.';
-  return errors;
-}
-
-function OrderDialog({ product, onClose, onDone }) {
-  const save = useSave();
-  const [quantity, setQuantity] = useState('1');
-  const [paymentMethod, setPaymentMethod] = useState('cod');
-  const [place, setPlace] = useState({ deliveryArea: '', deliveryCity: '', deliveryPincode: '' });
-  const [placeErrors, setPlaceErrors] = useState({});
-  const [notes, setNotes] = useState('');
-  const [problem, setProblem] = useState('');
-  const qty = Number(quantity);
-  const setPlaceField = (name) => (e) => {
-    setPlace((p) => ({ ...p, [name]: e.target.value }));
-    setPlaceErrors((er) => ({ ...er, [name]: undefined }));
-  };
-
-  const submit = async () => {
-    if (!Number.isInteger(qty) || qty < 1 || qty > product.stock) return setProblem(product.stock === 1 ? 'Only 1 is available, so the quantity must be 1.' : `Choose a quantity between 1 and ${product.stock}.`);
-    const found = validateDelivery(place);
-    setPlaceErrors(found);
-    if (Object.keys(found).length) return setProblem('');
-    setProblem('');
-    const body = { productId: product._id, quantity: qty, paymentMethod, deliveryArea: place.deliveryArea.trim(), deliveryCity: place.deliveryCity.trim(), deliveryPincode: place.deliveryPincode.trim(), ...(notes.trim() ? { notes: notes.trim() } : {}) };
-    const res = await save.run(() => orderApi.place(body), 'Order placed');
-    if (res.ok) onDone(res.result);
-    else applyFieldErrors(res.error, (name, { message }) => {
-      if (name === 'quantity') setProblem(message);
-      else setPlaceErrors((e) => ({ ...e, [name]: message }));
-    }, ['quantity', 'deliveryArea', 'deliveryCity', 'deliveryPincode']);
-    return res;
-  };
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title="Place your order"
-      footer={<>
-        <button type="button" className="btn btn-glass" onClick={onClose} disabled={save.saving}>Cancel</button>
-        <button type="button" className="btn btn-primary" onClick={submit} disabled={save.saving}>{save.saving ? 'Placing…' : 'Place order'}</button>
-      </>}
-    >
-      <div className="space-y-3">
-        <p className="text-sm text-ink dark:text-[#E8F1EB]">{product.title}: {formatMoney(product.price)} each. The seller confirms your order, then you arrange the handover. You pay the seller directly; the platform never handles money.</p>
-        <TextField label="Quantity" type="number" inputMode="numeric" min="1" max={product.stock} value={quantity} onChange={(e) => setQuantity(e.target.value)} error={problem} hint={`${product.stock} available`} />
-        <p className="text-sm font-semibold text-ink dark:text-white" aria-live="polite">Total: {formatMoney(product.price * (Number.isInteger(qty) && qty > 0 ? qty : 1))}</p>
-        <fieldset>
-          <legend className="mb-1 text-sm font-medium text-ink dark:text-white">How will you pay?</legend>
-          <div className="flex flex-wrap gap-4">
-            {PAYMENT_METHODS.map(([v, l]) => (
-              <label key={v} className="flex items-center gap-2 text-sm text-ink dark:text-white">
-                <input type="radio" name="paymentMethod" value={v} checked={paymentMethod === v} onChange={() => setPaymentMethod(v)} className="h-4 w-4 accent-[#1E8449]" />{l}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-        <fieldset className="space-y-3">
-          <legend className="mb-1 text-sm font-medium text-ink dark:text-white">Where should it be delivered?</legend>
-          <TextField label="Area or locality" value={place.deliveryArea} onChange={setPlaceField('deliveryArea')} error={placeErrors.deliveryArea} maxLength={150} autoComplete="address-level3" hint="Area only. Share your exact address with the seller yourself, once they confirm." />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <TextField label="City" value={place.deliveryCity} onChange={setPlaceField('deliveryCity')} error={placeErrors.deliveryCity} maxLength={80} autoComplete="address-level2" />
-            <TextField label="Pincode" inputMode="numeric" value={place.deliveryPincode} onChange={setPlaceField('deliveryPincode')} error={placeErrors.deliveryPincode} maxLength={6} autoComplete="postal-code" />
-          </div>
-        </fieldset>
-        <TextField as="textarea" rows={2} label="Note for the seller (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} />
-        <Alert variant="error">{save.status === 'error' && !problem ? friendlyMessage(save.error) : ''}</Alert>
-      </div>
-    </Modal>
   );
 }
 
@@ -143,17 +65,46 @@ function EnquiryForm({ product }) {
   );
 }
 
+// How an order really goes (the workflow of the app), so a buyer knows what happens after pressing "Order this device".
+const BUYING_STEPS = [
+  ['Place your order', 'Pay on delivery, pay the seller directly, or pay online.'],
+  ['The seller confirms', 'They reserve the device and get it ready for you.'],
+  ['Handover', 'You and the seller arrange it. Only the delivery area is shared.'],
+  ['You confirm receipt', 'The order is complete, and you can review the seller.'],
+];
+
+function HowBuying() {
+  return (
+    <GlassCard as="section" aria-label="How buying works" className="!rounded-3xl !p-6 sm:!p-7">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="flex items-center gap-3 text-lg font-bold text-ink dark:text-white">
+          <span aria-hidden className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary dark:text-primary-tint"><Route size={18} /></span>
+          How buying works
+        </h2>
+        <p className="rounded-full bg-primary/10 px-3.5 py-1.5 text-xs font-semibold text-primary dark:text-primary-tint sm:text-sm">You can cancel an order until the seller marks it ready.</p>
+      </div>
+      <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {BUYING_STEPS.map(([title, text], i) => (
+          <li key={title} className="rounded-2xl bg-black/[0.03] p-4 dark:bg-white/5">
+            <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-sm font-bold text-white dark:bg-primary-tint dark:text-canvas-dark">{i + 1}</span>
+            <p className="mt-3 text-sm font-semibold text-ink dark:text-white">{title}</p>
+            <p className="mt-1 text-sm leading-relaxed text-ink-muted dark:text-[#9FB2A7]">{text}</p>
+          </li>
+        ))}
+      </ol>
+    </GlassCard>
+  );
+}
+
 /** Public product page (FR-MKT-006/007): photos, condition, the Refurbished label, what was done, specs and the seller. */
 export default function ProductDetails() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const location = useLocation();
   const marketBase = useMarketplaceBase();
   const { user, isAuthenticated } = useAuth();
   const { data: p, error, loading, reload } = useFetch((signal) => marketApi.get(id, signal), [id, user?._id]);
-  const [ordering, setOrdering] = useState(false);
 
-  if (loading && !p) return <div className="mx-auto max-w-6xl space-y-5 px-4 py-10" aria-busy><Skeleton className="h-10 w-1/2" /><Skeleton className="h-64 w-full !rounded-3xl" /></div>;
+  if (loading && !p) return <div className="mx-auto max-w-7xl space-y-5 px-4 py-10" aria-busy><Skeleton className="h-10 w-1/2" /><Skeleton className="h-64 w-full !rounded-3xl" /></div>;
   if (error && !p) {
     const missing = error.status === 404 || error.status === 422;
     return (
@@ -170,51 +121,73 @@ export default function ProductDetails() {
   const specs = Object.entries(p.specs || {});
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5 px-4 py-10">
-      <Link to={marketBase} className="inline-flex items-center gap-1 text-sm font-medium text-primary dark:text-primary-tint"><ArrowLeft size={16} aria-hidden /> Marketplace</Link>
+    <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:space-y-8 sm:py-10">
+      <Link to={marketBase} className="glass-subtle inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium text-primary transition hover:-translate-x-0.5 dark:text-primary-tint"><ArrowLeft size={16} aria-hidden /> Marketplace</Link>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* Row 1: the photo and the buy card, side by side and the same height */}
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
         <Gallery photos={p.photos} title={p.title} />
-        <div className="space-y-4">
-          <ProductBadges product={p} />
-          <h1 className="text-3xl font-extrabold text-ink dark:text-white">{p.title}</h1>
-          <p className="text-sm text-ink-muted dark:text-[#9FB2A7]">{[p.category?.name, p.brand, p.model].filter(Boolean).join(' · ')}</p>
-          <p className="font-numeric text-3xl font-bold text-primary dark:text-primary-tint">{formatMoney(p.price)}</p>
-          <p className="text-sm text-ink dark:text-[#E8F1EB]">{forSale ? `${p.stock} in stock` : <Badge tone="neutral">{p.status === 'sold' ? 'Sold' : 'Not on sale'}</Badge>}</p>
-          <GlassCard className="!p-4"><SellerLine seller={p.seller} /></GlassCard>
 
-          {mine ? (
-            <Alert variant="info">This is your product. <Link to={`/dashboard/products/${p._id}/edit`} className="font-semibold underline">Edit it</Link>.</Alert>
-          ) : forSale ? (
-            isAuthenticated ? (
-              <button type="button" className="btn btn-primary" onClick={() => setOrdering(true)}><ShoppingBag size={16} aria-hidden /> Order this device</button>
+        <div className="glass-strong flex flex-col gap-6 rounded-3xl p-6 sm:p-8">
+          <ProductBadges product={p} />
+          <div>
+            <h1 className="text-3xl font-extrabold leading-tight tracking-tight text-ink dark:text-white sm:text-4xl">{p.title}</h1>
+            <p className="mt-2 text-sm text-ink-muted dark:text-[#9FB2A7]">{[p.category?.name, p.brand, p.model].filter(Boolean).join(' · ')}</p>
+          </div>
+          <div className="flex flex-wrap items-end justify-between gap-3 border-y border-black/5 py-5 dark:border-white/10">
+            <p className="font-numeric text-4xl font-extrabold leading-none text-primary dark:text-primary-tint sm:text-5xl">{formatMoney(p.price)}</p>
+            {forSale
+              ? <span className="rounded-full bg-primary/10 px-3.5 py-1.5 text-sm font-semibold text-primary dark:text-primary-tint">{`${p.stock} in stock`}</span>
+              : <Badge tone="neutral">{p.status === 'sold' ? 'Sold' : 'Not on sale'}</Badge>}
+          </div>
+          <div className="glass-subtle rounded-2xl px-4 py-3.5"><SellerLine seller={p.seller} /></div>
+
+          <div className="mt-auto">
+            {mine ? (
+              <Alert variant="info">This is your product. <Link to={`/dashboard/products/${p._id}/edit`} className="font-semibold underline">Edit it</Link>.</Alert>
+            ) : forSale ? (
+              isAuthenticated ? (
+                <Link to={`${marketBase}/${p._id}/order`} className="btn btn-primary w-full justify-center !py-4 text-base"><ShoppingBag size={18} aria-hidden /> Order this device</Link>
+              ) : (
+                <Link to={loginTo} state={{ from: location.pathname }} className="btn btn-primary w-full justify-center !py-4 text-base">Log in to order or ask a question</Link>
+              )
             ) : (
-              <Link to={loginTo} state={{ from: location.pathname }} className="btn btn-primary">Log in to order or ask a question</Link>
-            )
-          ) : (
-            <Alert variant="info">This product is no longer available.</Alert>
-          )}
+              <Alert variant="info">This product is no longer available.</Alert>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <GlassCard as="section" aria-label="What was done" className="space-y-2">
-          <h2 className="flex items-center gap-2 text-lg font-bold text-ink dark:text-white"><Wrench size={18} aria-hidden />What was done to it</h2>
-          <p className="whitespace-pre-line text-sm text-ink dark:text-[#E8F1EB]">{p.refurbishmentInfo}</p>
+      {/* Row 2: how each part is doing, across the whole page, so its four tiles sit in one tidy row */}
+      <AboutDevice product={p} />
+
+      {/* Row 3: what was done beside the specifications, the same height. With no specifications it is one wide callout instead, so no card is left half empty. */}
+      <div className={`grid gap-6 lg:items-stretch ${specs.length > 0 ? 'lg:grid-cols-2' : ''}`}>
+        <GlassCard as="section" aria-label="What was done" className={`!rounded-3xl !p-6 sm:!p-7 ${specs.length > 0 ? 'space-y-3' : 'flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-7'}`}>
+          <h2 className="flex shrink-0 items-center gap-3 text-lg font-bold text-ink dark:text-white">
+            <span aria-hidden className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary dark:text-primary-tint"><Wrench size={18} /></span>
+            What was done to it
+          </h2>
+          <p className={`whitespace-pre-line leading-relaxed text-ink dark:text-[#E8F1EB] ${specs.length > 0 ? 'text-sm' : 'text-base sm:border-l sm:border-black/10 sm:pl-7 dark:sm:border-white/10'}`}>{p.refurbishmentInfo}</p>
         </GlassCard>
         {specs.length > 0 && (
-          <GlassCard as="section" aria-label="Specifications">
-            <h2 className="mb-2 text-lg font-bold text-ink dark:text-white">Specifications</h2>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-              {specs.map(([k, v]) => (<div key={k} className="contents"><dt className="font-semibold text-ink dark:text-white">{k}</dt><dd className="text-ink dark:text-[#E8F1EB]">{v}</dd></div>))}
+          <GlassCard as="section" aria-label="Specifications" className="!rounded-3xl !p-6 sm:!p-7">
+            <h2 className="mb-3 flex items-center gap-3 text-lg font-bold text-ink dark:text-white">
+              <span aria-hidden className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary dark:text-primary-tint"><Cpu size={18} /></span>
+              Specifications
+            </h2>
+            <dl className="divide-y divide-black/5 text-sm dark:divide-white/10">
+              {specs.map(([k, v]) => (<div key={k} className="flex items-baseline justify-between gap-4 py-2.5"><dt className="font-semibold text-ink dark:text-white">{k}</dt><dd className="text-right text-ink dark:text-[#E8F1EB]">{v}</dd></div>))}
             </dl>
           </GlassCard>
         )}
       </div>
 
+      {/* Row 4: how an order goes, as a strip across the page */}
+      <HowBuying />
+
       {!mine && forSale && isAuthenticated && <GlassCard as="section" aria-label="Contact the seller"><EnquiryForm product={p} /></GlassCard>}
 
-      {ordering && <OrderDialog product={p} onClose={() => setOrdering(false)} onDone={(order) => navigate(`/dashboard/orders/${order._id}`, { state: { flash: 'Your order was placed. The seller will confirm it soon.' } })} />}
     </div>
   );
 }

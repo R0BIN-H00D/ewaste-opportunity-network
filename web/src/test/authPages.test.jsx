@@ -102,7 +102,9 @@ describe('Register page', () => {
     // A new person lands on their profile first, with the email code box and the documents section for providers.
     expect(await screen.findByRole('heading', { name: 'Profile' })).toBeInTheDocument();
     expect(screen.getByText(/Welcome! Start by filling in your profile/)).toBeInTheDocument();
-    expect(screen.getByText('Verify your email address')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Email' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Verification code')).toBeInTheDocument(); // the code was emailed at sign-up
+    expect(screen.getByText(/We emailed a 6-digit code to asha@test.local when you signed up/)).toBeInTheDocument();
     expect(authApi.register).toHaveBeenCalledWith({ role: 'technician', name: 'Asha Rao', email: 'asha@test.local', password: 'Passw0rd!x' });
   });
 

@@ -301,6 +301,7 @@ const LabelPairs productSorts = [
 const LabelPairs paymentMethods = [
   ('cod', 'Cash on delivery'),
   ('offline', 'Pay the seller directly'),
+  ('online', 'Pay online'),
 ];
 
 /// Where an order stands, worded for the buyer (mirrors `ORDER_STATUS`).

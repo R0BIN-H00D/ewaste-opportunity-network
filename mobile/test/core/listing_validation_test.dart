@@ -63,7 +63,7 @@ void main() {
     expect(validateModel(''), isNotNull);
     expect(validateModel('###'), isNotNull);
     expect(validateModel('Galaxy A12'), isNull);
-    expect(validateDescription(''), isNull);
+    expect(validateDescription(''), isNull); // not asked on the form any more
     expect(validateDescription('ok'), isNull);
     expect(validateDescription('x' * 2001), isNotNull);
     expect(validateArea('12'), isNotNull);

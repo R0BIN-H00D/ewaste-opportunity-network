@@ -84,6 +84,31 @@ describe('wanted-device requests', () => {
 });
 
 describe('requests I accepted', () => {
+  it('returns one request with whether the viewer accepted it, and what they said', async () => {
+    const w = (await call(refurb, 'post', '', { title: 'Phones', quantity: 4, city: 'Chennai' })).body.data;
+    const before = (await call(owner, 'get', `/${w._id}`)).body.data;
+    expect(before).toMatchObject({ title: 'Phones', quantity: 4, hasResponded: false, isMine: false });
+    expect(before.refurbisher.name).toBeTruthy();
+    await call(owner, 'post', `/${w._id}/respond`, { message: 'I have two' });
+    expect((await call(owner, 'get', `/${w._id}`)).body.data).toMatchObject({ hasResponded: true, myResponse: { message: 'I have two' } });
+    expect((await call(refurb, 'get', `/${w._id}`)).body.data.isMine).toBe(true);
+    expect((await call(owner, 'get', '/64b64b64b64b64b64b64b64b')).status).toBe(404);
+    expect((await request(app).get(`/api/wanted-requests/${w._id}`)).status).toBe(401);
+  });
+
+  it('lets the refurbisher edit their own request, clearing what is left empty, and no one else', async () => {
+    const w = (await call(refurb, 'post', '', { title: 'Phones', quantity: 4, city: 'Chennai', brand: 'Apple', notes: 'Cracked is fine' })).body.data;
+    const res = await call(refurb, 'put', `/${w._id}`, { title: 'Used phones', quantity: 9, city: '', notes: 'Must power on', minCondition: 'minor_damage' });
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ title: 'Used phones', quantity: 9, notes: 'Must power on', minCondition: 'minor_damage', brand: 'Apple' });
+    expect(res.body.data.city).toBeUndefined();
+    expect((await call(refurb, 'put', `/${w._id}`, { minCondition: '' })).body.data.minCondition).toBeUndefined();
+    expect((await call(refurb, 'put', `/${w._id}`, { title: 'ab' })).status).toBe(422);
+    expect((await call(refurb, 'put', `/${w._id}`, { status: 'closed' })).status).toBe(422); // status has its own call
+    expect((await call(refurb2, 'put', `/${w._id}`, { title: 'Stolen' })).status).toBe(404);
+    expect((await call(owner, 'put', `/${w._id}`, { title: 'Stolen' })).status).toBe(403);
+  });
+
   it('lists them for the accepter, including closed ones', async () => {
     const a = (await call(refurb, 'post', '', { title: 'Phones' })).body.data;
     await call(refurb, 'post', '', { title: 'Tablets' });

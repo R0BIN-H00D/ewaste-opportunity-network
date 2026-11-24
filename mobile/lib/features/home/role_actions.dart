@@ -118,8 +118,13 @@ List<QuickAction> _roleActions(UserRole role) {
         QuickAction(
             icon: Icons.search_outlined,
             title: 'Requests',
-            subtitle: 'Devices owners want refurbished, and your own wanted requests',
+            subtitle: 'Devices owners want refurbished',
             route: Routes.refurbOpportunities),
+        QuickAction(
+            icon: Icons.campaign_outlined,
+            title: 'My requests',
+            subtitle: 'The devices you are looking for, and who can help',
+            route: Routes.wanted),
         QuickAction(
             icon: Icons.storefront_outlined,
             title: 'Refurbished products',

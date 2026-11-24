@@ -1,3 +1,5 @@
+import 'package:ewaste_opportunity/models/geo_place.dart';
+import 'package:ewaste_opportunity/services/location_service.dart';
 import 'package:ewaste_opportunity/core/format.dart';
 import 'package:ewaste_opportunity/core/network/api_exception.dart';
 import 'package:ewaste_opportunity/core/storage/key_value_store.dart';
@@ -6,10 +8,12 @@ import 'package:ewaste_opportunity/models/listing.dart';
 import 'package:ewaste_opportunity/providers/core_providers.dart';
 import 'package:ewaste_opportunity/providers/listings_controller.dart';
 import 'package:ewaste_opportunity/providers/marketplace_providers.dart';
+import 'package:ewaste_opportunity/providers/location_providers.dart';
 import 'package:ewaste_opportunity/screens/marketplace/marketplace_screen.dart';
 import 'package:ewaste_opportunity/screens/marketplace/order_details_screen.dart';
 import 'package:ewaste_opportunity/screens/marketplace/orders_screen.dart';
 import 'package:ewaste_opportunity/screens/marketplace/product_details_screen.dart';
+import 'package:ewaste_opportunity/services/razorpay_checkout.dart';
 import 'package:ewaste_opportunity/widgets/app_chip.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,7 +23,8 @@ import '../fakes.dart';
 import '../helpers.dart';
 
 Future<void> _pump(
-    WidgetTester tester, Widget screen, FakeMarketplaceRepository repo) async {
+    WidgetTester tester, Widget screen, FakeMarketplaceRepository repo,
+    {PaymentLauncher? launcher, FakeLocationService? phone, FakeGeoRepository? geo}) async {
   tester.view.physicalSize = const Size(900, 3000);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -45,6 +50,9 @@ Future<void> _pump(
         keyValueStoreProvider.overrideWithValue(MemoryKeyValueStore()),
         authRepositoryProvider.overrideWithValue(FakeAuthRepository()),
         marketplaceRepositoryProvider.overrideWithValue(repo),
+        if (launcher != null) paymentLauncherProvider.overrideWithValue(launcher),
+        if (phone != null) locationServiceProvider.overrideWithValue(phone),
+        if (geo != null) geoRepositoryProvider.overrideWithValue(geo),
         deviceRepositoryProvider.overrideWithValue(FakeDeviceRepository()),
         categoriesProvider.overrideWith((ref) async =>
             const [Category(id: 'c2', name: 'Laptops', slug: 'laptops')]),
@@ -184,6 +192,27 @@ void main() {
   });
 
   group('a product', () {
+    testWidgets('has an About this device card with the parts, and Read more for the rest', (tester) async {
+      await _pump(
+          tester,
+          const ProductDetailsScreen(id: 'p1'),
+          FakeMarketplaceRepository(
+              product: sampleProduct(conditionDetails: const {'power': 'works_normally', 'battery': 'drains_fast', 'screen': 'no_damage', 'body': 'scratched_or_dented', 'water': 'none'}, conditionNote: 'Charger included.')));
+      expect(find.text('About this device'), findsOneWidget);
+      expect(find.text('Overall condition: Good'), findsOneWidget);
+      expect(find.text('Drains quickly'), findsOneWidget);
+      expect(find.text('Water damage'), findsNothing);
+      await _tap(tester, find.text('Read more'));
+      expect(find.text('Water damage'), findsOneWidget);
+      expect(find.text('Charger included.'), findsOneWidget);
+    });
+
+    testWidgets('says when the seller has not added the parts yet', (tester) async {
+      await _pump(tester, const ProductDetailsScreen(id: 'p1'), FakeMarketplaceRepository());
+      expect(find.text('About this device'), findsOneWidget);
+      expect(find.textContaining('has not added the details of each part yet'), findsOneWidget);
+    });
+
     testWidgets(
         'shows the label, what was done, the specifications and the seller',
         (tester) async {
@@ -444,6 +473,96 @@ void main() {
           find.text(
               'This order was just changed. Reload the page and try again.'),
           findsOneWidget);
+    });
+  });
+
+  group('detecting the delivery address', () {
+    String text(WidgetTester tester, String label) => tester.widget<TextFormField>(find.widgetWithText(TextFormField, label)).controller!.text;
+
+    testWidgets('fills the area, city and pincode from where the phone is', (tester) async {
+      final repo = FakeMarketplaceRepository();
+      await _pump(tester, const ProductDetailsScreen(id: 'p1'), repo,
+          phone: FakeLocationService.at(const GeoPoint(12.9716, 77.5946)),
+          geo: FakeGeoRepository(place: const GeoPlace(area: 'Indiranagar', city: 'Bengaluru', postcode: '560038')));
+      await _tap(tester, find.text('Order this'));
+      await _tap(tester, find.text('Detect my current location'));
+
+      expect(text(tester, 'Area or locality'), 'Indiranagar');
+      expect(text(tester, 'City'), 'Bengaluru');
+      expect(text(tester, 'Pincode'), '560038');
+    });
+
+    testWidgets('leaves a pincode that is not six digits empty', (tester) async {
+      await _pump(tester, const ProductDetailsScreen(id: 'p1'), FakeMarketplaceRepository(),
+          phone: FakeLocationService.at(const GeoPoint(12.9716, 77.5946)),
+          geo: FakeGeoRepository(place: const GeoPlace(area: 'Indiranagar', city: 'Bengaluru', postcode: '56')));
+      await _tap(tester, find.text('Order this'));
+      await _tap(tester, find.text('Detect my current location'));
+      expect(text(tester, 'Pincode'), isEmpty);
+      expect(text(tester, 'City'), 'Bengaluru');
+    });
+
+    testWidgets('GPS off: an alert asks to turn it on and nothing is filled', (tester) async {
+      final phone = FakeLocationService.failing(LocationProblem.serviceOff);
+      await _pump(tester, const ProductDetailsScreen(id: 'p1'), FakeMarketplaceRepository(), phone: phone);
+      await _tap(tester, find.text('Order this'));
+      await _tap(tester, find.text('Detect my current location'));
+
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.textContaining('Turn on GPS to fill in your address'), findsOneWidget);
+      expect(text(tester, 'City'), isEmpty);
+    });
+  });
+
+  group('paying online', () {
+    final proof = const PaymentProof(orderId: 'order_1', paymentId: 'pay_1', signature: 'sig');
+
+    testWidgets('shows a Pay button, opens the window and sends the proof to the server', (tester) async {
+      final repo = FakeMarketplaceRepository(
+          current: sampleOrder(paymentMethod: 'online', paymentStatus: 'unpaid', actions: ['pay', 'cancel']))
+        ..result = sampleOrder(paymentMethod: 'online', paymentStatus: 'paid_online', actions: ['cancel']);
+      final launcher = FakePaymentLauncher(proof: proof);
+      await _pump(tester, const OrderDetailsScreen(id: 'o1'), repo, launcher: launcher);
+
+      expect(find.text('Pay online'), findsOneWidget);
+      await _tap(tester, find.textContaining('Pay ₹'));
+
+      expect(launcher.opened, 1);
+      expect(repo.calls, containsAllInOrder(['startPayment:o1', 'verifyPayment:o1:pay_1']));
+      expect(find.text('Paid online'), findsOneWidget);
+      expect(find.textContaining('Pay ₹'), findsNothing); // no Pay button once paid
+      expect(find.byIcon(Icons.payment_rounded), findsNothing);
+    });
+
+    testWidgets('closing the window leaves the order as it was and does not call verify', (tester) async {
+      final repo = FakeMarketplaceRepository(
+          current: sampleOrder(paymentMethod: 'online', paymentStatus: 'unpaid', actions: ['pay']));
+      final launcher = FakePaymentLauncher(error: const PaymentCancelled());
+      await _pump(tester, const OrderDetailsScreen(id: 'o1'), repo, launcher: launcher);
+
+      await _tap(tester, find.textContaining('Pay ₹'));
+
+      expect(launcher.opened, 1);
+      expect(repo.calls.where((c) => c.startsWith('verifyPayment')), isEmpty);
+      expect(find.textContaining('Pay ₹'), findsOneWidget); // can try again
+    });
+
+    testWidgets('a failed payment shows the reason and keeps the Pay button', (tester) async {
+      final repo = FakeMarketplaceRepository(
+          current: sampleOrder(paymentMethod: 'online', paymentStatus: 'unpaid', actions: ['pay']));
+      final launcher = FakePaymentLauncher(error: const PaymentFailed('Card declined'));
+      await _pump(tester, const OrderDetailsScreen(id: 'o1'), repo, launcher: launcher);
+
+      await _tap(tester, find.textContaining('Pay ₹'));
+
+      expect(find.text('Card declined'), findsOneWidget);
+      expect(find.textContaining('Pay ₹'), findsOneWidget);
+    });
+
+    testWidgets('cash on delivery has no Pay button', (tester) async {
+      await _pump(tester, const OrderDetailsScreen(id: 'o1'),
+          FakeMarketplaceRepository(current: sampleOrder(actions: ['cancel'])));
+      expect(find.textContaining('Pay ₹'), findsNothing);
     });
   });
 

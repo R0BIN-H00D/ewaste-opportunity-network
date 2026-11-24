@@ -2,6 +2,7 @@
 // Shapes a ServiceRequest for one viewer. The exact device location is released to the technician only after they
 // accept the job (BR-08); `actions` tells clients which buttons to show so the rules live in one place.
 const { availableActions } = require('../services/workflow/serviceRequest');
+const gateway = require('../services/paymentGateway');
 
 const idOf = (v) => String(v && v._id ? v._id : v);
 const NO_ADDRESS_STATUSES = ['request_submitted', 'rejected', 'cancelled'];
@@ -52,7 +53,9 @@ function serializeRequest(r, { role, invited = false }) {
     customerConfirmedAt: r.customerConfirmedAt,
     reviewed: Boolean(r.reviewed),
     viewerRole: role,
-    actions: availableActions(r, role, { invited }),
+    // The Pay button is only offered when online (test mode) payment is switched on.
+    actions: availableActions(r, role, { invited }).filter((a) => a !== 'pay' || gateway.isConfigured()),
+    payment: { status: r.payment?.status || 'unpaid', amount: r.payment?.amount, paidAt: r.payment?.paidAt },
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };

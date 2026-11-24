@@ -70,7 +70,7 @@ export default function RequestDetail() {
 
   return (
     <div className="space-y-5">
-      <Link to="/dashboard/requests" className="inline-flex items-center gap-1 text-sm font-medium text-primary dark:text-primary-tint"><ArrowLeft size={16} aria-hidden /> All requests</Link>
+      <Link to={technicianView ? '/dashboard/my-jobs' : '/dashboard/requests'} className="inline-flex items-center gap-1 text-sm font-medium text-primary dark:text-primary-tint"><ArrowLeft size={16} aria-hidden /> All requests</Link>
 
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-bold text-ink dark:text-white">{r.listing?.title}</h1>
@@ -78,6 +78,7 @@ export default function RequestDetail() {
       </div>
 
       <Alert variant="success">{flash}</Alert>
+      {r.payment?.status === 'paid_online' && <Alert variant="success">Paid online{r.payment.amount ? `: ${formatMoney(r.payment.amount)}` : ''}.</Alert>}
       <GlassCard><Tracker request={r} /></GlassCard>
 
       <ActionPanel

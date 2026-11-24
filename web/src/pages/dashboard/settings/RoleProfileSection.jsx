@@ -51,7 +51,7 @@ export default function RoleProfileSection() {
             {...register(f.name)}
           />
         ))}
-        <div className="sm:col-span-2">
+        <div className="mt-1 flex justify-end border-t border-black/5 pt-5 dark:border-white/10 sm:col-span-2">
           <button type="submit" className="btn btn-primary" disabled={save.saving}>{save.saving ? 'Saving…' : 'Save details'}</button>
         </div>
       </form>

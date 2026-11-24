@@ -18,6 +18,9 @@ class PagedList<T> extends ConsumerStatefulWidget {
     this.emptyActionLabel,
     this.onEmptyAction,
     this.skeletonHeight = 120,
+    this.itemFilter,
+    this.itemSort,
+    this.onClearFilters,
   });
 
   final NotifierProvider<PagedNotifier<T>, Paged<T>> provider;
@@ -29,6 +32,11 @@ class PagedList<T> extends ConsumerStatefulWidget {
   final String? emptyActionLabel;
   final VoidCallback? onEmptyAction;
   final double skeletonHeight;
+
+  /// Hides loaded items that do not match, and orders what is left. When nothing matches, "Clear filters" calls [onClearFilters].
+  final bool Function(T item)? itemFilter;
+  final int Function(T a, T b)? itemSort;
+  final VoidCallback? onClearFilters;
 
   @override
   ConsumerState<PagedList<T>> createState() => _PagedListState<T>();
@@ -66,7 +74,18 @@ class _PagedListState<T> extends ConsumerState<PagedList<T>> {
     } else if (state.loaded && state.items.isEmpty) {
       children.add(EmptyState(icon: widget.emptyIcon, title: widget.emptyTitle, message: widget.emptyMessage, actionLabel: widget.emptyActionLabel, onAction: widget.onEmptyAction));
     } else {
-      for (final item in state.items) {
+      final shown = [for (final item in state.items) if (widget.itemFilter?.call(item) ?? true) item];
+      if (widget.itemSort != null) shown.sort(widget.itemSort);
+      if (shown.isEmpty) {
+        children.add(EmptyState(
+          icon: Icons.filter_alt_off_outlined,
+          title: 'Nothing matches',
+          message: 'Try different filters.',
+          actionLabel: widget.onClearFilters == null ? null : 'Clear filters',
+          onAction: widget.onClearFilters,
+        ));
+      }
+      for (final item in shown) {
         children.add(Padding(padding: const EdgeInsets.only(bottom: 12), child: widget.itemBuilder(context, item)));
       }
       if (state.loadingMore) {

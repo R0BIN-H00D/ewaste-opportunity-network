@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { FileText, Trash2 } from 'lucide-react';
+import { FileText, ShieldCheck, Trash2 } from 'lucide-react';
 import { verificationApi } from '../../../services/authApi';
 import { useSave } from '../../../hooks/useSave';
 import { loadMe } from '../../../store/authSlice';
@@ -45,6 +45,7 @@ export default function VerificationSection() {
   const [docType, setDocType] = useState('');
   const [files, setFiles] = useState([]);
   const [fileError, setFileError] = useState('');
+  const [open, setOpen] = useState(false); // the upload form stays folded away until the person asks to verify
   const input = useRef(null);
 
   const load = useCallback(async () => {
@@ -75,6 +76,7 @@ export default function VerificationSection() {
     const { ok } = await save.run(() => verificationApi.submit(docType, files), 'Documents submitted. An administrator will review them.');
     if (ok) {
       setFiles([]);
+      setOpen(false);
       await load();
       dispatch(loadMe());
     }
@@ -91,6 +93,14 @@ export default function VerificationSection() {
 
   if (loadError) return <Section id="verification" title="Verification"><Alert variant="error">{loadError}</Alert></Section>;
   if (!data) return <Section id="verification" title="Verification"><div className="skeleton h-3 w-40" aria-hidden /><span className="sr-only">Loading…</span></Section>;
+
+  if (data.status === 'approved') return null;
+
+  const note = data.status === 'pending'
+    ? 'Your documents are with an administrator. You will be told when they are reviewed.'
+    : data.status === 'rejected'
+      ? 'Your documents were not accepted. Upload clearer ones to try again.'
+      : 'Verified providers can take requests and show a Verified badge. Upload an ID or certificate to start.';
 
   return (
     <Section
@@ -122,7 +132,14 @@ export default function VerificationSection() {
         </ul>
       )}
 
-      {data.status !== 'approved' && (
+      {!open ? (
+        <div className="flex flex-col gap-3 rounded-2xl bg-black/[0.03] p-4 dark:bg-white/5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-ink dark:text-[#E8F1EB]">{note}</p>
+          <button type="button" className="btn btn-primary shrink-0" onClick={() => setOpen(true)}>
+            <ShieldCheck size={16} aria-hidden /> {data.documents.length ? 'Upload more documents' : 'Verify my account'}
+          </button>
+        </div>
+      ) : (
         <div className="space-y-3">
           <TextField as="select" label="Document type" value={docType} onChange={(e) => setDocType(e.target.value)}>
             {data.allowedDocTypes.map((t) => <option key={t} value={t}>{LABELS[t] || t}</option>)}
@@ -136,6 +153,7 @@ export default function VerificationSection() {
           <button type="button" className="btn btn-primary" onClick={submit} disabled={save.saving || !files.length}>
             {save.saving ? 'Uploading…' : 'Submit for review'}
           </button>
+          <button type="button" className="btn btn-glass ml-2" onClick={() => setOpen(false)} disabled={save.saving}>Cancel</button>
         </div>
       )}
     </Section>

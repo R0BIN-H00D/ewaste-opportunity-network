@@ -11,9 +11,11 @@ const refurbisherOnly = [authenticate, authorize(ROLES.REFURBISHER), requireVeri
 
 router.get('/', authenticate, validate({ query: v.listQuery }), ctrl.list);
 router.post('/', ...refurbisherOnly, validate({ body: v.createBody }), ctrl.create);
+router.get('/:id', validObjectIdParam(), authenticate, ctrl.getOne);
 // Device owners and (verified) technicians can accept a request; the refurbisher sees who did.
 router.post('/:id/respond', validObjectIdParam(), authenticate, authorize(ROLES.USER, ROLES.TECHNICIAN), requireVerified, validate({ body: v.respondBody }), ctrl.respond);
 router.get('/:id/responses', validObjectIdParam(), ...refurbisherOnly, ctrl.responses);
+router.put('/:id', validObjectIdParam(), ...refurbisherOnly, validate({ body: v.updateBody }), ctrl.update);
 router.put('/:id/status', validObjectIdParam(), ...refurbisherOnly, validate({ body: v.statusBody }), ctrl.setStatus);
 router.delete('/:id', validObjectIdParam(), ...refurbisherOnly, ctrl.remove);
 

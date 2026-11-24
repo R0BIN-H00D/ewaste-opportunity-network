@@ -23,7 +23,7 @@ beforeEach(async () => {
 function create(user, fields = {}, { photo = true } = {}) {
   let r = request(app).post('/api/devices');
   if (user) r = r.set(authHeader(user));
-  const body = { name: 'HP Pavilion laptop', category: 'laptop', brand: 'HP', model: 'Pavilion 15', modelYear: 2018, purchaseYear: 2019, description: 'Screen flickers, works otherwise.', condition: 'minor_damage', preferredService: 'repair', pickupPreference: 'pickup', addressArea: 'Indiranagar', agentPhone: '9876543210', lat: 12.97, lng: 77.59, city: 'Bengaluru', ...fields };
+  const body = { name: 'HP Pavilion laptop', category: 'laptop', brand: 'HP', model: 'Pavilion 15', modelYear: 2018, purchaseYear: 2019, description: 'Screen flickers, works otherwise.', conditionNote: 'Small scratch on the lid.', conditionDetails: '{"battery":"drains_fast","screen":"scratched","ports":"all_work","water":"none"}', condition: 'minor_damage', preferredService: 'repair', pickupPreference: 'pickup', addressArea: 'Indiranagar', agentPhone: '9876543210', lat: 12.97, lng: 77.59, city: 'Bengaluru', ...fields };
   for (const [k, v] of Object.entries(body)) if (v !== undefined) r = r.field(k, String(v));
   if (photo) r = r.attach('photos', PNG, { filename: 'a.png', contentType: 'image/png' });
   return r;
@@ -51,6 +51,24 @@ describe('POST /api/devices', () => {
     expect(l.device.photos).toHaveLength(1);
     expect(l.device.photos[0].url).toMatch(/^\/uploads\//);
     expect(l.category.slug).toBe('laptop');
+    expect(l.conditionNote).toBe('Small scratch on the lid.');
+    expect(l.conditionDetails).toEqual({ battery: 'drains_fast', screen: 'scratched', ports: 'all_work', water: 'none' });
+  });
+
+  it('needs battery, screen, ports and water damage answered to go live, for the categories that have them', async () => {
+    const without = await create(owner, { conditionDetails: '{"battery":"drains_fast","power":"works_normally"}' });
+    expect(without.status).toBe(422);
+    const text = JSON.stringify(without.body);
+    expect(text).toContain('Choose the screen condition');
+    expect(text).toContain('Choose the ports and buttons condition');
+    expect(text).toContain('Choose the water damage condition');
+    expect(text).not.toContain('Choose the battery condition'); // that one was answered
+    expect((await create(owner, { conditionDetails: undefined })).status).toBe(422);
+    // a keyboard has no battery or screen: only ports and water damage are asked
+    expect((await create(owner, { category: 'keyboard', conditionDetails: '{"ports":"all_work","water":"none"}' })).status).toBe(201);
+    expect((await create(owner, { category: 'keyboard', conditionDetails: '{"ports":"all_work"}' })).status).toBe(422);
+    // a draft may be unfinished
+    expect((await create(owner, { status: 'draft', conditionDetails: undefined }, { photo: false })).status).toBe(201);
   });
 
   it('returns field-level validation errors (422)', async () => {
@@ -90,7 +108,29 @@ describe('POST /api/devices', () => {
       const text = JSON.stringify(res.body);
       fieldsWrong.forEach((f) => expect([f, text.includes(f)]).toEqual([f, true]));
     }
-    expect((await create(owner, { expectedPrice: '1500.50', description: 'x', modelYear: '2019', purchaseYear: '2019' })).status).toBe(201); // the same year is fine // a description has no minimum
+    expect((await create(owner, { expectedPrice: '1500.50', modelYear: '2019', purchaseYear: '2019' })).status).toBe(201); // the same year is fine
+  });
+
+  it('accepts the condition of each part only from the listed choices', () => {
+    const { createBody } = require('../src/validators/device.validators');
+    const base = { name: 'HP Pavilion laptop', category: 'laptop', brand: 'HP', model: 'Pavilion 15', modelYear: '2018', purchaseYear: '2019', condition: 'minor_damage', preferredService: 'repair', pickupPreference: 'pickup', addressArea: 'Indiranagar', agentPhone: '9876543210', city: 'Bengaluru' };
+    const ok = (details) => createBody.safeParse({ ...base, conditionDetails: details }).success;
+    expect(ok(undefined)).toBe(true); // optional
+    expect(ok('')).toBe(true);
+    expect(ok('{"battery":"drains_fast","water":"none"}')).toBe(true);
+    expect(ok({ screen: 'cracked' })).toBe(true);
+    expect(ok('{"battery":"on fire"}')).toBe(false); // not one of the choices
+    expect(ok('{"flux_capacitor":"works"}')).toBe(false); // not a known part
+    expect(ok('not json')).toBe(false);
+  });
+
+  it('keeps the condition note optional and short', () => {
+    const { createBody } = require('../src/validators/device.validators');
+    const base = { name: 'HP Pavilion laptop', category: 'laptop', brand: 'HP', model: 'Pavilion 15', modelYear: '2018', purchaseYear: '2019', description: 'Works fine, charger included.', condition: 'minor_damage', preferredService: 'repair', pickupPreference: 'pickup', addressArea: 'Indiranagar', agentPhone: '9876543210', city: 'Bengaluru' };
+    const ok = (body) => createBody.safeParse(body).success;
+    expect(ok(base)).toBe(true);
+    expect(ok({ ...base, conditionNote: 'Small scratch.' })).toBe(true);
+    expect(ok({ ...base, conditionNote: 'x'.repeat(501) })).toBe(false);
   });
 
   it('accepts a delivery agent phone in the usual Indian forms, keeps it private, and rejects bad ones', async () => {
@@ -216,6 +256,19 @@ describe('PUT /api/devices/:id', () => {
     expect(res.body.data.title).toBe('HP Pavilion 15');
     expect(res.body.data.device.name).toBe('HP Pavilion 15');
     expect(res.body.data.expectedPrice).toBe(7000);
+    expect(res.body.data.conditionNote).toBe('Small scratch on the lid.'); // left alone when not sent
+    const changed = await request(app).put(`/api/devices/${listing._id}`).set(authHeader(owner)).field('conditionNote', 'Screen now has a crack.');
+    expect(changed.body.data.conditionNote).toBe('Screen now has a crack.');
+    const cleared = await request(app).put(`/api/devices/${listing._id}`).set(authHeader(owner)).field('conditionNote', '');
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.data.conditionNote).toBeUndefined(); // an empty note clears it
+    expect(res.body.data.conditionDetails).toEqual({ battery: 'drains_fast', screen: 'scratched', ports: 'all_work', water: 'none' }); // left alone when not sent
+    const parts = await request(app).put(`/api/devices/${listing._id}`).set(authHeader(owner)).field('conditionDetails', '{"battery":"swollen","power":"works_normally","screen":""}');
+    expect(parts.status).toBe(200);
+    expect(parts.body.data.conditionDetails).toEqual({ battery: 'swollen', power: 'works_normally' }); // replaced as a whole; blanks dropped
+    const none = await request(app).put(`/api/devices/${listing._id}`).set(authHeader(owner)).field('conditionDetails', '{}');
+    expect(none.status).toBe(200);
+    expect(none.body.data.conditionDetails).toBeUndefined(); // an empty object clears them
   });
 
   it('forbids other users but allows admin', async () => {

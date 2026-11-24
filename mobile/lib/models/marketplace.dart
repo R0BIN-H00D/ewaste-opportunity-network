@@ -33,6 +33,8 @@ class Product {
     this.isMine = false,
     this.specs = const {},
     this.refurbishmentInfo,
+    this.conditionDetails = const {},
+    this.conditionNote,
     this.createdAt,
   });
 
@@ -58,6 +60,10 @@ class Product {
 
   /// Specification name to value, for example `RAM: 8 GB`. Only on the product page.
   final Map<String, String> specs;
+
+  /// How each part is doing (`battery` -> `drains_fast`, ...), when the seller said, and their own remarks.
+  final Map<String, String> conditionDetails;
+  final String? conditionNote;
   final String? refurbishmentInfo;
   final DateTime? createdAt;
 
@@ -98,6 +104,11 @@ class Product {
           if (e.value is String) e.key: e.value as String
       },
       refurbishmentInfo: json['refurbishmentInfo'] as String?,
+      conditionDetails: {
+        for (final e in _map(json['conditionDetails']).entries)
+          if (e.value is String) e.key: e.value as String
+      },
+      conditionNote: json['conditionNote'] as String?,
       createdAt: _date(json['createdAt']),
     );
   }

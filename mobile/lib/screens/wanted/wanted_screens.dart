@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import '../../core/format.dart';
 import '../../core/network/api_exception.dart';
@@ -7,6 +8,8 @@ import '../../models/user.dart';
 import '../../models/wanted.dart';
 import '../../providers/auth_controller.dart';
 import '../../providers/wanted_providers.dart';
+import '../../routes/route_paths.dart';
+import '../../widgets/detect_location_button.dart';
 import '../../widgets/app_background.dart';
 import '../../widgets/app_chip.dart';
 import '../../widgets/glass_app_bar.dart';
@@ -100,12 +103,12 @@ class WantedPage extends ConsumerWidget {
   }
 }
 
-Future<void> _addRequest(BuildContext context, WidgetRef ref) async {
+Future<void> _addRequest(BuildContext context, WidgetRef ref, {WantedRequest? edit}) async {
   final saved = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (_) => const _NewRequestSheet(),
+    builder: (_) => _NewRequestSheet(initial: edit),
   );
   if (saved == true) ref.invalidate(wantedMineProvider);
 }
@@ -141,45 +144,6 @@ class _Board extends ConsumerWidget {
   }
 }
 
-/// Asks for an optional message before accepting. It owns its text field, so it is cleaned up only after it has closed.
-class _AcceptDialog extends StatefulWidget {
-  const _AcceptDialog({required this.request});
-
-  final WantedRequest request;
-
-  @override
-  State<_AcceptDialog> createState() => _AcceptDialogState();
-}
-
-class _AcceptDialogState extends State<_AcceptDialog> {
-  final _message = TextEditingController();
-
-  @override
-  void dispose() {
-    _message.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-        icon: Icon(Icons.handshake_outlined, size: 32, color: Theme.of(context).colorScheme.primary),
-        title: const Text('Accept this request'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('${widget.request.refurbisherName ?? 'The refurbisher'} is looking for: ${widget.request.title}. They will be told you can help and can message you.'),
-            const SizedBox(height: 14),
-            TextField(controller: _message, maxLines: 3, maxLength: 1000, decoration: const InputDecoration(labelText: 'Message (optional)', helperText: 'For example what device you have')),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, _message.text), child: const Text('Accept')),
-        ],
-      );
-}
-
 class _BoardCard extends ConsumerStatefulWidget {
   const _BoardCard({required this.request, required this.accent});
 
@@ -191,25 +155,9 @@ class _BoardCard extends ConsumerStatefulWidget {
 }
 
 class _BoardCardState extends ConsumerState<_BoardCard> {
-  bool _busy = false;
-
   Future<void> _accept() async {
-    final message = await showDialog<String>(
-      context: context,
-      builder: (_) => _AcceptDialog(request: widget.request),
-    );
-    if (message == null || !mounted) return;
-    setState(() => _busy = true);
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      await ref.read(wantedRepositoryProvider).respond(widget.request.id, message: message);
-      ref.invalidate(wantedBoardProvider);
-      messenger.showSnackBar(const SnackBar(content: Text('Accepted. The refurbisher has been told.')));
-    } on ApiException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(e.message)));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    final done = await context.push<bool>(Routes.wantedAccept(widget.request.id), extra: widget.request);
+    if (done == true) ref.invalidate(wantedBoardProvider);
   }
 
   @override
@@ -273,14 +221,14 @@ class _BoardCardState extends ConsumerState<_BoardCard> {
             )
           else
             FilledButton(
-              onPressed: _busy ? null : _accept,
+              onPressed: _accept,
               style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(Icons.handshake_outlined, size: 20),
                   const SizedBox(width: 8),
-                  Flexible(child: Text(_busy ? 'Sending…' : 'Accept')),
+                  const Flexible(child: Text('Accept')),
                 ],
               ),
             ),
@@ -384,6 +332,7 @@ class _MineCardState extends ConsumerState<_MineCard> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               if (w.responseCount > 0) AppChip(label: '${w.responseCount} accepted', selected: _showWho, onTap: () => setState(() => _showWho = !_showWho)),
+              _CardAction(icon: Icons.edit_outlined, label: 'Edit', onTap: _busy ? null : () async { await _addRequest(context, ref, edit: w); }),
               _CardAction(icon: w.isOpen ? Icons.lock_outline_rounded : Icons.lock_open_rounded, label: w.isOpen ? 'Close' : 'Reopen', onTap: _busy ? null : () => _do(() => repo.setStatus(w.id, w.isOpen ? 'closed' : 'open'))),
               _CardAction(icon: Icons.delete_outline_rounded, label: 'Delete', danger: true, onTap: _busy ? null : () => _do(() => repo.delete(w.id))),
             ],
@@ -490,7 +439,10 @@ class _Responders extends ConsumerWidget {
 }
 
 class _NewRequestSheet extends ConsumerStatefulWidget {
-  const _NewRequestSheet();
+  const _NewRequestSheet({this.initial});
+
+  /// The request being edited; null when adding a new one.
+  final WantedRequest? initial;
 
   @override
   ConsumerState<_NewRequestSheet> createState() => _NewRequestSheetState();
@@ -498,12 +450,12 @@ class _NewRequestSheet extends ConsumerStatefulWidget {
 
 class _NewRequestSheetState extends ConsumerState<_NewRequestSheet> {
   final _form = GlobalKey<FormState>();
-  final _title = TextEditingController();
-  final _brand = TextEditingController();
-  final _quantity = TextEditingController(text: '1');
-  final _city = TextEditingController();
-  final _notes = TextEditingController();
-  String _condition = '';
+  late final _title = TextEditingController(text: widget.initial?.title ?? '');
+  late final _brand = TextEditingController(text: widget.initial?.brand ?? '');
+  late final _quantity = TextEditingController(text: '${widget.initial?.quantity ?? 1}');
+  late final _city = TextEditingController(text: widget.initial?.city ?? '');
+  late final _notes = TextEditingController(text: widget.initial?.notes ?? '');
+  late String _condition = widget.initial?.minCondition ?? '';
   bool _saving = false;
   String? _error;
 
@@ -522,14 +474,14 @@ class _NewRequestSheetState extends ConsumerState<_NewRequestSheet> {
       _error = null;
     });
     try {
-      await ref.read(wantedRepositoryProvider).create(
-            title: _title.text,
-            brand: _brand.text,
-            minCondition: _condition,
-            quantity: int.tryParse(_quantity.text.trim()) ?? 1,
-            city: _city.text,
-            notes: _notes.text,
-          );
+      final repo = ref.read(wantedRepositoryProvider);
+      final quantity = int.tryParse(_quantity.text.trim()) ?? 1;
+      final editing = widget.initial;
+      if (editing == null) {
+        await repo.create(title: _title.text, brand: _brand.text, minCondition: _condition, quantity: quantity, city: _city.text, notes: _notes.text);
+      } else {
+        await repo.update(editing.id, title: _title.text, brand: _brand.text, minCondition: _condition, quantity: quantity, city: _city.text, notes: _notes.text);
+      }
       if (mounted) Navigator.pop(context, true);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.fieldErrors.values.isNotEmpty ? e.fieldErrors.values.first : e.message);
@@ -577,7 +529,7 @@ class _NewRequestSheetState extends ConsumerState<_NewRequestSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Semantics(header: true, child: Text('New request', style: theme.textTheme.titleLarge)),
+                        Semantics(header: true, child: Text(widget.initial == null ? 'New request' : 'Edit request', style: theme.textTheme.titleLarge)),
                         const SizedBox(height: 2),
                         Text('Tell device owners what you are looking for. Open requests are visible to them.', style: theme.textTheme.bodySmall),
                       ],
@@ -609,10 +561,155 @@ class _NewRequestSheetState extends ConsumerState<_NewRequestSheet> {
                 },
               ),
               const SizedBox(height: 12),
+              DetectLocationButton(onDetected: (_, place) {
+                if (place != null && place.city.isNotEmpty) setState(() => _city.text = place.city);
+              }),
+              const SizedBox(height: 12),
               TextFormField(controller: _city, maxLength: 80, decoration: const InputDecoration(labelText: 'City (optional)', prefixIcon: Icon(Icons.place_outlined))),
               TextFormField(controller: _notes, maxLines: 3, maxLength: 1000, decoration: const InputDecoration(labelText: 'Notes (optional)')),
               const SizedBox(height: 8),
-              FilledButton(onPressed: _saving ? null : _save, style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)), child: Text(_saving ? 'Saving…' : 'Add request')),
+              FilledButton(onPressed: _saving ? null : _save, style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)), child: Text(_saving ? 'Saving…' : (widget.initial == null ? 'Add request' : 'Save changes'))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+const _acceptIdeas = [
+  'I have this device and can hand it over this week.',
+  'I have a few of these. Please message me to talk about the condition.',
+  'I can give it for free.',
+  'I would like to sell it. Please tell me what you can pay.',
+];
+
+/// Accept one wanted request, on a page of its own: what they are looking for in full, then a message and the Accept button.
+class WantedAcceptScreen extends ConsumerStatefulWidget {
+  const WantedAcceptScreen({super.key, required this.request});
+
+  final WantedRequest request;
+
+  @override
+  ConsumerState<WantedAcceptScreen> createState() => _WantedAcceptScreenState();
+}
+
+class _WantedAcceptScreenState extends ConsumerState<WantedAcceptScreen> {
+  final _message = TextEditingController();
+  bool _sending = false;
+  bool _done = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _message.dispose();
+    super.dispose();
+  }
+
+  Future<void> _accept() async {
+    setState(() {
+      _sending = true;
+      _error = null;
+    });
+    try {
+      await ref.read(wantedRepositoryProvider).respond(widget.request.id, message: _message.text);
+      ref.invalidate(wantedBoardProvider);
+      if (mounted) setState(() => _done = true);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final w = widget.request;
+    final accepted = _done || w.hasResponded;
+    final ok = AppColors.adapt(context, AppColors.success);
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: glassAppBar(context, 'Accept this request'),
+      body: AppBackground(
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+            children: [
+              Text('Accept this request', style: theme.textTheme.headlineSmall),
+              const SizedBox(height: 4),
+              Text('Read what they are looking for, then tell them how you can help.', style: theme.textTheme.bodyMedium),
+              const SizedBox(height: 16),
+              GlassContainer(
+                radius: 24,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(w.title, style: theme.textTheme.titleLarge),
+                    const SizedBox(height: 12),
+                    _FactPills(w),
+                    if ((w.notes ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      Text('What they wrote', style: theme.textTheme.titleSmall),
+                      const SizedBox(height: 6),
+                      Text(w.notes!, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface)),
+                    ],
+                    const SizedBox(height: 14),
+                    Row(children: [
+                      Icon(Icons.storefront_outlined, size: 16, color: theme.textTheme.bodySmall?.color),
+                      const SizedBox(width: 6),
+                      Expanded(child: Text('Wanted by ${w.refurbisherName ?? 'a refurbisher'}', style: theme.textTheme.bodyMedium)),
+                    ]),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (accepted)
+                GlassContainer(
+                  radius: 24,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        Icon(Icons.check_circle_rounded, color: ok),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text('You accepted this request', style: theme.textTheme.titleMedium)),
+                      ]),
+                      const SizedBox(height: 8),
+                      Text('${w.refurbisherName ?? 'The refurbisher'} has been told that you can help. Watch your notifications and messages for their reply.', style: theme.textTheme.bodyMedium),
+                      const SizedBox(height: 14),
+                      FilledButton(onPressed: () => context.pop(true), child: const Text('See more requests')),
+                    ],
+                  ),
+                )
+              else
+                GlassContainer(
+                  radius: 24,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Tell them how you can help', style: theme.textTheme.titleMedium),
+                      const SizedBox(height: 4),
+                      Text('A short message is optional, but it helps them decide quickly. Tap an idea to start with it.', style: theme.textTheme.bodySmall),
+                      const SizedBox(height: 10),
+                      Wrap(spacing: 8, runSpacing: 8, children: [
+                        for (final idea in _acceptIdeas) AppChip(label: idea, selected: _message.text == idea, onTap: () => setState(() => _message.text = idea)),
+                      ]),
+                      const SizedBox(height: 12),
+                      TextField(controller: _message, maxLines: 4, maxLength: 1000, decoration: const InputDecoration(labelText: 'Your message (optional)', helperText: 'For example what device you have')),
+                      if (_error != null) ...[const SizedBox(height: 4), MessageBanner(message: _error!, tone: BannerTone.error)],
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        onPressed: _sending ? null : _accept,
+                        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                        icon: const Icon(Icons.handshake_outlined, size: 20),
+                        label: Text(_sending ? 'Sending…' : 'Accept this request'),
+                      ),
+                      const SizedBox(height: 10),
+                      Text('Accepting does not commit you to anything. You and the refurbisher agree the details together.', style: theme.textTheme.bodySmall),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),

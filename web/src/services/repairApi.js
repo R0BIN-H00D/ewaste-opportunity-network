@@ -28,6 +28,8 @@ export const requestApi = {
   progress: (id, { note, photos = [] }) => data(api.post(`/service-requests/${id}/progress`, toForm({ note }, photos), UPLOAD)),
   pickup: (id, body) => data(api.post(`/service-requests/${id}/pickup`, body)),
   handover: (id, body = {}) => data(api.post(`/service-requests/${id}/handover`, body)),
+  startPayment: (id) => data(api.post(`/service-requests/${id}/payment`)),
+  verifyPayment: (id, body) => data(api.post(`/service-requests/${id}/payment/verify`, body)),
   confirmCompletion: (id) => data(api.post(`/service-requests/${id}/confirm-completion`)),
   cancel: (id, reason) => data(api.post(`/service-requests/${id}/cancel`, reason ? { reason } : {})),
 };

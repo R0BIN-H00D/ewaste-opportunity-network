@@ -21,6 +21,7 @@ import ImpactPage from '../pages/public/Impact';
 import ImpactDashboard from '../pages/dashboard/Impact';
 import Marketplace from '../pages/public/Marketplace';
 import ProductDetails from '../pages/public/ProductDetails';
+import PlaceOrder from '../pages/public/PlaceOrder';
 import { TechnicianDirectory, TechnicianProfile } from '../pages/public/Technicians';
 import Requests from '../pages/dashboard/Requests';
 import NewRequest from '../pages/dashboard/NewRequest';
@@ -32,13 +33,17 @@ import Donations from '../pages/public/Donations';
 import DonationDetail from '../pages/public/DonationDetail';
 import MyDonations from '../pages/dashboard/MyDonations';
 import Opportunities from '../pages/dashboard/Opportunities';
+import OfferPage from '../pages/dashboard/OfferPage';
 import WantedBoard from '../pages/dashboard/WantedBoard';
+import MyWantedRequests from '../pages/dashboard/MyWantedRequests';
+import WantedAccept from '../pages/dashboard/WantedAccept';
 import RefurbJobs from '../pages/dashboard/RefurbJobs';
 import RefurbJobDetail from '../pages/dashboard/RefurbJobDetail';
 import MyProducts from '../pages/dashboard/MyProducts';
 import ProductForm from '../pages/dashboard/ProductForm';
 import Orders from '../pages/dashboard/Orders';
 import OrderDetail from '../pages/dashboard/OrderDetail';
+import OrderPayment from '../pages/dashboard/OrderPayment';
 import { RecyclingCenterCompare, RecyclingCenterDetail, RecyclingCenterDirectory } from '../pages/public/RecyclingCenters';
 import RecyclingRequests from '../pages/dashboard/RecyclingRequests';
 import RecyclingNew from '../pages/dashboard/RecyclingNew';
@@ -94,6 +99,7 @@ export const routeConfig = [
       { path: 'technicians/:id', element: <TechnicianProfile /> },
       { path: 'marketplace', element: <Marketplace /> },
       { path: 'marketplace/:id', element: <ProductDetails /> },
+      { element: <RequireAuth />, children: [{ path: 'marketplace/:id/order', element: <PlaceOrder /> }] },
       { path: 'recycling-centers', element: <RecyclingCenterDirectory /> },
       { path: 'recycling-centers/compare', element: <RecyclingCenterCompare /> },
       { path: 'recycling-centers/:id', element: <RecyclingCenterDetail /> },
@@ -128,6 +134,8 @@ export const routeConfig = [
           { path: 'dashboard/messages/:id', element: <Messages /> },
           { path: 'dashboard/transactions', element: <Transactions /> },
           { path: 'dashboard/requests', element: <Requests /> },
+          { path: 'dashboard/find-requests', element: <Requests view="board" /> },
+          { path: 'dashboard/my-jobs', element: <Requests view="jobs" /> },
           { path: 'dashboard/requests/:id', element: <RequestDetail /> },
           { path: 'dashboard/donations', element: <MyDonations /> },
           { path: 'dashboard/donations/:id', element: <DonationDetail /> },
@@ -137,8 +145,10 @@ export const routeConfig = [
           { path: 'dashboard/pickups', element: <Pickups /> },
           { path: 'dashboard/marketplace', element: <Marketplace /> },
           { path: 'dashboard/marketplace/:id', element: <ProductDetails /> },
+          { path: 'dashboard/marketplace/:id/order', element: <PlaceOrder /> },
           { path: 'dashboard/orders', element: <Orders /> },
           { path: 'dashboard/orders/:id', element: <OrderDetail /> },
+          { path: 'dashboard/orders/:id/pay', element: <OrderPayment /> },
           {
             element: <RequireRole roles={['user', 'technician', 'refurbisher', 'recycler']} />,
             children: [
@@ -181,8 +191,8 @@ export const routeConfig = [
             ],
           },
           { element: <RequireRole roles={['user']} />, children: [{ path: 'dashboard/recipient', element: <RecipientOrg /> }] },
-          { element: <RequireRole roles={['user', 'technician']} />, children: [{ path: 'dashboard/wanted', element: <WantedBoard /> }] },
-          { element: <RequireRole roles={['refurbisher']} />, children: [{ path: 'dashboard/opportunities', element: <Opportunities /> }] },
+          { element: <RequireRole roles={['user', 'technician']} />, children: [{ path: 'dashboard/wanted', element: <WantedBoard /> }, { path: 'dashboard/wanted/:id/accept', element: <WantedAccept /> }] },
+          { element: <RequireRole roles={['refurbisher']} />, children: [{ path: 'dashboard/opportunities', element: <Opportunities /> }, { path: 'dashboard/opportunities/:id/offer', element: <OfferPage /> }, { path: 'dashboard/my-requests', element: <MyWantedRequests /> }] },
           {
             element: <RequireRole roles={LISTER_ROLES} />,
             children: [

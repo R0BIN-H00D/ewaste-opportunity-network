@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import { Activity, BarChart3, Bell, BookOpen, ClipboardList, Flag, Megaphone, MessageSquareWarning, ScrollText, Shapes, Star, ShieldCheck, Users, CalendarClock, Boxes, Factory, Heart, LayoutDashboard, Leaf, LogOut, MessageCircle, PackageSearch, Recycle, ReceiptText, Search, Settings, ShoppingBag, Store, UserRound, Wrench } from 'lucide-react';
+import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { Activity, BarChart3, Bell, BookOpen, ClipboardList, Flag, Megaphone, MessageSquareWarning, ScrollText, Shapes, Star, ShieldCheck, Users, CalendarClock, Boxes, Factory, Heart, LayoutDashboard, Leaf, Lock, LogOut, MessageCircle, PackageSearch, Recycle, ReceiptText, Search, Settings, ShoppingBag, Store, UserRound, Wrench } from 'lucide-react';
 import ThemeToggle from '../components/layout/ThemeToggle';
+import NotificationBell from '../components/layout/NotificationBell';
+import TopNav from '../components/layout/TopNav';
 import AnnouncementBanner from '../components/layout/AnnouncementBanner';
-import { logoutUser } from '../store/authSlice';
+import { isLockedProvider, logoutUser } from '../store/authSlice';
 import { useAuth } from '../hooks/useAuth';
 import { useLiveSession, useUnreadCounts } from '../hooks/useRealtime';
 
@@ -30,8 +32,8 @@ const ITEMS = {
   overview: { to: '/dashboard', end: true, icon: LayoutDashboard, label: 'Overview' },
   devices: { to: '/dashboard/listings', icon: Boxes, label: 'My devices' },
   repairs: { to: '/dashboard/requests', icon: Wrench, label: 'My repairs' },
-  openRequests: { to: '/dashboard/requests?tab=board', tab: 'board', icon: Search, label: 'Find repair requests' },
-  jobs: { to: '/dashboard/requests?tab=jobs', tab: 'jobs', icon: ClipboardList, label: 'My repair jobs' },
+  openRequests: { to: '/dashboard/find-requests', icon: Search, label: 'Find repair requests' },
+  jobs: { to: '/dashboard/my-jobs', icon: ClipboardList, label: 'My repair jobs' },
   donations: { to: '/dashboard/donations', icon: Heart, label: 'Donations' },
   recycling: { to: '/dashboard/recycling', end: true, icon: Factory, label: 'Recycling' },
   recyclingRequests: { to: '/dashboard/recycling', end: true, icon: Factory, label: 'Recycling requests' },
@@ -40,6 +42,7 @@ const ITEMS = {
   marketplace: { to: '/dashboard/marketplace', icon: Store, label: 'Marketplace' },
   wanted: { to: '/dashboard/wanted', icon: Search, label: 'Wanted devices' },
   refurbRequests: { to: '/dashboard/opportunities', icon: PackageSearch, label: 'Requests' },
+  myRequests: { to: '/dashboard/my-requests', icon: ClipboardList, label: 'My requests' },
   refurbJobs: { to: '/dashboard/refurbishment', icon: Recycle, label: 'Refurbishment jobs' },
   refurbOffers: { to: '/dashboard/refurbishment', icon: Recycle, label: 'Refurbishment offers' },
   products: { to: '/dashboard/products', icon: Store, label: 'Refurbished products' },
@@ -53,14 +56,26 @@ const ITEMS = {
   profile: { to: '/dashboard/settings', icon: UserRound, label: 'Profile' },
 };
 const MENU = {
-  user: { main: ['profile', 'devices', 'repairs', 'marketplace', 'orders', 'wanted', 'messages', 'notifications', 'pickups', 'transactions', 'complaints'], more: [] },
-  technician: { main: ['profile', 'overview', 'openRequests', 'jobs', 'messages', 'notifications'], more: ['wanted', 'devices', 'pickups', 'transactions', 'complaints'] },
-  refurbisher: { main: ['profile', 'refurbRequests', 'pickups', 'products', 'orders', 'messages', 'notifications', 'transactions'], more: [] },
+  user: { main: ['devices', 'repairs', 'marketplace', 'orders', 'wanted', 'profile', 'messages', 'notifications', 'pickups', 'transactions', 'complaints'], more: [] },
+  technician: { main: ['overview', 'openRequests', 'jobs', 'profile', 'messages', 'notifications'], more: ['wanted', 'pickups', 'transactions', 'complaints'] },
+  refurbisher: { main: ['profile', 'refurbRequests', 'myRequests', 'pickups', 'products', 'orders', 'messages', 'notifications', 'transactions', 'complaints'], more: [] },
   recycler: { main: ['profile', 'overview', 'recyclingRequests', 'recyclingReport', 'pickups', 'messages', 'notifications'], more: ['transactions', 'complaints'] },
 };
 
-function MenuItem({ item, counts, search }) {
+// Until an administrator approves a technician, refurbisher or recycler, only these two work.
+const OPEN_WHEN_LOCKED = ['profile', 'complaints'];
+const open = (pathname) => pathname === '/dashboard/settings' || pathname.startsWith('/dashboard/complaints');
+
+function MenuItem({ item, counts, search, locked }) {
   const Icon = item.icon;
+  if (locked) {
+    return (
+      <span aria-disabled="true" title="Available after your account is verified" className="flex min-h-[44px] cursor-not-allowed items-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm font-medium text-ink-muted opacity-50 dark:text-[#9FB2A7]">
+        <Icon size={18} aria-hidden /> {item.label} <Lock size={14} aria-hidden className="ml-auto" />
+        <span className="sr-only"> (locked until your account is verified)</span>
+      </span>
+    );
+  }
   const tabNow = new URLSearchParams(search).get('tab') || '';
   const className = (state) => link({ isActive: item.tab === undefined ? state.isActive : state.isActive && tabNow === item.tab });
   return (
@@ -70,10 +85,10 @@ function MenuItem({ item, counts, search }) {
   );
 }
 
-function RoleMenu({ role, counts, search }) {
+function RoleMenu({ role, counts, search, locked }) {
   const menu = MENU[role];
   if (!menu) return null;
-  const render = (keys) => keys.map((k) => <MenuItem key={k} item={ITEMS[k]} counts={counts} search={search} />);
+  const render = (keys) => keys.map((k) => <MenuItem key={k} item={ITEMS[k]} counts={counts} search={search} locked={locked && !OPEN_WHEN_LOCKED.includes(k)} />);
   return (
     <>
       {render(menu.main)}
@@ -93,6 +108,8 @@ export default function DashboardLayout() {
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
   const { user } = useAuth();
+  const verification = useSelector((state) => state.auth.verification);
+  const locked = isLockedProvider(user, verification);
   const navRef = useRef(null);
   // The live connection and the unread badges live as long as the dashboard is open.
   useLiveSession(user?._id);
@@ -108,9 +125,17 @@ export default function DashboardLayout() {
     navigate('/login', { replace: true });
   };
 
+  // Nothing but the profile page and Report a problem opens until the account is verified.
+  if (locked && !open(pathname)) return <Navigate to="/dashboard/settings#verification" replace />;
+
+  // A signed-in member keeps the same top navigation as the public pages above the dashboard.
+  const topNav = ['user', 'technician', 'recycler', 'refurbisher'].includes(user?.role);
+
   return (
-    <div className="flex min-h-screen flex-col gap-4 p-4 md:flex-row" style={{ background: 'var(--grad-hero)' }}>
-      <aside className="glass-strong flex shrink-0 flex-col p-4 print:hidden md:w-64" aria-label="Dashboard navigation">
+    <div className="min-h-screen" style={{ background: 'var(--grad-hero)' }}>
+      {topNav && <TopNav />}
+      <div className={`flex flex-col gap-4 p-4 md:flex-row ${topNav ? '' : 'min-h-screen'}`}>
+      <aside className={`glass-strong flex shrink-0 flex-col p-4 print:hidden md:sticky md:w-64 md:self-start md:overflow-y-auto ${topNav ? 'md:top-24 md:max-h-[calc(100vh-7rem)]' : 'md:top-4 md:max-h-[calc(100vh-2rem)]'}`} aria-label="Dashboard navigation">
         <p className="font-display font-bold text-primary dark:text-primary-tint">E-Waste Network</p>
         {user && <p className="mt-1 truncate text-xs text-ink-muted dark:text-[#9FB2A7]">{user.name} · {user.role}</p>}
         <nav ref={navRef} className="mt-4 flex gap-1 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0">
@@ -131,7 +156,7 @@ export default function DashboardLayout() {
               <NavLink to="/dashboard/admin/analytics" className={link}><BarChart3 size={18} aria-hidden /> Analytics</NavLink>
             </>
           )}
-          {user?.role !== 'admin' && <RoleMenu role={user?.role} counts={counts} search={search} />}
+          {user?.role !== 'admin' && <RoleMenu role={user?.role} counts={counts} search={search} locked={locked} />}
           {user?.role === 'admin' && (
             <>
               <NavLink to="/dashboard/notifications" className={link}><Bell size={18} aria-hidden /> Notifications <Badge count={counts.notifications} label="unread notifications" /></NavLink>
@@ -140,14 +165,15 @@ export default function DashboardLayout() {
             </>
           )}
         </nav>
-        <button type="button" onClick={logout} className="btn btn-glass mt-4 md:mt-auto">
+        <button type="button" onClick={logout} className="btn btn-glass mt-3">
           <LogOut size={18} aria-hidden /> Log out
         </button>
       </aside>
       <div className="flex-1">
-        <div className="mb-4 flex justify-end print:hidden"><ThemeToggle /></div>
+        {!topNav && <div className="mb-4 flex justify-end gap-2 print:hidden"><NotificationBell /><ThemeToggle /></div>}
         <AnnouncementBanner />
         <main id="main" className="mt-2"><Outlet /></main>
+      </div>
       </div>
     </div>
   );

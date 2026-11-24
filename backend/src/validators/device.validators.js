@@ -1,6 +1,6 @@
 'use strict';
 const { z, objectId, optNum, optStr, blankToUndefined, pageQuery } = require('./common');
-const { CONDITIONS, SERVICES, LISTING_STATUS, MAX_DEVICE_PHOTOS } = require('../config/constants');
+const { CONDITIONS, CONDITION_PARTS, SERVICES, LISTING_STATUS, MAX_DEVICE_PHOTOS } = require('../config/constants');
 
 const thisYear = new Date().getFullYear();
 const PICKUP = ['pickup', 'drop_off', 'either'];
@@ -28,6 +28,15 @@ const phoneNumber = z.preprocess((v) => {
   return d;
 }, z.string().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit mobile number').optional());
 
+// A JSON object in a multipart field ('{"battery":"drains_fast"}'), or a plain object. '{}' on an edit clears the details.
+const conditionDetails = z.preprocess((v) => {
+  if (v === undefined || v === '' || v === null) return undefined;
+  if (typeof v === 'string') {
+    try { return JSON.parse(v); } catch { return v; }
+  }
+  return v;
+}, z.object(Object.fromEntries(Object.entries(CONDITION_PARTS).map(([part, values]) => [part, z.preprocess(blankToUndefined, z.enum(values, { errorMap: () => ({ message: 'Choose one of the listed options' }) }).optional())]))).strict().optional());
+
 const fields = {
   name: z.string().trim().min(3, 'Give the device a name (at least 3 characters)').max(120).regex(LETTER, 'The name must contain letters'),
   category: z.string().trim().min(1).max(60), // ObjectId or slug
@@ -37,6 +46,9 @@ const fields = {
   purchaseYear: optNum(z.coerce.number().int().min(1990, 'Enter a year from 1990').max(thisYear, `The year cannot be after ${thisYear}`)),
   condition: z.enum(CONDITIONS),
   description: optStr(2000),
+  // Optional. An empty value on an edit clears the note.
+  conditionNote: z.string().trim().max(500, 'Keep the condition note under 500 characters').optional(),
+  conditionDetails,
   preferredService: z.enum(SERVICES),
   expectedPrice: optNum(z.coerce.number().min(0, 'The price cannot be negative').max(MAX_PRICE, 'That price is too high').refine((n) => Math.round(n * 100) === n * 100 || Math.abs(Math.round(n * 100) - n * 100) < 1e-6, 'Use at most 2 decimal places')),
   pickupPreference: z.preprocess(blankToUndefined, z.enum(PICKUP).optional()),
@@ -108,4 +120,4 @@ const listQuery = z
   .strict()
   .refine((o) => (o.lat === undefined) === (o.lng === undefined), latLngMsg);
 
-module.exports = { createBody, updateBody, listQuery, objectId };
+module.exports = { createBody, updateBody, listQuery, objectId, conditionDetails };

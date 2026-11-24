@@ -139,6 +139,54 @@ describe('POST /api/marketplace', () => {
   });
 });
 
+describe('the condition of each part of a product', () => {
+  const DETAILS = { power: 'works_normally', battery: 'holds_well', screen: 'no_damage', body: 'scratched_or_dented', water: 'none' };
+
+  it('is optional, and a product without it still has empty details to show', async () => {
+    const res = await form(seller);
+    expect(res.status).toBe(201);
+    const page = await request(app).get(`/api/marketplace/${res.body.data._id}`);
+    expect(page.body.data.conditionDetails).toEqual({});
+    expect(page.body.data.conditionNote).toBeUndefined();
+  });
+
+  it('is saved with the product and shown on its page to everyone, with the seller\'s own remarks', async () => {
+    const created = await form(seller, { conditionDetails: JSON.stringify(DETAILS), conditionNote: 'Light scratches on the lid. Charger included.' });
+    expect(created.status).toBe(201);
+    const page = await request(app).get(`/api/marketplace/${created.body.data._id}`);
+    expect(page.status).toBe(200);
+    expect(page.body.data.conditionDetails).toEqual(DETAILS);
+    expect(page.body.data.conditionNote).toBe('Light scratches on the lid. Charger included.');
+  });
+
+  it('is not part of the short card shown in the list', async () => {
+    await form(seller, { conditionDetails: JSON.stringify(DETAILS) });
+    const list = await request(app).get('/api/marketplace');
+    expect(list.body.data[0]).not.toHaveProperty('conditionDetails');
+  });
+
+  it('can be changed as a whole, left alone when not sent, and cleared', async () => {
+    const p = await makeProduct(seller, { conditionDetails: DETAILS, conditionNote: 'Old remark.' });
+    const untouched = await form(seller, { price: '14000' }, { method: 'put', url: `/${p._id}`, photos: 0 });
+    expect(untouched.body.data.conditionDetails).toEqual(DETAILS);
+    expect(untouched.body.data.conditionNote).toBe('Old remark.');
+    const changed = await form(seller, { conditionDetails: JSON.stringify({ battery: 'drains_fast', screen: '' }), conditionNote: 'New remark.' }, { method: 'put', url: `/${p._id}`, photos: 0 });
+    expect(changed.body.data.conditionDetails).toEqual({ battery: 'drains_fast' }); // replaced as a whole; blanks dropped
+    expect(changed.body.data.conditionNote).toBe('New remark.');
+    const cleared = await form(seller, { conditionDetails: '{}', conditionNote: '' }, { method: 'put', url: `/${p._id}`, photos: 0 });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.data.conditionDetails).toEqual({});
+    expect(cleared.body.data.conditionNote).toBeUndefined();
+  });
+
+  it('only accepts the listed choices, known parts and a note of a sensible length', async () => {
+    expect((await form(seller, { conditionDetails: JSON.stringify({ battery: 'on fire' }) })).status).toBe(422);
+    expect((await form(seller, { conditionDetails: JSON.stringify({ flux_capacitor: 'works' }) })).status).toBe(422);
+    expect((await form(seller, { conditionDetails: 'not json' })).status).toBe(422);
+    expect((await form(seller, { conditionNote: 'x'.repeat(1001) })).status).toBe(422);
+  });
+});
+
 describe('GET /api/marketplace', () => {
   beforeEach(async () => {
     await makeProduct(seller, { title: 'Dell Latitude E7450', brand: 'Dell', model: 'E7450', price: 18000, condition: 'excellent' });

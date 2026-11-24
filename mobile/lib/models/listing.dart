@@ -23,6 +23,7 @@ class Listing {
     this.brand,
     this.model,
     this.description,
+    this.conditionDetails = const {},
     this.expectedPrice,
     this.pickupPreference,
     this.addressArea,
@@ -46,6 +47,9 @@ class Listing {
   final String? model;
   final String condition;
   final String? description;
+
+  /// How each part is doing, when the owner said (`battery` -> `drains_fast`, ...).
+  final Map<String, String> conditionDetails;
   final String preferredService;
   final double? expectedPrice;
   final String? pickupPreference;
@@ -88,6 +92,7 @@ class Listing {
       model: (json['model'] as String?) ?? device['model'] as String?,
       condition: (json['condition'] as String?) ?? '',
       description: json['description'] as String?,
+      conditionDetails: {for (final e in _map(json['conditionDetails']).entries) if (e.value is String) e.key: e.value as String},
       preferredService: (json['preferredService'] as String?) ?? '',
       expectedPrice: (json['expectedPrice'] as num?)?.toDouble(),
       pickupPreference: json['pickupPreference'] as String?,

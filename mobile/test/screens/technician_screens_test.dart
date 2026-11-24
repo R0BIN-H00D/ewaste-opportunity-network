@@ -232,39 +232,60 @@ void main() {
     expect(find.textContaining('You still have the device'), findsOneWidget);
   });
 
-  group('jobs list', () {
-    testWidgets('opens on new requests; the tabs ask for the board, jobs in progress, and every job', (tester) async {
+  group('find repair requests and my repair jobs', () {
+    testWidgets('find repair requests lists the board, with a Filters button instead of tabs', (tester) async {
       final repo = FakeRequestRepository(pages: {1: [_job()]});
-      await _pump(tester, const JobsScreen(), repo);
+      await _pump(tester, const FindRequestsScreen(), repo);
       expect(repo.asCalls.last, 'board');
       expect(find.text('Asha'), findsOneWidget); // the customer, not the technician
       expect(find.text('New request'), findsOneWidget);
+      expect(find.text('Filters'), findsOneWidget);
+      expect(find.text('In progress'), findsNothing);
+    });
 
-      await _tap(tester, find.text('In progress'));
-      expect((as: repo.asCalls.last, active: repo.listCalls.last.activeOnly), (as: 'technician', active: true));
-      await _tap(tester, find.text('All jobs'));
-      expect((as: repo.asCalls.last, active: repo.listCalls.last.activeOnly), (as: 'technician', active: false));
+    testWidgets('the filters narrow the loaded requests by on-site, and clear again', (tester) async {
+      final repo = FakeRequestRepository(pages: {1: [_job(onSite: true), _job()]});
+      await _pump(tester, const FindRequestsScreen(), repo);
+      expect(find.text('Old Samsung phone'), findsNWidgets(2));
+      await _tap(tester, find.text('Filters'));
+      await _tap(tester, _sheetText('On-site repairs only'));
+      await _tap(tester, _sheetText('Show results'));
+      expect(find.text('Old Samsung phone'), findsOneWidget);
+      expect(find.text('Filters (1)'), findsOneWidget);
+      await _tap(tester, find.text('Filters (1)'));
+      await _tap(tester, _sheetText('Clear all filters'));
+      expect(find.text('Old Samsung phone'), findsNWidgets(2));
     });
 
     testWidgets('says so when there is nothing', (tester) async {
-      await _pump(tester, const JobsScreen(), FakeRequestRepository());
+      await _pump(tester, const FindRequestsScreen(), FakeRequestRepository());
       expect(find.text('No new requests'), findsOneWidget);
     });
 
-    testWidgets('opening a job shows it', (tester) async {
+    testWidgets('opening a request shows it', (tester) async {
       final repo = FakeRequestRepository(pages: {1: [_job(status: 'repair_in_progress')]});
-      await _pump(tester, const JobsScreen(), repo);
+      await _pump(tester, const FindRequestsScreen(), repo);
       await _tap(tester, find.text('Old Samsung phone'));
       expect(find.text('request r1'), findsOneWidget);
     });
 
-    testWidgets('the page can open on the jobs in progress', (tester) async {
-      final repo = FakeRequestRepository();
-      await _pump(tester, const JobsPage(initial: JobsFilter.active), repo);
+    testWidgets('my repair jobs opens on the jobs in progress, and the filter switches to all jobs', (tester) async {
+      final repo = FakeRequestRepository(pages: {1: [_job(status: 'repair_in_progress')]});
+      await _pump(tester, const MyJobsPage(), repo);
       await tester.pump(const Duration(milliseconds: 200));
-      expect(repo.asCalls.last, 'technician');
-      expect(repo.listCalls.last.activeOnly, isTrue);
+      expect((as: repo.asCalls.last, active: repo.listCalls.last.activeOnly), (as: 'technician', active: true));
+      expect(find.text('In progress'), findsNothing); // no row of tabs
+      await _tap(tester, find.text('Filters'));
+      await _tap(tester, _sheetText('All jobs'));
+      await _tap(tester, _sheetText('Show results'));
+      expect((as: repo.asCalls.last, active: repo.listCalls.last.activeOnly), (as: 'technician', active: false));
+    });
+
+    testWidgets('my repair jobs says so when there is nothing, and points to the requests', (tester) async {
+      await _pump(tester, const MyJobsPage(), FakeRequestRepository());
+      await tester.pump(const Duration(milliseconds: 200));
       expect(find.text('No jobs in progress'), findsOneWidget);
+      expect(find.text('Find repair requests'), findsWidgets);
     });
   });
 }

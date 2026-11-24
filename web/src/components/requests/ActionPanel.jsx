@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CalendarClock, CheckCircle2, ClipboardCheck, PackageCheck, Plus, Star, Trash2, Wrench, XCircle } from 'lucide-react';
+import { CalendarClock, CheckCircle2, CreditCard, ClipboardCheck, PackageCheck, Plus, Star, Trash2, Wrench, XCircle } from 'lucide-react';
 import Alert from '../ui/Alert';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import TextField from '../ui/TextField';
@@ -9,6 +9,8 @@ import GlassCard from '../glass/GlassCard';
 import { useSave } from '../../hooks/useSave';
 import { requestApi, reviewApi } from '../../services/repairApi';
 import { friendlyMessage } from '../../utils/errors';
+import { openCheckout } from '../../lib/razorpay';
+import { useAuth } from '../../hooks/useAuth';
 import { formatMoney } from '../../lib/requests';
 import ActionBox from '../handover/ActionBox';
 import ConfirmHandover from '../handover/ConfirmHandover';
@@ -197,6 +199,18 @@ export default function ActionPanel({ request, onChanged }) {
     return res;
   };
   const busy = save.saving;
+  const { user } = useAuth();
+  const pay = () => run(async () => {
+    const session = await requestApi.startPayment(request._id);
+    let response;
+    try {
+      response = await openCheckout(session, { name: user?.name, email: user?.email });
+    } catch (err) {
+      if (err.cancelled) return request; // closed the window: nothing changes
+      throw err;
+    }
+    return requestApi.verifyPayment(request._id, response);
+  }, 'Payment received');
   const close = () => setDialog('');
   const simple = (label, action, message, { primary = true } = {}) => (
     <button type="button" className={`btn ${primary ? 'btn-primary' : 'btn-glass'}`} disabled={busy} onClick={() => run(action, message)}>{label}</button>
@@ -244,6 +258,12 @@ export default function ActionPanel({ request, onChanged }) {
             'Delivery arranged',
           )}
         />
+      )}
+      {has('pay') && (
+        <Box title="Pay for the repair online" icon={CreditCard}>
+          <p className="text-sm text-ink-muted dark:text-[#9FB2A7]">Optional. Pay the approved quote of {formatMoney(request.activeQuotation?.amount)} here, or pay the technician directly instead.</p>
+          <button type="button" className="btn btn-primary" disabled={busy} onClick={pay}>{busy ? 'Opening payment…' : `Pay ${formatMoney(request.activeQuotation?.amount)}`}</button>
+        </Box>
       )}
       {has('confirm_completion') && (
         <Box title="Happy with the repair?" icon={CheckCircle2}>

@@ -7,6 +7,7 @@ const { uploadLimiter } = require('../middleware/rateLimit');
 const { validObjectIdParam } = require('../middleware/guards');
 const { ROLES } = require('../config/constants');
 const v = require('../validators/serviceRequest.validators');
+const { verifyBody } = require('../validators/order.validators');
 const ctrl = require('../controllers/serviceRequest.controller');
 
 // Same roles that may list a device may ask for a repair.
@@ -26,6 +27,8 @@ router.post('/:id/progress', validObjectIdParam(), uploadLimiter, ...imageUpload
 router.post('/:id/pickup', validObjectIdParam(), validate({ body: v.pickupBody }), ctrl.schedulePickup);
 router.post('/:id/handover', validObjectIdParam(), validate({ body: v.handoverBody }), ctrl.confirmHandover);
 router.post('/:id/confirm-completion', validObjectIdParam(), ctrl.confirmCompletion);
+router.post('/:id/payment', validObjectIdParam(), ctrl.startPayment);
+router.post('/:id/payment/verify', validObjectIdParam(), validate({ body: verifyBody }), ctrl.verifyPayment);
 router.post('/:id/cancel', validObjectIdParam(), validate({ body: v.cancelBody }), ctrl.cancel);
 
 module.exports = router;

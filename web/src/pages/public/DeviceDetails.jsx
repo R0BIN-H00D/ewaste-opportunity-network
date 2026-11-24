@@ -8,12 +8,13 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Skeleton from '../../components/ui/Skeleton';
 import ReportDialog from '../../components/devices/ReportDialog';
 import MessageButton from '../../components/chat/MessageButton';
+import SmartMatches from '../../components/devices/SmartMatches';
 import { useFetch } from '../../hooks/useFetch';
 import { useAuth } from '../../hooks/useAuth';
 import { deviceApi } from '../../services/deviceApi';
 import { assetUrl } from '../../services/api';
 import { friendlyMessage, toApiError } from '../../utils/errors';
-import { CONDITIONS, LISTING_STATUS, PICKUPS, SERVICES, formatPrice, labelOf, photosOf, placeLabel } from '../../lib/devices';
+import { CONDITIONS, LISTING_STATUS, PICKUPS, SERVICES, conditionRows, formatPrice, labelOf, photosOf, placeLabel } from '../../lib/devices';
 
 function Row({ label, children }) {
   if (!children) return null;
@@ -124,6 +125,12 @@ export default function DeviceDetails() {
           <p className="mt-4 font-numeric text-3xl font-bold text-primary dark:text-primary-tint">{formatPrice(listing.expectedPrice)}</p>
 
           {listing.description && <p className="mt-4 whitespace-pre-line text-ink dark:text-[#E8F1EB]">{listing.description}</p>}
+          {listing.conditionNote && <p className="mt-3 text-sm text-ink dark:text-[#E8F1EB]"><span className="font-semibold">About its condition:</span> {listing.conditionNote}</p>}
+          {conditionRows(listing.conditionDetails).length > 0 && (
+            <dl className="glass mt-4 px-5 py-2" aria-label="Condition of each part">
+              {conditionRows(listing.conditionDetails).map(([label, answer]) => <Row key={label} label={label}>{answer}</Row>)}
+            </dl>
+          )}
 
           <dl className="glass mt-5 px-5 py-2">
             <Row label="Brand">{listing.brand}</Row>
@@ -173,6 +180,7 @@ export default function DeviceDetails() {
           )}
         </section>
       </div>
+      {listing.isOwner && isLive && <SmartMatches listing={listing} />}
 
       <ReportDialog open={reporting} onClose={() => setReporting(false)} listingId={listing._id} />
       <ConfirmDialog open={confirmDelete} danger busy={busy} title="Delete this listing?" confirmLabel="Delete" onConfirm={remove} onCancel={() => setConfirmDelete(false)}>

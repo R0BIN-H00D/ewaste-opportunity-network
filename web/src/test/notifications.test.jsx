@@ -1,7 +1,7 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { chatApi, notificationApi } from '../services/chatApi';
 import { getCounts, resetCounts } from '../services/unread';
-import { renderApp, signedIn } from './helpers';
+import { anonymous, renderApp, signedIn } from './helpers';
 
 const rt = vi.hoisted(() => {
   const handlers = new Map();
@@ -60,6 +60,25 @@ const open = (items, meta) => {
   return renderApp('/dashboard/notifications', signedIn());
 };
 
+describe('the notification bell', () => {
+  it('sits beside the theme button for a signed-in person, shows the unread number and opens the notifications', async () => {
+    notificationApi.unreadCount.mockResolvedValue(3);
+    notificationApi.list.mockResolvedValue(page([]));
+    const view = renderApp('/dashboard/messages', signedIn());
+    const bell = await screen.findByRole('link', { name: 'Open notifications, 3 unread' });
+    expect(bell).toHaveAttribute('href', '/dashboard/notifications');
+    expect(bell).toHaveTextContent('3');
+    fireEvent.click(bell);
+    await waitFor(() => expect(view.router.state.location.pathname).toBe('/dashboard/notifications'));
+  });
+
+  it('is not shown to a visitor who is not signed in', async () => {
+    renderApp('/', anonymous());
+    await screen.findByRole('link', { name: 'Login' });
+    expect(screen.queryByRole('link', { name: /Open notifications/ })).not.toBeInTheDocument();
+  });
+});
+
 describe('the notifications page', () => {
   it('lists them newest first with the unread ones marked', async () => {
     open([note('n2', { title: 'New quote' }), note('n1', { title: 'Old news', readAt: '2026-11-16T10:00:00.000Z' })]);
@@ -69,6 +88,18 @@ describe('the notifications page', () => {
     expect(within(list()).getAllByText(/\(unread\)/)).toHaveLength(1);
     expect(within(list()).getByText('Body n2')).toBeInTheDocument();
     expect(within(list()).getByText('Old news')).toBeInTheDocument();
+  });
+
+  it('has an Unread tab that shows only the unread ones, and says so when there are none', async () => {
+    open([note('n2', { title: 'New quote' }), note('n1', { title: 'Old news', readAt: '2026-11-16T10:00:00.000Z' })]);
+    await screen.findByText('Old news');
+    fireEvent.click(screen.getByRole('button', { name: /^Unread/ }));
+    expect(within(list()).getAllByRole('listitem')).toHaveLength(1);
+    expect(screen.queryByText('Old news')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Mark all as read' }));
+    expect(await screen.findByText('No unread notifications.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'All' }));
+    expect(await screen.findByText('Old news')).toBeInTheDocument();
   });
 
   it('is an empty page that says so', async () => {

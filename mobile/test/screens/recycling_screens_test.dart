@@ -1,3 +1,5 @@
+import 'package:ewaste_opportunity/models/geo_place.dart';
+import 'package:ewaste_opportunity/services/location_service.dart';
 import 'package:ewaste_opportunity/core/network/api_exception.dart';
 import 'package:ewaste_opportunity/core/storage/key_value_store.dart';
 import 'package:ewaste_opportunity/core/theme/app_theme.dart';
@@ -7,6 +9,7 @@ import 'package:ewaste_opportunity/models/user.dart';
 import 'package:ewaste_opportunity/providers/auth_controller.dart';
 import 'package:ewaste_opportunity/providers/core_providers.dart';
 import 'package:ewaste_opportunity/providers/listings_controller.dart';
+import 'package:ewaste_opportunity/providers/location_providers.dart';
 import 'package:ewaste_opportunity/providers/photo_providers.dart';
 import 'package:ewaste_opportunity/providers/recycling_providers.dart';
 import 'package:ewaste_opportunity/screens/recycling/center_details_screen.dart';
@@ -22,7 +25,7 @@ import 'package:material_ui/material_ui.dart';
 import '../fakes.dart';
 import '../helpers.dart';
 
-Future<void> _pump(WidgetTester tester, Widget screen, FakeRecyclingRepository repo, {bool asCentre = false, double textScale = 1}) async {
+Future<void> _pump(WidgetTester tester, Widget screen, FakeRecyclingRepository repo, {bool asCentre = false, double textScale = 1, FakeLocationService? phone, FakeGeoRepository? geo}) async {
   tester.view.physicalSize = asCentre ? const Size(390, 850) : const Size(900, 3000);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -43,6 +46,8 @@ Future<void> _pump(WidgetTester tester, Widget screen, FakeRecyclingRepository r
         keyValueStoreProvider.overrideWithValue(MemoryKeyValueStore()),
         authRepositoryProvider.overrideWithValue(FakeAuthRepository(loginResult: asCentre ? sampleMe(role: UserRole.recycler) : null)),
         recyclingRepositoryProvider.overrideWithValue(repo),
+        if (phone != null) locationServiceProvider.overrideWithValue(phone),
+        if (geo != null) geoRepositoryProvider.overrideWithValue(geo),
         deviceRepositoryProvider.overrideWithValue(FakeDeviceRepository()),
         photoPickerProvider.overrideWithValue(FakePhotoPicker()),
         categoriesProvider.overrideWith((ref) async =>
@@ -156,6 +161,22 @@ void main() {
       expect(find.text('Enter the area or locality'), findsOneWidget);
       expect(find.text('Enter the full pickup address'), findsOneWidget);
       expect(repo.calls, isEmpty);
+    });
+
+    testWidgets('detecting the location fills the area and starts the address, without replacing one already typed', (tester) async {
+      final repo = FakeRecyclingRepository(centerList: [sampleCenter()]);
+      await _pump(tester, const RecycleScreen(centerId: 'ce1'), repo,
+          phone: FakeLocationService.at(const GeoPoint(12.9716, 77.5946)),
+          geo: FakeGeoRepository(place: const GeoPlace(label: 'Indiranagar, Bengaluru, Karnataka, India', area: 'Indiranagar', city: 'Bengaluru')));
+      String text(String label) => tester.widget<TextFormField>(find.widgetWithText(TextFormField, label)).controller!.text;
+
+      await _tap(tester, find.text('Detect my current location'));
+      expect(text('Area or locality'), 'Indiranagar');
+      expect(text('Full pickup address'), 'Indiranagar, Bengaluru, Karnataka, India');
+
+      await tester.enterText(find.widgetWithText(TextFormField, 'Full pickup address'), '12 MG Road, Indiranagar');
+      await _tap(tester, find.text('Detect my current location'));
+      expect(text('Full pickup address'), '12 MG Road, Indiranagar');
     });
 
     testWidgets('sends the chosen kinds, the count and the address, then opens the request', (tester) async {

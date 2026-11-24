@@ -190,6 +190,13 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
       children: [
+        if (ref.watch(authControllerProvider.select((auth) => auth.me?.isLocked ?? false))) ...[
+          const MessageBanner(
+            message: 'Verify your account to unlock the rest of the app. Until then only your profile, account and help are open.',
+            tone: BannerTone.info,
+          ),
+          const SizedBox(height: 16),
+        ],
         GlassContainer(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

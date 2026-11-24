@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CONDITIONS, PICKUPS, SERVICES } from './devices';
+import { CONDITIONS, CONDITION_PARTS, PICKUPS, SERVICES, partsFor, requiredPartsFor } from './devices';
 
 const thisYear = new Date().getFullYear();
 
@@ -40,8 +40,10 @@ const baseSchema = z.object({
     .trim()
     .min(1, 'Enter the year it was bought')
     .refine((v) => v === '' || (/^\d{4}$/.test(v) && Number(v) >= 1990 && Number(v) <= thisYear), `Enter a year between 1990 and ${thisYear}`),
-  description: z.string().trim().max(2000, 'Keep the description under 2000 characters'),
+  description: z.string().trim().max(2000, 'Keep the description under 2000 characters'), // not asked on the form any more; kept so an older listing's text is not lost
   condition: oneOf(CONDITIONS, 'Choose the condition'),
+  conditionNote: z.string().trim().max(500, 'Keep the condition note under 500 characters'), // optional
+  conditionDetails: z.object(Object.fromEntries(CONDITION_PARTS.map((p) => [p.key, z.string()]))), // each part optional ('' = not stated)
   preferredService: oneOf(SERVICES, 'Choose what should happen to this device'),
   expectedPrice: z
     .string()
@@ -68,22 +70,33 @@ const baseSchema = z.object({
 });
 
 // The device cannot have been bought before its model came out.
-export const deviceSchema = baseSchema.superRefine((v, ctx) => {
+const checkListing = (requireParts) => (v, ctx) => {
+  // A new listing needs battery, screen, ports and buttons, and water damage answered, for the categories that have them.
+  if (requireParts) {
+    for (const part of requiredPartsFor(v.category)) {
+      if (!v.conditionDetails?.[part.key]) ctx.addIssue({ code: 'custom', path: ['conditionDetails', part.key], message: `Choose the ${part.label.toLowerCase()} condition` });
+    }
+  }
   const model = Number(v.modelYear);
   const bought = Number(v.purchaseYear);
   if (/^\d{4}$/.test(v.modelYear) && /^\d{4}$/.test(v.purchaseYear) && bought < model) {
     ctx.addIssue({ code: 'custom', path: ['purchaseYear'], message: `The purchase year cannot be earlier than the model year (${model})` });
   }
-});
+};
+
+export const deviceSchema = baseSchema.superRefine(checkListing(true));
+// Editing an older listing does not force the answers a new one needs.
+export const deviceEditSchema = baseSchema.superRefine(checkListing(false));
+
+const EMPTY_DETAILS = Object.fromEntries(CONDITION_PARTS.map((p) => [p.key, '']));
 
 export const EMPTY_VALUES = {
   name: '', category: '', brand: '', model: '', modelYear: '', purchaseYear: '', description: '',
-  condition: '', preferredService: '', expectedPrice: '', pickupPreference: '', addressArea: '', agentPhone: '', city: '',
+  condition: '', conditionNote: '', conditionDetails: EMPTY_DETAILS, preferredService: '', expectedPrice: '', pickupPreference: '', addressArea: '', agentPhone: '', city: '',
 };
 
 export const STEP_FIELDS = {
-  details: ['name', 'category', 'brand', 'model', 'modelYear', 'purchaseYear', 'description'],
-  photos: ['condition'],
+  details: ['name', 'category', 'brand', 'model', 'modelYear', 'purchaseYear', 'condition', 'conditionNote'],
   service: ['preferredService', 'expectedPrice', 'pickupPreference', 'addressArea', 'city', 'agentPhone'],
 };
 
@@ -94,10 +107,18 @@ export const CHECKLIST = [
 ];
 
 /** Form strings -> API fields. Empty strings are left out (the API treats missing as "no value"). */
-export function toDevicePayload(values, { coords, status } = {}) {
+export function toDevicePayload(values, { coords, status, editing } = {}) {
   const out = {};
   for (const [key, raw] of Object.entries(values)) {
+    if (key === 'conditionDetails') {
+      // Only the parts asked about for this category, and only the ones that were answered.
+      const asked = partsFor(values.category).map((p) => p.key);
+      const picked = Object.fromEntries(Object.entries(raw || {}).filter(([part, answer]) => asked.includes(part) && answer));
+      if (Object.keys(picked).length || editing) out.conditionDetails = picked; // {} on an edit clears them
+      continue;
+    }
     const v = typeof raw === 'string' ? raw.trim() : raw;
+    if (v === '' && editing && key === 'conditionNote') out[key] = ''; // an emptied note is cleared on the server
     if (v === '' || v === undefined) continue;
     out[key] = key === 'agentPhone' ? normalizePhone(v) : v;
   }
@@ -121,6 +142,8 @@ export function listingToValues(listing) {
     purchaseYear: s(listing.device?.purchaseYear),
     description: s(listing.description),
     condition: s(listing.condition),
+    conditionNote: s(listing.conditionNote),
+    conditionDetails: { ...EMPTY_DETAILS, ...(listing.conditionDetails || {}) },
     preferredService: s(listing.preferredService),
     expectedPrice: s(listing.expectedPrice),
     pickupPreference: s(listing.pickupPreference),

@@ -34,6 +34,18 @@ const schema = baseSchema({
     },
     { _id: false },
   ),
+  // Optional online payment of the approved quotation (Razorpay TEST mode demo, no real money).
+  payment: new Schema(
+    {
+      status: { type: String, enum: ['unpaid', 'paid_online'], default: 'unpaid' },
+      quotation: { type: ObjectId, ref: 'Quotation' },
+      amount: Number,
+      gatewayOrderId: String,
+      gatewayPaymentId: String,
+      paidAt: Date,
+    },
+    { _id: false },
+  ),
   customerConfirmedAt: Date,
   reviewed: { type: Boolean, default: false },
 });

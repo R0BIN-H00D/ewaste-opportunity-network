@@ -5,6 +5,7 @@ import '../../core/network/api_exception.dart';
 import '../../providers/location_providers.dart';
 import '../../services/location_service.dart';
 import '../../widgets/location_field.dart';
+import '../../models/geo_place.dart';
 import '../../models/account.dart';
 import '../../models/user.dart';
 import '../../providers/account_providers.dart';
@@ -13,6 +14,7 @@ import '../../core/theme/app_colors.dart';
 import '../../routes/route_paths.dart';
 import '../../widgets/app_background.dart';
 import '../../widgets/glass_app_bar.dart';
+import '../../widgets/email_verify_panel.dart';
 import '../../widgets/glass_container.dart';
 import '../../widgets/message_banner.dart';
 import '../../widgets/skeleton.dart';
@@ -117,6 +119,20 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  /// "Detect my current location" found the spot and its address: every address field is filled in (replacing what was there).
+  void _onDetected(GeoPoint point, GeoPlace? place) {
+    setState(() {
+      _where = point;
+      _whereNote = place == null ? 'Location saved, but we could not look up the address. Please type your address.' : null;
+      if (place != null) {
+        if (place.area.isNotEmpty) _area.text = place.area;
+        if (place.city.isNotEmpty) _city.text = place.city;
+        if (place.state.isNotEmpty) _state.text = place.state;
+        if (place.postcode.isNotEmpty) _pincode.text = place.postcode;
+      }
+    });
   }
 
   /// Finds where the person is, then fills in the area, city, state and pincode from that spot.
@@ -247,6 +263,7 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
             ),
           ),
           const SizedBox(height: 16),
+          _section(theme, Icons.mark_email_read_outlined, 'Email', [const EmailVerifyPanel()]),
           _section(theme, Icons.badge_outlined, 'About you', [
             _field(_name, 'Name', maxLength: 80, validator: (v) => (v ?? '').trim().length < 2 ? 'Enter your name' : null),
             Padding(
@@ -272,6 +289,7 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
               LocationField(
                 value: _where,
                 onChanged: _onWhere,
+                onDetected: _onDetected,
                 title: 'Where are you?',
                 blurb: 'Use your location to fill in your address. Others only see a blurred spot, never your exact address.',
               ),

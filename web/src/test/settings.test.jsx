@@ -1,10 +1,10 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { authApi, verificationApi } from '../services/authApi';
 import { geoApi } from '../services/geoApi';
 import { TECH, USER, renderApp, signedIn } from './helpers';
 
 vi.mock('../services/authApi', () => ({
-  authApi: { me: vi.fn(), resendVerification: vi.fn() },
+  authApi: { me: vi.fn(), resendVerification: vi.fn(), verifyEmailCode: vi.fn() },
   userApi: {},
   verificationApi: { status: vi.fn(), submit: vi.fn(), remove: vi.fn() },
 }));
@@ -55,6 +55,7 @@ describe('Settings page', () => {
     authApi.me.mockResolvedValue({ user: TECH_ACTIVE, profile: {}, roleProfile: {}, verification: { status: 'pending' } });
     renderApp('/dashboard/settings', signedIn(TECH_ACTIVE, { verification: { status: 'not_submitted' } }));
 
+    fireEvent.click(await screen.findByRole('button', { name: 'Verify my account' }));
     const submit = await screen.findByRole('button', { name: 'Submit for review' });
     expect(submit).toBeDisabled();
 
@@ -71,6 +72,7 @@ describe('Settings page', () => {
   it('rejects unsupported files before uploading', async () => {
     verificationApi.status.mockResolvedValue(statusData());
     renderApp('/dashboard/settings', signedIn(TECH_ACTIVE));
+    fireEvent.click(await screen.findByRole('button', { name: 'Verify my account' }));
     await screen.findByRole('button', { name: 'Submit for review' });
     const bad = new File(['hi'], 'notes.txt', { type: 'text/plain' });
     fireEvent.change(screen.getByLabelText('Choose document files'), { target: { files: [bad] } });
@@ -91,11 +93,25 @@ describe('Settings page', () => {
     expect(screen.getByRole('button', { name: 'Delete id.png' })).toBeInTheDocument();
   });
 
-  it('does not show verification controls once approved', async () => {
+  it('asks an unverified technician to verify, right under the header, with a button that opens the upload form', async () => {
+    verificationApi.status.mockResolvedValue(statusData());
+    renderApp('/dashboard/settings', signedIn(TECH_ACTIVE, { verification: { status: 'not_submitted' } }));
+    const box = await screen.findByRole('region', { name: 'Verification' });
+    expect(within(box).getByText(/Verified providers can take requests/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Submit for review' })).not.toBeInTheDocument(); // folded away until asked for
+    fireEvent.click(within(box).getByRole('button', { name: 'Verify my account' }));
+    expect(screen.getByRole('button', { name: 'Submit for review' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('button', { name: 'Submit for review' })).not.toBeInTheDocument();
+  });
+
+  it('shows no verification box once approved, and a Verified badge in the header instead', async () => {
     verificationApi.status.mockResolvedValue(statusData({ status: 'approved' }));
     renderApp('/dashboard/settings', signedIn({ ...TECH_ACTIVE, status: 'active' }, { verification: { status: 'approved' } }));
-    expect(await screen.findByRole('heading', { name: 'Verification' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Submit for review' })).not.toBeInTheDocument();
+    expect(within(await screen.findByRole('region', { name: 'Profile photo' })).getByText('Verified')).toBeInTheDocument();
+    await waitFor(() => expect(verificationApi.status).toHaveBeenCalled());
+    expect(screen.queryByRole('heading', { name: 'Verification' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Verify my account' })).not.toBeInTheDocument();
   });
 });
 
@@ -149,5 +165,84 @@ describe('Use my current location', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Use my current location' }));
     expect(await screen.findByText(/Location is blocked/)).toBeInTheDocument();
     expect(geoApi.reverse).not.toHaveBeenCalled();
+  });
+});
+
+describe('verifying the email on the profile page', () => {
+  const unverified = () => signedIn({ ...USER, emailVerified: false });
+
+  it('shows a verified person that their email is verified, with no button', async () => {
+    renderApp('/dashboard/settings', signedIn());
+    expect(await screen.findByRole('heading', { name: 'Email' })).toBeInTheDocument();
+    expect(screen.getByText(/is verified./)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Verify my email' })).not.toBeInTheDocument();
+  });
+
+  it('sends nothing until the button is pressed, then asks for the code', async () => {
+    authApi.resendVerification.mockResolvedValue({ delivery: 'smtp' });
+    renderApp('/dashboard/settings', unverified());
+    expect(await screen.findByText(/is not verified yet/)).toBeInTheDocument();
+    expect(authApi.resendVerification).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText('Verification code')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Verify my email' }));
+    expect(await screen.findByLabelText('Verification code')).toBeInTheDocument();
+    expect(authApi.resendVerification).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/We sent a 6-digit code to asha@test.local/)).toBeInTheDocument();
+  });
+
+  it('confirms the email with the code and shows it as verified', async () => {
+    authApi.resendVerification.mockResolvedValue({ delivery: 'smtp' });
+    authApi.verifyEmailCode.mockResolvedValue(null);
+    authApi.me.mockResolvedValue({ user: { ...USER, emailVerified: true }, profile: {}, roleProfile: null });
+    renderApp('/dashboard/settings', unverified());
+    fireEvent.click(await screen.findByRole('button', { name: 'Verify my email' }));
+    const input = await screen.findByLabelText('Verification code');
+    fireEvent.change(input, { target: { value: '12ab' } }); // letters are dropped as they are typed
+    expect(input).toHaveValue('12');
+    fireEvent.click(screen.getByRole('button', { name: 'Verify' }));
+    expect(await screen.findByText('Enter the 6-digit code from your email.')).toBeInTheDocument();
+    expect(authApi.verifyEmailCode).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: '482913' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Verify' }));
+    await waitFor(() => expect(authApi.verifyEmailCode).toHaveBeenCalledWith('482913'));
+    expect(await screen.findByText(/is verified./)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Verification code')).not.toBeInTheDocument();
+  });
+
+  it('says when the code is wrong and keeps the box', async () => {
+    authApi.resendVerification.mockResolvedValue({ delivery: 'smtp' });
+    authApi.verifyEmailCode.mockRejectedValue({ response: { status: 400, data: { message: 'That code is not right. 4 tries left.' } } });
+    renderApp('/dashboard/settings', unverified());
+    fireEvent.click(await screen.findByRole('button', { name: 'Verify my email' }));
+    fireEvent.change(await screen.findByLabelText('Verification code'), { target: { value: '000000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Verify' }));
+    expect(await screen.findByText('That code is not right. 4 tries left.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Verification code')).toBeInTheDocument();
+  });
+
+  it('can send a new code', async () => {
+    authApi.resendVerification.mockResolvedValue({ delivery: 'smtp' });
+    renderApp('/dashboard/settings', unverified());
+    fireEvent.click(await screen.findByRole('button', { name: 'Verify my email' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Send a new code' }));
+    await waitFor(() => expect(authApi.resendVerification).toHaveBeenCalledTimes(2));
+  });
+
+  it('says so, and offers no code box, when the server has no email service', async () => {
+    authApi.resendVerification.mockResolvedValue({ delivery: 'console' });
+    renderApp('/dashboard/settings', unverified());
+    fireEvent.click(await screen.findByRole('button', { name: 'Verify my email' }));
+    expect(await screen.findByText(/no email service set up/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Verification code')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Verify my email' })).toBeInTheDocument(); // the person can try again later
+  });
+
+  it('shows the server message when the email could not be sent', async () => {
+    authApi.resendVerification.mockRejectedValue({ response: { status: 502, data: { message: 'We could not send the email. Check the address is right, or try again in a minute.' } } });
+    renderApp('/dashboard/settings', unverified());
+    fireEvent.click(await screen.findByRole('button', { name: 'Verify my email' }));
+    expect(await screen.findByText(/We could not send the email/)).toBeInTheDocument();
   });
 });

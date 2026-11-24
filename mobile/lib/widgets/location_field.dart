@@ -2,21 +2,31 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import '../models/geo_place.dart';
-import '../providers/location_providers.dart';
 import '../routes/route_paths.dart';
 import '../services/location_service.dart';
 import 'address_search.dart';
+import 'detect_location_button.dart';
 import 'glass_container.dart';
-import 'message_banner.dart';
 
-/// Lets a person share where a device is: their phone's position, or a pin on the map. It is always optional. When the
-/// phone will not say where it is (permission refused, location off, no signal) the screen explains why and says the
-/// city and area still work, so nobody is stuck.
+/// Lets a person share where a device is: their phone's position (with the address filled in for them), a pin on the map, or a
+/// typed address. It is always optional. If the phone's GPS is off an alert asks to turn it on, and the city and area can
+/// always be typed, so nobody is stuck.
 class LocationField extends ConsumerStatefulWidget {
-  const LocationField({super.key, required this.value, required this.onChanged, this.title = 'Where is it? (optional)', this.blurb = 'This helps people nearby find it. Others only see a blurred spot, never your exact address.'});
+  const LocationField({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    this.onDetected,
+    this.title = 'Where is it? (optional)',
+    this.blurb = 'This helps people nearby find it. Others only see a blurred spot, never your exact address.',
+  });
 
   final GeoPoint? value;
   final ValueChanged<GeoPoint?> onChanged;
+
+  /// Called when "Detect my current location" finds the spot and its address, so the form can fill itself in. When it is not
+  /// given the spot is passed to [onChanged] like any other.
+  final void Function(GeoPoint point, GeoPlace? place)? onDetected;
   final String title;
   final String blurb;
 
@@ -25,56 +35,17 @@ class LocationField extends ConsumerStatefulWidget {
 }
 
 class _LocationFieldState extends ConsumerState<LocationField> {
-  bool _busy = false;
-  LocationProblem? _problem;
-
-  Future<void> _useCurrent() async {
-    setState(() {
-      _busy = true;
-      _problem = null;
-    });
-    final result = await ref.read(locationServiceProvider).current();
-    if (!mounted) return;
-    setState(() {
-      _busy = false;
-      _problem = result.problem;
-    });
-    if (result.point != null) widget.onChanged(result.point);
-  }
-
   Future<void> _pickOnMap() async {
     final picked = await context.push<GeoPoint>(Routes.pickLocation, extra: widget.value);
-    if (picked != null && mounted) {
-      setState(() => _problem = null);
-      widget.onChanged(picked);
-    }
+    if (picked != null && mounted) widget.onChanged(picked);
   }
 
   /// An address was chosen from the search: it becomes the shared spot, and the form fills in the area and city from it.
-  void _useAddress(GeoPlace place) {
-    setState(() => _problem = null);
-    widget.onChanged(GeoPoint(place.lat!, place.lng!).rounded());
-  }
-
-  (String, String, VoidCallback)? _help() {
-    switch (_problem) {
-      case LocationProblem.denied:
-        return ('Location was not allowed, so nothing was shared. You can try again, pick a spot on the map, or just fill in the city and area.', 'Try again', _useCurrent);
-      case LocationProblem.deniedForever:
-        return ('Location is blocked for this app. Allow it in the phone settings, or pick a spot on the map, or just fill in the city and area.', 'Open settings', () => ref.read(locationServiceProvider).openAppSettings());
-      case LocationProblem.serviceOff:
-        return ('Location is switched off on this phone. Turn it on, or pick a spot on the map, or just fill in the city and area.', 'Turn on', () => ref.read(locationServiceProvider).openLocationSettings());
-      case LocationProblem.unavailable:
-        return ('The phone could not find where it is just now. Try again outside, pick a spot on the map, or just fill in the city and area.', 'Try again', _useCurrent);
-      case null:
-        return null;
-    }
-  }
+  void _useAddress(GeoPlace place) => widget.onChanged(GeoPoint(place.lat!, place.lng!).rounded());
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final help = _help();
     final value = widget.value;
     return GlassContainer(
       child: Column(
@@ -95,28 +66,16 @@ class _LocationFieldState extends ConsumerState<LocationField> {
             ),
             const SizedBox(height: 8),
           ],
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              OutlinedButton.icon(
-                onPressed: _busy ? null : _useCurrent,
-                icon: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.my_location),
-                label: Text(_busy ? 'Finding you...' : 'Use my location'),
-              ),
-              OutlinedButton.icon(
-                onPressed: _busy ? null : _pickOnMap,
-                icon: const Icon(Icons.pin_drop_outlined),
-                label: const Text('Pick on map'),
-              ),
-            ],
+          DetectLocationButton(onDetected: (point, place) => (widget.onDetected ?? (p, _) => widget.onChanged(p))(point, place)),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _pickOnMap,
+            icon: const Icon(Icons.pin_drop_outlined),
+            label: const Text('Pick on map'),
+            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
           ),
           const SizedBox(height: 12),
           AddressSearch(onPicked: _useAddress),
-          if (help != null) ...[
-            const SizedBox(height: 12),
-            MessageBanner(tone: BannerTone.warning, message: help.$1, action: TextButton(onPressed: help.$3, child: Text(help.$2))),
-          ],
         ],
       ),
     );

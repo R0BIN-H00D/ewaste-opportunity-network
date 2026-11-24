@@ -21,6 +21,14 @@ import { labelOf } from '../../lib/devices';
 import { formatDate, formatMoney } from '../../lib/requests';
 import { friendlyMessage } from '../../utils/errors';
 
+const PAYMENT_STATE = {
+  unpaid: ' (not paid yet)',
+  paid_offline: ' (paid, recorded)',
+  paid_online: ' (paid online)',
+  refunded: ' (refunded)',
+  refund_pending: ' (refund pending)',
+};
+
 function Tracker({ order }) {
   return (
     <ol className="flex flex-wrap gap-x-2 gap-y-3" aria-label="Order progress">
@@ -60,11 +68,16 @@ function OrderActions({ order: o, onChanged }) {
     complete: 'Confirming records the order as complete and the payment you made to the seller. Pay the seller directly.',
   };
 
-  if (steps.length === 0 && !has('cancel') && !o.canReview && save.status !== 'error') return null;
+  if (steps.length === 0 && !has('pay') && !has('cancel') && !o.canReview && save.status !== 'error') return null;
   return (
     <GlassCard as="section" aria-label="What you can do now" className="space-y-4">
       <h2 className="text-lg font-bold text-ink dark:text-white">What to do next</h2>
       <Alert variant="error">{save.status === 'error' && !dialog ? friendlyMessage(save.error) : ''}</Alert>
+      {has('pay') && (
+        <div className="space-y-2">
+          <Link to={`/dashboard/orders/${o._id}/pay`} className="btn btn-primary">{`Pay ${formatMoney(o.total)}`}</Link>
+        </div>
+      )}
       {steps.map(([action, [status, label]]) => (
         <div key={action} className="space-y-2">
           {note[action] && <p className="text-sm text-ink-muted dark:text-[#9FB2A7]">{note[action]}</p>}
@@ -142,9 +155,9 @@ export default function OrderDetail() {
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm text-ink dark:text-[#E8F1EB]">
             <dt className="font-semibold">Price</dt><dd>{o.quantity} × {formatMoney(o.priceAtOrder)}</dd>
             <dt className="font-semibold">Total</dt><dd className="font-numeric font-bold">{formatMoney(o.total)}</dd>
-            <dt className="font-semibold">Payment</dt><dd>{labelOf(PAYMENT_METHODS, o.paymentMethod)}{o.paymentStatus === 'unpaid' ? ' (not paid yet)' : o.paymentStatus === 'paid_offline' ? ' (paid, recorded)' : ' (payment confirmed)'}</dd>
+            <dt className="font-semibold">Payment</dt><dd>{labelOf(PAYMENT_METHODS, o.paymentMethod)}{PAYMENT_STATE[o.paymentStatus] || ' (payment confirmed)'}</dd>
           </dl>
-          <p className="text-xs text-ink-muted dark:text-[#9FB2A7]">Paid directly between the two people. The platform only keeps a record.</p>
+          <p className="text-xs text-ink-muted dark:text-[#9FB2A7]">{o.paymentMethod === 'online' ? 'Paid online through the payment window.' : 'Paid directly between the two people. The platform only keeps a record.'}</p>
           <p className="flex items-center gap-2 text-sm text-ink dark:text-[#E8F1EB]"><User size={16} aria-hidden />{seller ? `Buyer: ${o.buyer?.name}` : `Seller: ${o.seller?.businessName || o.seller?.name}`}</p>
           {o.deliveryArea && <p className="flex items-center gap-2 text-sm text-ink dark:text-[#E8F1EB]"><MapPin size={16} aria-hidden /><span className="font-semibold">Deliver to:</span> <span>{[o.deliveryArea, o.deliveryCity, o.deliveryPincode].filter(Boolean).join(', ')}</span></p>}
           {o.notes && <p className="text-sm text-ink-muted dark:text-[#9FB2A7]">Note: “{o.notes}”</p>}

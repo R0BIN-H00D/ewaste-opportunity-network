@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { setAccessToken } from '../services/api';
+import { aiApi } from '../services/aiApi';
 import { categoryApi, deviceApi } from '../services/deviceApi';
 import { geoApi } from '../services/geoApi';
 import { _resetCategoriesCache } from '../hooks/useCategories';
@@ -27,6 +28,8 @@ const lastListParams = () => deviceApi.list.mock.calls.at(-1)[0];
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.spyOn(aiApi, 'status').mockResolvedValue({ photoAi: false });
+  vi.spyOn(aiApi, 'analyzeDevice').mockResolvedValue({ estimate: { resale: null } });
   URL.createObjectURL = vi.fn(() => 'blob:preview');
   URL.revokeObjectURL = vi.fn();
   _resetCategoriesCache();
@@ -176,6 +179,10 @@ describe('listing form', () => {
     fireEvent.change(field(/Purchase year/), { target: { value: '2019' } });
   }
   const addPhoto = () => fireEvent.change(screen.getByTestId('photo-input'), { target: { files: [new File(['x'], 'a.png', { type: 'image/png' })] } });
+  const fillCondition = () => {
+    fireEvent.change(field('Condition *'), { target: { value: 'fully_working' } });
+    fireEvent.change(field(/Water damage/), { target: { value: 'none' } }); // needed for every category that is not listed
+  };
   function fillPlace() {
     fireEvent.change(field(/What should happen/), { target: { value: 'refurbishment' } });
     fireEvent.change(field(/Handover/), { target: { value: 'pickup' } });
@@ -185,9 +192,7 @@ describe('listing form', () => {
   }
   async function reachReview({ ticked = true, stopAtChecklist = false } = {}) {
     await fillDetails();
-    next();
-    await screen.findByRole('heading', { name: 'Condition and photos' });
-    fireEvent.change(field('Condition *'), { target: { value: 'fully_working' } });
+    fillCondition();
     addPhoto();
     next();
     await screen.findByRole('heading', { name: 'Service and location' });
@@ -212,18 +217,16 @@ describe('listing form', () => {
     expect(screen.getByRole('heading', { name: 'Tell us about the device' })).toBeInTheDocument();
   });
 
-  it('checks the condition and the service on their own steps', async () => {
+  it('checks the condition and a photo on the first page, and the service on the next', async () => {
     await openForm();
     await fillDetails();
     next();
-    await screen.findByRole('heading', { name: 'Condition and photos' });
-    next();
     expect(await screen.findByText('Choose the condition')).toBeInTheDocument();
     expect(screen.getByText('Add at least one photo of the device.')).toBeInTheDocument();
-    fireEvent.change(field('Condition *'), { target: { value: 'fully_working' } });
+    fillCondition();
     next();
     await waitFor(() => expect(screen.queryByText('Choose the condition')).not.toBeInTheDocument());
-    expect(screen.getByRole('heading', { name: 'Condition and photos' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Tell us about the device' })).toBeInTheDocument(); // still here: no photo yet
     addPhoto();
     next();
     await screen.findByRole('heading', { name: 'Service and location' });
@@ -251,10 +254,13 @@ describe('listing form', () => {
   it('goes back a step without losing what was typed', async () => {
     await openForm();
     await fillDetails();
+    fillCondition();
+    addPhoto();
     next();
-    await screen.findByRole('heading', { name: 'Condition and photos' });
+    await screen.findByRole('heading', { name: 'Service and location' });
     fireEvent.click(screen.getByRole('button', { name: /Back/ }));
     expect(await screen.findByLabelText(/Device name/)).toHaveValue('Old laptop');
+    expect(screen.getByLabelText('Condition *')).toHaveValue('fully_working');
   });
 
   it('saves a draft and tells the owner', async () => {
@@ -324,6 +330,51 @@ describe('listing form', () => {
   });
 });
 
+describe('the order of the first page', () => {
+  const open = async () => {
+    renderApp('/list-device', signedIn(USER));
+    await screen.findByRole('heading', { name: 'Tell us about the device' });
+    await screen.findByRole('option', { name: 'Laptops' });
+  };
+  const before = (a, b) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  it('starts with the photos, then the device, then the condition, and has no description box', async () => {
+    await open();
+    const photos = screen.getByRole('heading', { name: 'Add photos of the device' });
+    const device = screen.getByRole('heading', { name: 'Tell us about the device' });
+    const condition = screen.getByRole('heading', { name: 'Condition of the device' });
+    const note = screen.getByLabelText(/Anything more about its condition/);
+    expect(before(photos, device)).toBe(true);
+    expect(before(device, condition)).toBe(true);
+    expect(screen.queryByLabelText(/Description/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Not sure what to write? Tap to add:')).not.toBeInTheDocument();
+    expect(before(condition, note)).toBe(true);
+    expect(screen.queryByRole('heading', { name: 'Condition and photos' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the condition note optional, and sends it when it is filled in', async () => {
+    deviceApi.create.mockResolvedValue({ _id: 'd1', title: 'Old laptop', status: 'draft' });
+    await open();
+    const set = (label, value) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    set(/Device name/, 'Old laptop'); set(/Category/, 'laptops'); set(/Brand/, 'Dell'); set(/^Model \*/, 'Inspiron 15');
+    set(/Model year/, '2018'); set(/Purchase year/, '2019');
+    set('Condition *', 'minor_damage'); set(/Water damage/, 'none');
+    fireEvent.change(screen.getByTestId('photo-input'), { target: { files: [new File(['x'], 'a.png', { type: 'image/png' })] } });
+    fireEvent.click(screen.getByRole('button', { name: /Next/ })); // no condition note: still goes on
+    await screen.findByRole('heading', { name: 'Service and location' });
+    fireEvent.click(screen.getByRole('button', { name: /Back/ }));
+    set(/Anything more about its condition/, 'Small scratch on the lid.');
+    expect(screen.getByLabelText(/Anything more about its condition/)).toHaveValue('Small scratch on the lid.');
+  });
+
+  it('refuses a condition note over 500 characters', async () => {
+    await open();
+    fireEvent.change(screen.getByLabelText(/Anything more about its condition/), { target: { value: 'x'.repeat(501) } });
+    fireEvent.click(screen.getByRole('button', { name: /Next/ }));
+    expect(await screen.findByText('Keep the condition note under 500 characters')).toBeInTheDocument();
+  });
+});
+
 describe('Use my current location on the listing form', () => {
   const stepToPlace = async () => {
     renderApp('/list-device', signedIn(USER));
@@ -335,9 +386,8 @@ describe('Use my current location on the listing form', () => {
     fireEvent.change(screen.getByLabelText(/^Model \*/), { target: { value: 'Inspiron 15' } });
     fireEvent.change(screen.getByLabelText(/Model year/), { target: { value: '2018' } });
     fireEvent.change(screen.getByLabelText(/Purchase year/), { target: { value: '2019' } });
-    fireEvent.click(screen.getByRole('button', { name: /Next/ }));
-    await screen.findByRole('heading', { name: 'Condition and photos' });
     fireEvent.change(screen.getByLabelText('Condition *'), { target: { value: 'fully_working' } });
+    fireEvent.change(screen.getByLabelText(/Water damage/), { target: { value: 'none' } });
     fireEvent.change(screen.getByTestId('photo-input'), { target: { files: [new File(['x'], 'a.png', { type: 'image/png' })] } });
     fireEvent.click(screen.getByRole('button', { name: /Next/ }));
     await screen.findByRole('heading', { name: 'Service and location' });
@@ -386,7 +436,7 @@ describe('edit listing', () => {
     await waitFor(() => expect(screen.getByLabelText(/Category/)).toHaveValue('laptops'));
     expect(screen.queryByText('Data protection')).not.toBeInTheDocument();
     fireEvent.change(name, { target: { value: 'Dell Inspiron 15 (new battery)' } });
-    for (const heading of ['Condition and photos', 'Service and location', 'Review your listing']) {
+    for (const heading of ['Service and location', 'Review your listing']) {
       fireEvent.click(screen.getByRole('button', { name: /Next/ }));
       await screen.findByRole('heading', { name: heading });
     }
@@ -476,5 +526,149 @@ describe('My listings', () => {
     deviceApi.list.mockResolvedValue(page([listing()]));
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText('Dell Inspiron 15')).toBeInTheDocument();
+  });
+});
+
+describe('the condition of each part on the form', () => {
+  const PARTS_CATEGORIES = [{ slug: 'smartphone', name: 'Smartphone' }, { slug: 'keyboard', name: 'Keyboard' }];
+  const open = async (user = USER) => {
+    categoryApi.list.mockResolvedValue(PARTS_CATEGORIES);
+    renderApp('/list-device', signedIn(user));
+    await screen.findByRole('heading', { name: 'Tell us about the device' });
+    await screen.findByRole('option', { name: 'Smartphone' });
+  };
+  const set = (label, value) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
+  const next = () => fireEvent.click(screen.getByRole('button', { name: /Next/ }));
+  const fillDevice = () => {
+    set(/Device name/, 'Old phone'); set(/Category/, 'smartphone'); set(/Brand/, 'Samsung'); set(/^Model \*/, 'A12');
+    set(/Model year/, '2019'); set(/Purchase year/, '2020');
+  };
+  const fillFour = () => { set(/^Battery/, 'drains_fast'); set(/^Screen/, 'scratched'); set(/^Ports and buttons/, 'all_work'); set(/^Water damage/, 'none'); };
+  const addPhoto = () => fireEvent.change(screen.getByTestId('photo-input'), { target: { files: [new File(['x'], 'a.png', { type: 'image/png' })] } });
+  async function toServiceStep(user) {
+    await open(user);
+    fillDevice(); fillFour(); set('Condition *', 'minor_damage'); addPhoto();
+    next();
+    await screen.findByRole('heading', { name: 'Service and location' });
+  }
+
+  it('asks for battery, screen, ports and buttons, and water damage, and folds the rest behind a Show more button', async () => {
+    await open();
+    choose();
+    function choose() { set(/Category/, 'smartphone'); }
+    for (const part of ['Battery *', 'Screen *', 'Ports and buttons *', 'Water damage *']) expect(screen.getByLabelText(part)).toHaveValue('');
+    expect(screen.queryByLabelText('Camera')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Does it turn on?')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show more (5)' }));
+    for (const part of ['Does it turn on?', 'Body and casing', 'Charging', 'Speaker and microphone', 'Camera']) expect(screen.getByLabelText(part)).toHaveValue('');
+    expect(screen.getByLabelText('Camera')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show fewer details' }));
+    expect(screen.queryByLabelText('Camera')).not.toBeInTheDocument();
+  });
+
+  it('shows only the parts that fit the category', async () => {
+    await open();
+    set(/Category/, 'keyboard');
+    await waitFor(() => expect(screen.getByLabelText('Ports and buttons *')).toBeInTheDocument());
+    expect(screen.getByLabelText('Water damage *')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Battery/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Screen/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show more (1)' })).toBeInTheDocument(); // just the body
+  });
+
+  it('will not go on until the four are answered, and says which are missing', async () => {
+    await open();
+    fillDevice();
+    set('Condition *', 'minor_damage'); addPhoto();
+    set(/^Battery/, 'holds_well');
+    next();
+    expect(await screen.findByText('Choose the screen condition')).toBeInTheDocument();
+    expect(screen.getByText('Choose the ports and buttons condition')).toBeInTheDocument();
+    expect(screen.getByText('Choose the water damage condition')).toBeInTheDocument();
+    expect(screen.queryByText('Choose the battery condition')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Tell us about the device' })).toBeInTheDocument();
+    set(/^Screen/, 'no_damage'); set(/^Ports and buttons/, 'all_work'); set(/^Water damage/, 'none');
+    next();
+    await screen.findByRole('heading', { name: 'Service and location' });
+  });
+
+  it('suggests an overall condition from the answers, and applies it only when asked', async () => {
+    await open();
+    set(/Category/, 'smartphone');
+    expect(screen.queryByText(/we suggest/)).not.toBeInTheDocument();
+    set(/^Screen/, 'cracked');
+    expect(await screen.findByText(/Based on your answers below we suggest/)).toHaveTextContent('Major damage');
+    expect(screen.getByLabelText('Condition *')).toHaveValue(''); // not applied by itself
+    fireEvent.click(screen.getByRole('button', { name: 'Use this' }));
+    await waitFor(() => expect(screen.getByLabelText('Condition *')).toHaveValue('major_damage'));
+    expect(screen.queryByText(/we suggest/)).not.toBeInTheDocument();
+  });
+
+  it('sends the answers with the listing, including a part from Show more', async () => {
+    deviceApi.create.mockResolvedValue({ _id: 'd1', title: 'Old phone', status: 'draft' });
+    await open();
+    fillDevice(); fillFour(); set('Condition *', 'minor_damage'); addPhoto();
+    fireEvent.click(screen.getByRole('button', { name: 'Show more (5)' }));
+    set('Camera', 'faulty');
+    next();
+    await screen.findByRole('heading', { name: 'Service and location' });
+    set(/What should happen/, 'repair'); set(/Handover/, 'pickup'); set(/Area \/ locality/, 'Indiranagar');
+    set(/^City/, 'Bengaluru'); set(/Your phone number/, '98765 43210');
+    next();
+    await screen.findByRole('heading', { name: 'Protect your data' });
+    screen.getAllByRole('checkbox').forEach((box) => fireEvent.click(box));
+    next();
+    await screen.findByRole('heading', { name: 'Review your listing' });
+    expect(screen.getByText('Drains quickly')).toBeInTheDocument(); // shown on the review step
+    fireEvent.click(screen.getByRole('button', { name: 'Save as draft' }));
+    await waitFor(() => expect(deviceApi.create).toHaveBeenCalled());
+    expect(deviceApi.create.mock.calls[0][0].conditionDetails).toEqual({ screen: 'scratched', battery: 'drains_fast', ports: 'all_work', water: 'none', camera: 'faulty' });
+  });
+
+  it('fills the phone number from the profile', async () => {
+    await toServiceStep({ ...USER, phone: '+91 98765-43210' });
+    expect(screen.getByLabelText(/Your phone number/)).toHaveValue('9876543210');
+  });
+
+  it('leaves the phone number empty when the profile has none, or one that is not a mobile number', async () => {
+    await toServiceStep({ ...USER, phone: '12345' });
+    expect(screen.getByLabelText(/Your phone number/)).toHaveValue('');
+  });
+
+  it('shows the price the AI expects instead of the old hint, and fills it in on request', async () => {
+    aiApi.analyzeDevice.mockResolvedValue({ estimate: { resale: { min: 8000, max: 12000 } } });
+    await toServiceStep();
+    expect(await screen.findByText(/AI expects about/)).toHaveTextContent('₹8,000 to ₹12,000');
+    expect(screen.queryByText(/Leave empty for/)).not.toBeInTheDocument();
+    expect(aiApi.analyzeDevice).toHaveBeenCalledWith(expect.any(Array), expect.stringContaining('Old phone'));
+    fireEvent.click(screen.getByRole('button', { name: 'Use ₹10,000' }));
+    expect(screen.getByLabelText(/Expected price/)).toHaveValue(10000);
+  });
+
+  it('falls back to the plain hint, and lets the person ask again, when the AI has no price', async () => {
+    await toServiceStep(); // the stub answers without a price
+    expect(await screen.findByText(/could not suggest a price/)).toBeInTheDocument();
+    expect(screen.getByText(/Leave empty for “price on request”, or 0 to give it away/)).toBeInTheDocument();
+    aiApi.analyzeDevice.mockResolvedValue({ estimate: { resale: { min: 3000, max: 5000 } } });
+    fireEvent.click(screen.getByRole('button', { name: 'Ask the AI for a price' }));
+    expect(await screen.findByText(/AI expects about/)).toHaveTextContent('₹3,000 to ₹5,000');
+  });
+});
+
+describe('the condition of each part on a device page', () => {
+  it('lists the answered parts in words', async () => {
+    deviceApi.get.mockResolvedValue(listing({ isOwner: false, conditionDetails: { battery: 'needs_replacing', screen: 'cracked' } }));
+    renderApp('/devices/l1', anonymous());
+    const list = await screen.findByLabelText('Condition of each part');
+    expect(list).toHaveTextContent('Screen');
+    expect(list).toHaveTextContent('Cracked');
+    expect(list).toHaveTextContent('Needs replacing');
+  });
+
+  it('shows nothing extra when no part was answered', async () => {
+    deviceApi.get.mockResolvedValue(listing({ isOwner: false }));
+    renderApp('/devices/l1', anonymous());
+    await screen.findByRole('heading', { name: 'Dell Inspiron 15' });
+    expect(screen.queryByLabelText('Condition of each part')).not.toBeInTheDocument();
   });
 });

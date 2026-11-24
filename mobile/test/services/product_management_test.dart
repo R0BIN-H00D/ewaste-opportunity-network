@@ -85,6 +85,38 @@ void main() {
     expect(f.containsKey('removePhotoIds'), isFalse);
   });
 
+  test('the condition of each part travels as JSON, with blanks dropped, and the remarks beside it', () async {
+    final rig = _rig((o) async => _json(201, {'success': true, 'data': productJson(id: 'p9', detail: true, isMine: true)}));
+    await MarketplaceRepository(rig.client).createProduct(const ProductInput(
+      title: 'Refurbished ThinkPad',
+      category: 'laptops',
+      condition: 'good',
+      refurbishmentInfo: 'New battery fitted',
+      price: 24999,
+      conditionDetails: {'battery': 'drains_fast', 'screen': '', 'power': 'works_normally'},
+      conditionNote: 'Charger included.',
+    ));
+    final f = _fields(rig.api.requests.single);
+    expect(jsonDecode(f['conditionDetails']!), {'battery': 'drains_fast', 'power': 'works_normally'});
+    expect(f['conditionNote'], 'Charger included.');
+  });
+
+  test('on an update an empty set of answers and empty remarks are sent, so the old ones are cleared', () async {
+    final rig = _rig((o) async => _json(200, {'success': true, 'data': productJson(detail: true, isMine: true)}));
+    await MarketplaceRepository(rig.client).updateProduct('p1', const ProductInput(conditionDetails: {}, conditionNote: ''));
+    final f = _fields(rig.api.requests.single);
+    expect(f['conditionDetails'], '{}');
+    expect(f['conditionNote'], '');
+  });
+
+  test('nothing about the parts is sent when nothing is set', () async {
+    final rig = _rig((o) async => _json(200, {'success': true, 'data': productJson(detail: true, isMine: true)}));
+    await MarketplaceRepository(rig.client).updateProduct('p1', const ProductInput(price: 19999));
+    final f = _fields(rig.api.requests.single);
+    expect(f.containsKey('conditionDetails'), isFalse);
+    expect(f.containsKey('conditionNote'), isFalse);
+  });
+
   test('changing a product sends only what is set, and the photos to remove as a list', () async {
     final rig = _rig((o) async => _json(200, {'success': true, 'data': productJson(detail: true, isMine: true)}));
     await MarketplaceRepository(rig.client).updateProduct('p1', const ProductInput(price: 19999, status: 'hidden', removePhotoIds: ['a', 'b']));

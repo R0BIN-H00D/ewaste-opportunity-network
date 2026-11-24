@@ -54,6 +54,7 @@ Map<String, dynamic> orderJson({
   bool reviewed = false,
   String? cancelReason,
   String paymentStatus = 'pending',
+  String paymentMethod = 'cod',
   int quantity = 2,
 }) =>
     {
@@ -70,7 +71,7 @@ Map<String, dynamic> orderJson({
       'quantity': quantity,
       'priceAtOrder': 24999,
       'total': 24999 * quantity,
-      'paymentMethod': 'cod',
+      'paymentMethod': paymentMethod,
       'paymentStatus': paymentStatus,
       'buyer': {'_id': 'u1', 'name': 'Asha'},
       'seller': {
@@ -193,9 +194,9 @@ void main() {
       expect(orderStatusLabel('new_thing'), 'new_thing');
     });
 
-    test('payment is never through the app', () {
+    test('payment is cash, direct to the seller, or online', () {
       expect(labelOf(paymentMethods, 'cod'), 'Cash on delivery');
-      expect(paymentMethods.map((p) => p.$1), ['cod', 'offline']);
+      expect(paymentMethods.map((p) => p.$1), ['cod', 'offline', 'online']);
     });
 
     test('an enquiry needs a short question', () {

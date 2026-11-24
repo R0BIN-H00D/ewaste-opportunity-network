@@ -36,6 +36,27 @@ class WantedRepository {
         });
       });
 
+  /// The refurbisher changes their own request. An empty optional field is cleared on the server.
+  Future<void> update(
+    String id, {
+    required String title,
+    String? brand,
+    String? minCondition,
+    int quantity = 1,
+    String? city,
+    String? notes,
+  }) =>
+      guard(() async {
+        await _api.dio.put<dynamic>('/wanted-requests/$id', data: {
+          'title': title.trim(),
+          'quantity': quantity,
+          'brand': (brand ?? '').trim(),
+          'minCondition': (minCondition ?? '').trim(),
+          'city': (city ?? '').trim(),
+          'notes': (notes ?? '').trim(),
+        });
+      });
+
   Future<void> setStatus(String id, String status) => guard(() async {
         await _api.dio.put<dynamic>('/wanted-requests/$id/status', data: {'status': status});
       });

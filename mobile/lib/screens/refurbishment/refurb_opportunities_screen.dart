@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import '../../core/format.dart';
-import '../../core/network/api_exception.dart';
 import '../../models/listing.dart';
 import '../../models/refurbishment.dart';
 import '../../providers/listings_controller.dart';
@@ -11,10 +10,8 @@ import '../../providers/refurbishment_providers.dart';
 import '../../routes/route_paths.dart';
 import '../../widgets/app_background.dart';
 import '../../widgets/app_chip.dart';
-import '../../widgets/glass_app_bar.dart';
 import '../../widgets/message_banner.dart';
 import '../../widgets/paged_list.dart';
-import 'refurb_dialogs.dart';
 import 'refurb_opportunity_card.dart';
 
 /// Devices owners would like refurbished. Tapping one opens the offer form; sending it opens the new job.
@@ -111,24 +108,13 @@ class _RefurbOpportunitiesScreenState extends ConsumerState<RefurbOpportunitiesS
     ref.read(refurbOpportunityQueryProvider.notifier).update((q) => q.copyWith(category: filters.category, condition: filters.condition));
   }
 
-  Future<void> _offer(RefurbOpportunity o) async {
+  void _offer(RefurbOpportunity o) {
     if (o.hasOffered) {
       setState(() => _error = 'You already made an offer on this device. Open it from your jobs.');
       return;
     }
-    final input = await askOffer(context, title: o.device.title);
-    if (input == null || !mounted) return;
     setState(() => _error = null);
-    try {
-      final job = await ref.read(refurbishmentRepositoryProvider).makeOffer(listingId: o.id, amount: input.amount, message: input.message);
-      ref.invalidate(refurbOpportunitiesProvider);
-      ref.invalidate(refurbJobsProvider);
-      if (mounted) context.push(Routes.refurbJob(job.id));
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.fieldErrors.values.isNotEmpty ? e.fieldErrors.values.first : e.message);
-      if (e.code == 'ALREADY_OFFERED' || e.code == 'LISTING_UNAVAILABLE') ref.invalidate(refurbOpportunitiesProvider);
-    }
+    context.push(Routes.refurbOffer(o.id), extra: o);
   }
 
   @override

@@ -26,7 +26,8 @@ Map<String, dynamic> technicianJson({String id = 't1', String name = 'Ravi Kumar
     };
 
 /// A service request as `GET /api/service-requests/:id` sends it to the device owner.
-Map<String, dynamic> requestJson({String id = 'r1', String status = 'request_submitted', List<String> actions = const [], bool onSite = false, bool quote = false}) => {
+Map<String, dynamic> requestJson({String id = 'r1', String status = 'request_submitted', List<String> actions = const [], bool onSite = false, bool quote = false, bool paid = false}) => {
+      if (paid) 'payment': {'status': 'paid_online'},
       '_id': id,
       'status': status,
       'mode': 'targeted',

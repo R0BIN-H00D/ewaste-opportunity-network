@@ -11,6 +11,8 @@ router.post('/', authenticate, validate({ body: v.placeBody }), ctrl.place);
 router.get('/', authenticate, validate({ query: v.listQuery }), ctrl.list);
 router.get('/:id', validObjectIdParam(), authenticate, ctrl.get);
 router.put('/:id/status', validObjectIdParam(), authenticate, validate({ body: v.statusBody }), ctrl.status);
+router.post('/:id/payment', validObjectIdParam(), authenticate, ctrl.startPayment);
+router.post('/:id/payment/verify', validObjectIdParam(), authenticate, validate({ body: v.verifyBody }), ctrl.verifyPayment);
 router.post('/:id/cancel', validObjectIdParam(), authenticate, validate({ body: v.cancelBody }), ctrl.cancel);
 
 module.exports = router;

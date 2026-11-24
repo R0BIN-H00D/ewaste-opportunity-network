@@ -8,6 +8,8 @@ exports.list = asyncHandler(async (req, res) => {
   const { items, meta } = await svc.list(req.user, req.query);
   ok(res, items, 'OK', meta);
 });
+exports.getOne = asyncHandler(async (req, res) => ok(res, await svc.getOne(req.params.id, req.user)));
+exports.update = asyncHandler(async (req, res) => ok(res, await svc.update(req.params.id, req.user, req.body), 'Request updated'));
 exports.setStatus = asyncHandler(async (req, res) => ok(res, await svc.setStatus(req.params.id, req.user, req.body), 'Request updated'));
 exports.remove = asyncHandler(async (req, res) => {
   await svc.remove(req.params.id, req.user);

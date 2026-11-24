@@ -66,7 +66,7 @@ String? validateExpectedPrice(String? value) {
   return null;
 }
 
-/// Optional. Only a length limit.
+/// Not asked on the form any more; kept as an optional length limit.
 String? validateDescription(String? value) => (value ?? '').trim().length > 2000 ? 'Use at most 2000 characters' : null;
 
 /// Required: at least 3 characters, starting with a letter.

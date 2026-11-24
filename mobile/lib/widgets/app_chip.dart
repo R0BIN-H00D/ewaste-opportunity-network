@@ -38,7 +38,8 @@ class AppChip extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (selected) ...[Icon(Icons.check, size: 16, color: scheme.primary), const SizedBox(width: 6)],
-                    Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 13, color: selected ? scheme.primary : scheme.onSurface)),
+                    // A long answer wraps inside the chip instead of running off the side of a narrow screen.
+                    Flexible(child: Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 13, color: selected ? scheme.primary : scheme.onSurface)))),
                   ],
                 ),
               ),

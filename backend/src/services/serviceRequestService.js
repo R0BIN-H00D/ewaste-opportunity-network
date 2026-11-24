@@ -19,6 +19,7 @@ const { notify } = require('./notificationService');
 const matching = require('./matching');
 const { serializeRequest } = require('../serializers/serviceRequest');
 const workflow = require('./workflow/serviceRequest');
+const gateway = require('./paymentGateway');
 
 const { ACTORS } = workflow;
 const MAX_PROGRESS_PHOTOS = 20;
@@ -339,6 +340,7 @@ const rupees = (amount) => `₹${new Intl.NumberFormat('en-IN', { maximumFractio
 async function submitQuotation(id, user, input) {
   const { request } = await loadParticipant(id, user, { roles: [ACTORS.TECHNICIAN] });
   workflow.assertTransition(request, 'quotation_submitted', ACTORS.TECHNICIAN); // diagnosis, or a revision during repair
+  if (request.payment?.status === 'paid_online') throw ApiError.conflict('The customer already paid the approved quotation online, so it cannot be revised', 'ALREADY_PAID');
 
   const sum = (input.breakdown || []).reduce((acc, b) => acc + b.amount, 0);
   if (input.breakdown?.length && Math.abs(sum - input.amount) > 0.01) {
@@ -476,12 +478,17 @@ async function confirmCompletion(id, user) {
   const quotation = await acceptedQuotation(request);
   const done = await applyTransition(request, 'service_completed', ACTORS.CUSTOMER, { by: user.id, set: { customerConfirmedAt: new Date() } });
 
+  const paidOnline = done.payment?.status === 'paid_online';
   try {
     const listing = await DeviceListing.findById(done.listing).select('category').lean();
     await Promise.all([
       Transaction.findOneAndUpdate(
         { refType: 'ServiceRequest', refId: done._id },
-        { $setOnInsert: { type: 'repair', refType: 'ServiceRequest', refId: done._id, payer: done.customer, payee: done.technician, amount: quotation.amount, method: 'offline', status: 'recorded' } },
+        {
+          $setOnInsert: paidOnline
+            ? { type: 'repair', refType: 'ServiceRequest', refId: done._id, payer: done.customer, payee: done.technician, amount: quotation.amount, method: 'online', status: 'confirmed', reference: done.payment.gatewayPaymentId }
+            : { type: 'repair', refType: 'ServiceRequest', refId: done._id, payer: done.customer, payee: done.technician, amount: quotation.amount, method: 'offline', status: 'recorded' },
+        },
         { upsert: true },
       ),
       TechnicianProfile.updateOne({ user: done.technician }, { $inc: { completedJobs: 1, earningsTotal: quotation.amount } }),
@@ -493,6 +500,38 @@ async function confirmCompletion(id, user) {
     logger.error({ err: err.message, requestId: String(done._id) }, 'service completion side effects failed');
   }
   await notify(done.technician, { type: 'request.completed', title: 'Service completed', body: 'The customer confirmed the work.', data: { id: done._id, deepLink: linkTo(done._id) } });
+  return fetchView(id, user, { role: ACTORS.CUSTOMER });
+}
+
+/* ---------- online payment of the approved quotation (Razorpay TEST mode, demo) ---------- */
+
+async function startPayment(id, user) {
+  const { request } = await loadParticipant(id, user, { roles: [ACTORS.CUSTOMER] });
+  if (!workflow.PAYABLE.includes(request.status)) throw ApiError.conflict('You can pay after you approve the quotation, until you confirm the work', 'NOT_PAYABLE');
+  if (request.payment?.status === 'paid_online') throw ApiError.conflict('This service is already paid', 'ALREADY_PAID');
+  const quotation = await acceptedQuotation(request);
+  if (quotation.amount < 1) throw ApiError.conflict('Online payment needs an amount of at least ₹1', 'AMOUNT_TOO_SMALL');
+  const rz = await gateway.createOrder({ amountRupees: quotation.amount, receipt: `repair_${request._id}`, notes: { serviceRequestId: String(request._id) } });
+  await ServiceRequest.updateOne({ _id: request._id }, { $set: { 'payment.status': 'unpaid', 'payment.quotation': quotation._id, 'payment.amount': quotation.amount, 'payment.gatewayOrderId': rz.id } });
+  return { keyId: gateway.keyId(), gatewayOrderId: rz.id, amount: rz.amount, currency: rz.currency, description: 'Repair service', testMode: true };
+}
+
+/** Checks the signature from the checkout, then marks the service paid. Safe to repeat. */
+async function verifyPayment(id, user, { razorpay_order_id: gatewayOrderId, razorpay_payment_id: paymentId, razorpay_signature: signature }) {
+  const { request } = await loadParticipant(id, user, { roles: [ACTORS.CUSTOMER] });
+  if (request.payment?.status === 'paid_online' && request.payment.gatewayPaymentId === paymentId) return fetchView(id, user, { role: ACTORS.CUSTOMER });
+  const pay = request.payment || {};
+  if (!pay.gatewayOrderId || pay.gatewayOrderId !== gatewayOrderId) throw ApiError.badRequest('This payment does not belong to this request');
+  if (!gateway.verifySignature({ orderId: gatewayOrderId, paymentId, signature })) {
+    throw ApiError.badRequest('The payment could not be verified', [{ field: 'razorpay_signature', message: 'Signature does not match' }]);
+  }
+  const updated = await ServiceRequest.findOneAndUpdate(
+    { _id: request._id, 'payment.status': { $ne: 'paid_online' }, status: { $in: workflow.PAYABLE }, activeQuotation: pay.quotation },
+    { $set: { 'payment.status': 'paid_online', 'payment.gatewayPaymentId': paymentId, 'payment.paidAt': new Date() } },
+    { new: true },
+  );
+  if (!updated) throw ApiError.conflict('This request was just changed. Reload the page and try again.', 'STALE_STATE');
+  await notify(request.technician, { type: 'request.paid', title: 'The customer paid online (test mode)', data: { id: request._id, deepLink: linkTo(request._id) } });
   return fetchView(id, user, { role: ACTORS.CUSTOMER });
 }
 
@@ -523,5 +562,5 @@ async function changeStatus(id, user, { status, note, returnDate, returnSlot }, 
 
 module.exports = {
   createRequest, getRequest, listRequests, acceptRequest, rejectRequest, startDiagnosis, schedulePickup, confirmHandover,
-  submitQuotation, listQuotations, decideQuotation, addProgress, completeRepair, startDelivery, confirmCompletion, cancelRequest, changeStatus,
+  startPayment, verifyPayment, submitQuotation, listQuotations, decideQuotation, addProgress, completeRepair, startDelivery, confirmCompletion, cancelRequest, changeStatus,
 };

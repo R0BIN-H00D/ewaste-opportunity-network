@@ -15,11 +15,13 @@ export const marketApi = {
   enquire: (id, message) => data(api.post(`/marketplace/${id}/enquiries`, { message })),
 };
 
-// Orders (FR-MKT-009). Payment is cash on delivery or offline; the platform never handles money.
+// Orders (FR-MKT-009). Payment is cash on delivery, offline, or online in Razorpay TEST mode (demo, no real money).
 export const orderApi = {
   place: (body) => data(api.post('/orders', body)),
   list: (params, signal) => page(api.get('/orders', { params: clean(params), signal })),
   get: (id, signal) => data(api.get(`/orders/${id}`, { signal })),
   setStatus: (id, status) => data(api.put(`/orders/${id}/status`, { status })),
+  startPayment: (id) => data(api.post(`/orders/${id}/payment`)),
+  verifyPayment: (id, body) => data(api.post(`/orders/${id}/payment/verify`, body)),
   cancel: (id, reason) => data(api.post(`/orders/${id}/cancel`, reason ? { reason } : {})),
 };

@@ -47,13 +47,16 @@ export default function SecuritySection() {
         <PasswordField label="Current password" autoComplete="current-password" className="sm:col-span-2" error={errors.currentPassword?.message} {...register('currentPassword')} />
         <PasswordField label="New password" autoComplete="new-password" hint="8+ characters with a letter and a number" error={errors.newPassword?.message} {...register('newPassword')} />
         <PasswordField label="Confirm new password" autoComplete="new-password" error={errors.confirmPassword?.message} {...register('confirmPassword')} />
-        <div className="sm:col-span-2">
+        <div className="mt-1 flex justify-end border-t border-black/5 pt-5 dark:border-white/10 sm:col-span-2">
           <button type="submit" className="btn btn-primary" disabled={save.saving}>{save.saving ? 'Saving…' : 'Change password'}</button>
         </div>
       </form>
-      <div className="border-t border-black/10 pt-4 dark:border-white/10">
-        <p className="text-sm text-ink-muted dark:text-[#9FB2A7]">Lost a device or used a shared computer? End every active session.</p>
-        <button type="button" className="btn btn-glass mt-2" onClick={logoutAll} disabled={out.saving}>
+      <div className="flex flex-col gap-3 rounded-2xl bg-black/[0.03] p-4 dark:bg-white/5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-ink dark:text-white">Sessions</p>
+          <p className="text-sm text-ink-muted dark:text-[#9FB2A7]">Lost a device or used a shared computer? End every active session.</p>
+        </div>
+        <button type="button" className="btn btn-glass shrink-0" onClick={logoutAll} disabled={out.saving}>
           {out.saving ? 'Signing out…' : 'Sign out of all devices'}
         </button>
       </div>

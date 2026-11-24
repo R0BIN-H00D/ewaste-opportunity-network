@@ -8,6 +8,7 @@ import '../../models/listing.dart';
 import '../../models/marketplace.dart';
 import '../../providers/marketplace_providers.dart';
 import '../../routes/route_paths.dart';
+import '../../widgets/about_device_card.dart';
 import '../../widgets/app_background.dart';
 import '../../widgets/app_chip.dart';
 import '../../widgets/glass_app_bar.dart';
@@ -234,6 +235,8 @@ class _BodyState extends ConsumerState<_Body> {
                   ],
                 ),
               ),
+              const SizedBox(height: 16),
+              AboutDeviceCard(condition: p.condition, details: p.conditionDetails, note: p.conditionNote),
               if ((p.refurbishmentInfo ?? '').trim().isNotEmpty) ...[
                 const SizedBox(height: 16),
                 GlassContainer(

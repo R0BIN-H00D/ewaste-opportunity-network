@@ -52,9 +52,10 @@ describe('public navigation', () => {
   it('shows the main links and moves between pages', async () => {
     renderApp('/', anonymous());
     expect(await screen.findByRole('heading', { level: 1, name: /Give Your Electronics/ })).toBeInTheDocument();
-    for (const name of ['Home', 'How It Works', 'Browse Devices', 'Find Services', 'Marketplace', 'Environmental Impact']) {
+    for (const name of ['Home', 'How It Works', 'Browse Devices', 'Find Services', 'Marketplace']) {
       expect(primary().getAllByRole('link', { name }).length).toBeGreaterThan(0);
     }
+    expect(primary().queryByRole('link', { name: 'Environmental Impact' })).not.toBeInTheDocument(); // not in the top navigation
     fireEvent.click(primary().getAllByRole('link', { name: 'Browse Devices' })[0]);
     expect(await screen.findByRole('heading', { name: 'Browse devices' })).toBeInTheDocument();
   });

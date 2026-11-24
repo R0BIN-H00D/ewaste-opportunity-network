@@ -23,6 +23,8 @@ export const refurbApi = {
     return data(api.post(`/refurbishment/jobs/${id}/photos`, form));
   },
   wanted: (params, signal) => page(api.get('/wanted-requests', { params: clean(params), signal })),
+  getWanted: (id, signal) => data(api.get(`/wanted-requests/${id}`, { signal })),
+  updateWanted: (id, body) => data(api.put(`/wanted-requests/${id}`, body)),
   addWanted: (body) => data(api.post('/wanted-requests', body)),
   setWantedStatus: (id, status) => data(api.put(`/wanted-requests/${id}/status`, { status })),
   respondWanted: (id, message) => data(api.post(`/wanted-requests/${id}/respond`, message ? { message } : {})),

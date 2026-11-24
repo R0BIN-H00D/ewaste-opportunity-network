@@ -113,6 +113,8 @@ class ServiceRequest {
     this.deviceSubtitle = '',
     this.devicePhoto,
     this.deviceArea = '',
+    this.deviceCategory = '',
+    this.deviceCity = '',
     this.technicianId,
     this.technicianName,
     this.customerName,
@@ -127,6 +129,7 @@ class ServiceRequest {
     this.returnSchedule,
     this.actions = const [],
     this.reviewed = false,
+    this.paidOnline = false,
     this.createdAt,
     this.updatedAt,
   });
@@ -141,6 +144,10 @@ class ServiceRequest {
   final String deviceSubtitle;
   final ListingPhoto? devicePhoto;
   final String deviceArea;
+
+  /// The kind of device (Laptop, Smartphone...) and its city, for the filters on Find repair requests.
+  final String deviceCategory;
+  final String deviceCity;
   final String? technicianId;
   final String? technicianName;
 
@@ -166,6 +173,9 @@ class ServiceRequest {
   final PickupInfo? returnSchedule;
   final List<String> actions;
   final bool reviewed;
+
+  /// The customer paid the approved quote online (Razorpay test mode demo).
+  final bool paidOnline;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -206,6 +216,8 @@ class ServiceRequest {
       deviceSubtitle: subtitle,
       devicePhoto: photos is List && photos.isNotEmpty && photos.first is Map ? ListingPhoto.fromJson((photos.first as Map).cast<String, dynamic>()) : null,
       deviceArea: area,
+      deviceCategory: ((category['name'] as String?) ?? '').trim(),
+      deviceCity: ((listing['city'] as String?) ?? '').trim(),
       technicianId: technician['_id'] as String?,
       technicianName: technician['name'] as String?,
       customerName: customer['name'] as String?,
@@ -228,6 +240,7 @@ class ServiceRequest {
       returnSchedule: back is Map && _date(back['date']) != null ? PickupInfo(date: _date(back['date']), timeSlot: back['timeSlot'] as String?) : null,
       actions: actions is List ? [for (final a in actions) if (a is String) a] : const [],
       reviewed: json['reviewed'] == true,
+      paidOnline: _map(json['payment'])['status'] == 'paid_online',
       createdAt: _date(json['createdAt']),
       updatedAt: _date(json['updatedAt']),
     );

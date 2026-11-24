@@ -5,6 +5,8 @@ import 'package:ewaste_opportunity/models/service_request.dart';
 import 'package:ewaste_opportunity/widgets/listing_photo.dart';
 import 'package:ewaste_opportunity/providers/core_providers.dart';
 import 'package:ewaste_opportunity/providers/listings_controller.dart';
+import 'package:ewaste_opportunity/providers/marketplace_providers.dart' show paymentLauncherProvider;
+import 'package:ewaste_opportunity/services/razorpay_checkout.dart';
 import 'package:ewaste_opportunity/providers/technicians_controller.dart';
 import 'package:ewaste_opportunity/screens/requests/request_details_screen.dart';
 import 'package:ewaste_opportunity/screens/requests/requests_screen.dart';
@@ -16,7 +18,7 @@ import '../fakes.dart';
 import '../helpers.dart';
 import '../models/request_models_test.dart';
 
-Future<void> _pump(WidgetTester tester, Widget screen, FakeRequestRepository repo) async {
+Future<void> _pump(WidgetTester tester, Widget screen, FakeRequestRepository repo, {PaymentLauncher? launcher}) async {
   tester.view.physicalSize = const Size(900, 2600);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -30,6 +32,7 @@ Future<void> _pump(WidgetTester tester, Widget screen, FakeRequestRepository rep
         keyValueStoreProvider.overrideWithValue(MemoryKeyValueStore()),
         authRepositoryProvider.overrideWithValue(FakeAuthRepository()),
         requestRepositoryProvider.overrideWithValue(repo),
+        if (launcher != null) paymentLauncherProvider.overrideWithValue(launcher),
         deviceRepositoryProvider.overrideWithValue(FakeDeviceRepository()),
       ],
       child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
@@ -51,6 +54,39 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 Finder _inDialog(String text) => find.descendant(of: find.byType(AlertDialog), matching: find.text(text));
 
 void main() {
+  group('paying for a repair online', () {
+    const proof = PaymentProof(orderId: 'order_1', paymentId: 'pay_1', signature: 'sig');
+
+    testWidgets('Pay opens the window, sends the proof and shows the request as paid', (tester) async {
+      final repo = FakeRequestRepository(current: sampleRequest(status: 'repair_in_progress', actions: ['pay', 'cancel'], quote: true))
+        ..result = sampleRequest(status: 'repair_in_progress', quote: true, paid: true);
+      final launcher = FakePaymentLauncher(proof: proof);
+      await _pump(tester, const RequestDetailsScreen(id: 'r1'), repo, launcher: launcher);
+
+      await _tap(tester, find.text('Pay ₹2,500'));
+
+      expect(launcher.opened, 1);
+      expect(repo.calls, containsAllInOrder(['startPayment:r1', 'verifyPayment:r1:pay_1']));
+      expect(find.text('Paid online'), findsOneWidget);
+    });
+
+    testWidgets('closing the window changes nothing and does not verify', (tester) async {
+      final repo = FakeRequestRepository(current: sampleRequest(status: 'repair_in_progress', actions: ['pay'], quote: true));
+      final launcher = FakePaymentLauncher(error: const PaymentCancelled());
+      await _pump(tester, const RequestDetailsScreen(id: 'r1'), repo, launcher: launcher);
+
+      await _tap(tester, find.text('Pay ₹2,500'));
+
+      expect(repo.calls.where((c) => c.startsWith('verifyPayment')), isEmpty);
+      expect(find.text('Pay ₹2,500'), findsOneWidget);
+    });
+
+    testWidgets('no Pay button without the pay action', (tester) async {
+      await _pump(tester, const RequestDetailsScreen(id: 'r1'), FakeRequestRepository(current: sampleRequest(status: 'repair_in_progress', actions: ['cancel'], quote: true)));
+      expect(find.textContaining('Pay ₹'), findsNothing);
+    });
+  });
+
   group('request list', () {
     testWidgets('shows each request with its device, technician and status', (tester) async {
       final repo = FakeRequestRepository(pages: {

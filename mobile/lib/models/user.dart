@@ -135,6 +135,10 @@ class Me {
   /// For provider roles: `not_submitted`, `pending`, `approved`, `rejected` or `resubmission_required`.
   final String? verificationStatus;
 
+  /// A technician, refurbisher or recycler whose documents an administrator has not approved yet. Most of the app stays
+  /// locked for them: only the verification, profile, account and help screens open.
+  bool get isLocked => user.role.isProvider && verificationStatus != 'approved';
+
   Me copyWith({AppUser? user}) =>
       Me(user: user ?? this.user, verificationStatus: verificationStatus);
 

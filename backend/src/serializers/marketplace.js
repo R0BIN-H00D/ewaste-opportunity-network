@@ -40,6 +40,8 @@ function serializeProduct(p, { profile, viewerId, role, detail = false } = {}) {
   if (!detail) return out;
   out.specs = p.specs || {};
   out.refurbishmentInfo = p.refurbishmentInfo;
+  out.conditionDetails = p.conditionDetails && typeof p.conditionDetails.toObject === 'function' ? p.conditionDetails.toObject() : p.conditionDetails || {};
+  out.conditionNote = p.conditionNote;
   out.updatedAt = p.updatedAt;
   if (isMine || role === 'admin') out.refurbishmentJob = p.refurbishmentJob ? idOf(p.refurbishmentJob) : null;
   return out;

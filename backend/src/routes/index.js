@@ -16,6 +16,7 @@ router.use('/contact', require('./contact.routes'));
 router.use('/technicians', require('./technician.routes'));
 router.use('/service-requests', require('./serviceRequest.routes'));
 router.use('/matching', require('./matching.routes'));
+router.use('/ai', require('./ai.routes'));
 router.use('/reviews', require('./review.routes'));
 router.use('/transactions', require('./transaction.routes'));
 router.use('/donations', require('./donation.routes'));

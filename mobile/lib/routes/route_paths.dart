@@ -48,9 +48,9 @@ abstract class Routes {
   static const newRequest = '/requests/new';
   static const jobs = '/jobs';
 
-  /// A technician's jobs opened on one tab: `board` (new requests), `active` (in progress) or `all`.
-  static const jobsBoard = '$jobs?tab=board';
-  static const jobsActive = '$jobs?tab=active';
+  /// A technician's two pages: new requests they could take, and the jobs they have accepted. (`/jobs` itself sends to one of them.)
+  static const jobsBoard = '$jobs/find';
+  static const jobsActive = '$jobs/mine';
   static const requests = '/requests';
   static const requestPattern = '/requests/:id';
 
@@ -94,6 +94,14 @@ abstract class Routes {
 
   /// Refurbishment: the feed of devices to refurbish, the jobs, and the refurbisher's own products.
   static const wanted = '/wanted';
+
+  /// The page where an owner or technician accepts one wanted request. The request itself is passed as `extra`.
+  static const wantedAcceptPattern = '/wanted/:id/accept';
+  static String wantedAccept(String id) => '$wanted/$id/accept';
+
+  /// Making an offer on one device to refurbish. The opportunity is passed as `extra`.
+  static const refurbOfferPattern = '/refurbish/offer/:id';
+  static String refurbOffer(String id) => '/refurbish/offer/$id';
   static const refurbOpportunities = '/refurbish';
   static const refurbJobs = '/refurbish/jobs';
   static const refurbJobPattern = '/refurbish/jobs/:id';

@@ -2,6 +2,7 @@ import 'package:ewaste_opportunity/core/network/api_exception.dart';
 import 'package:ewaste_opportunity/core/storage/key_value_store.dart';
 import 'package:ewaste_opportunity/core/theme/app_theme.dart';
 import 'package:ewaste_opportunity/models/listing.dart';
+import 'package:ewaste_opportunity/models/refurbishment.dart';
 import 'package:ewaste_opportunity/providers/core_providers.dart';
 import 'package:ewaste_opportunity/providers/listings_controller.dart';
 import 'package:ewaste_opportunity/providers/marketplace_providers.dart';
@@ -11,6 +12,7 @@ import 'package:ewaste_opportunity/screens/refurbishment/my_products_screen.dart
 import 'package:ewaste_opportunity/screens/refurbishment/product_form_screen.dart';
 import 'package:ewaste_opportunity/screens/refurbishment/refurb_job_details_screen.dart';
 import 'package:ewaste_opportunity/screens/refurbishment/refurb_jobs_screen.dart';
+import 'package:ewaste_opportunity/screens/refurbishment/refurb_offer_screen.dart';
 import 'package:ewaste_opportunity/screens/refurbishment/refurb_opportunities_screen.dart';
 import 'package:ewaste_opportunity/services/photo_picker.dart';
 import 'package:ewaste_opportunity/widgets/app_chip.dart';
@@ -37,6 +39,7 @@ Future<void> _pump(
   final router = GoRouter(
     routes: [
       GoRoute(path: '/', builder: (_, __) => Scaffold(body: screen)),
+      GoRoute(path: '/refurbish/offer/:id', builder: (_, s) => RefurbOfferScreen(opportunity: s.extra! as RefurbOpportunity)),
       GoRoute(path: '/refurbish/jobs/:id', builder: (_, s) => Scaffold(body: Text('job page ${s.pathParameters['id']}'))),
       GoRoute(path: '/my-products/new', builder: (_, s) => Scaffold(body: Text('new product ${s.uri.queryParameters['job']}'))),
       GoRoute(path: '/my-products/:id/edit', builder: (_, s) => Scaffold(body: Text('edit product ${s.pathParameters['id']}'))),
@@ -117,13 +120,25 @@ void main() {
       await _pump(tester, const RefurbOpportunitiesScreen(), refurb: repo);
 
       await _tap(tester, find.text('Old Dell laptop'));
-      expect(find.text('Offer to refurbish this device'), findsOneWidget);
+      expect(find.byType(BottomSheet), findsNothing); // a page of its own
+      expect(find.text('Make an offer'), findsWidgets);
+      expect(find.text('What happens next'), findsOneWidget);
       await tester.enterText(find.widgetWithText(TextFormField, 'Amount you will pay the owner, in rupees (optional)'), '500');
       await tester.enterText(find.widgetWithText(TextFormField, 'A message for the owner (optional)'), 'Within a week');
       await _tap(tester, find.text('Send offer'));
 
       expect(repo.calls, ['offer:l1:500.0:Within a week']);
       expect(find.text('job page j-new'), findsOneWidget);
+    });
+
+    testWidgets('the quick choices fill the amount and the message', (tester) async {
+      final repo = FakeRefurbishmentRepository(opportunityPages: {1: [sampleRefurbOpportunity()]});
+      await _pump(tester, const RefurbOpportunitiesScreen(), refurb: repo);
+      await _tap(tester, find.text('Old Dell laptop'));
+      await _tap(tester, find.text('₹1000'));
+      await _tap(tester, find.text('I can collect it this week.'));
+      await _tap(tester, find.text('Send offer'));
+      expect(repo.calls, ['offer:l1:1000.0:I can collect it this week.']);
     });
 
     testWidgets('a bad amount stops the offer', (tester) async {
@@ -377,6 +392,59 @@ void main() {
       await _tap(tester, find.text('Save changes'));
       expect(shop.calls, ['update:p1']);
       expect(shop.inputs.single.price, 22999);
+    });
+
+    testWidgets('asks about the condition of each part, with the rest behind Show more', (tester) async {
+      await _pump(tester, const ProductFormScreen(productId: 'p1'), shop: FakeMarketplaceRepository(product: sampleProduct(id: 'p1', isMine: true)));
+      expect(find.text('Condition of each part (optional)'), findsOneWidget);
+      expect(find.text('Does it turn on?'), findsOneWidget);
+      expect(find.text('Body and casing'), findsOneWidget);
+      expect(find.text('Water damage'), findsNothing); // folded away until asked
+      await _tap(tester, find.text('Show more (1)'));
+      expect(find.text('Water damage'), findsOneWidget);
+      await _tap(tester, find.text('Show fewer details'));
+      expect(find.text('Water damage'), findsNothing);
+    });
+
+    testWidgets('starts from the saved answers and notes, and sends the changes', (tester) async {
+      final shop = FakeMarketplaceRepository(product: sampleProduct(id: 'p1', isMine: true, conditionDetails: const {'power': 'works_normally', 'body': 'scratched_or_dented'}, conditionNote: 'Old note.'));
+      await _pump(tester, const ProductFormScreen(productId: 'p1'), shop: shop);
+      expect(tester.widget<TextFormField>(find.widgetWithText(TextFormField, 'Other notes (optional)')).controller!.text, 'Old note.');
+
+      await _tap(tester, find.text('Turns on but is unstable (restarts or freezes)'));
+      await _tap(tester, find.text('Scratches or dents')); // tapping the chosen answer again takes it back
+      await tester.enterText(find.widgetWithText(TextFormField, 'Other notes (optional)'), 'Box included.');
+      await _tap(tester, find.text('Save changes'));
+      final sent = shop.inputs.single;
+      expect(sent.conditionDetails, {'power': 'unstable'});
+      expect(sent.conditionNote, 'Box included.');
+    });
+
+    testWidgets('clears the answers and notes on an edit when they are emptied', (tester) async {
+      final shop = FakeMarketplaceRepository(product: sampleProduct(id: 'p1', isMine: true, conditionDetails: const {'power': 'works_normally'}, conditionNote: 'Old note.'));
+      await _pump(tester, const ProductFormScreen(productId: 'p1'), shop: shop);
+      await _tap(tester, find.text('Turns on and works normally')); // take the answer back
+      await tester.enterText(find.widgetWithText(TextFormField, 'Other notes (optional)'), '');
+      await _tap(tester, find.text('Save changes'));
+      final sent = shop.inputs.single;
+      expect(sent.conditionDetails, isEmpty);
+      expect(sent.conditionNote, '');
+    });
+
+    testWidgets('sends nothing about the parts when a new product has none', (tester) async {
+      final shop = FakeMarketplaceRepository();
+      await _pump(tester, const ProductFormScreen(), shop: shop, picker: FakePhotoPicker(gallery: [_good]));
+      await tester.enterText(find.widgetWithText(TextFormField, 'Title'), 'Refurbished Dell laptop');
+      await _tap(tester, find.widgetWithText(DropdownButtonFormField<String>, 'Type of device'));
+      await _tap(tester, find.text('Laptops').last);
+      await _tap(tester, find.widgetWithText(DropdownButtonFormField<String>, 'Condition (shown to buyers)'));
+      await _tap(tester, find.text('Good').last);
+      await tester.enterText(find.widgetWithText(TextFormField, 'What was repaired, replaced or tested?'), 'New battery fitted and every port tested');
+      await tester.enterText(find.widgetWithText(TextFormField, 'Price in rupees'), '18999');
+      await _tap(tester, find.text('Choose'));
+      await _tap(tester, find.text('Put it on sale'));
+      expect(shop.inputs.single.conditionDetails, isNull);
+      expect(shop.inputs.single.conditionNote, isNull);
     });
 
     testWidgets('removing a product asks first', (tester) async {

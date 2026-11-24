@@ -1,6 +1,6 @@
 'use strict';
 const { Schema, ObjectId, point, baseSchema, softDelete, model } = require('./_common');
-const { CONDITIONS, SERVICES, LISTING_STATUS } = require('../config/constants');
+const { CONDITIONS, CONDITION_PARTS, SERVICES, LISTING_STATUS } = require('../config/constants');
 const { fuzzPoint } = require('../utils/geo');
 
 // title/brand/model/category are denormalised from Device so browse/search needs no join (kept in sync by deviceService).
@@ -13,6 +13,9 @@ const schema = baseSchema({
   model: { type: String, trim: true },
   condition: { type: String, enum: CONDITIONS, required: true },
   description: { type: String, trim: true, maxlength: 2000 },
+  conditionNote: { type: String, trim: true, maxlength: 500 }, // optional: a few words on the state the device is in
+  // optional: how each part is doing (battery, screen, ...), each from a short list
+  conditionDetails: new Schema(Object.fromEntries(Object.entries(CONDITION_PARTS).map(([part, values]) => [part, { type: String, enum: values }])), { _id: false }),
   preferredService: { type: String, enum: SERVICES, required: true },
   expectedPrice: { type: Number, min: 0 },
   pickupPreference: { type: String, enum: ['pickup', 'drop_off', 'either'], default: 'either' },

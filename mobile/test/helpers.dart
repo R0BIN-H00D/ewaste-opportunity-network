@@ -35,7 +35,8 @@ Me sampleMe(
         status: 'active',
         emailVerified: emailVerified,
       ),
-      verificationStatus: verificationStatus,
+      // A provider counts as approved unless a test says otherwise: the app is locked for the ones that are not.
+      verificationStatus: verificationStatus ?? (role.isProvider ? 'approved' : null),
     );
 
 /// An [AccountRepository] that never touches the network and records what was asked of it.

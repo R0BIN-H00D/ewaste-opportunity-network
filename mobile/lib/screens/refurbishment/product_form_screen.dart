@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
+import '../../core/condition_parts.dart';
 import '../../core/format.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/refurbishment_validation.dart';
@@ -14,6 +15,7 @@ import '../../routes/route_paths.dart';
 import '../../services/marketplace_repository.dart';
 import '../../services/photo_picker.dart';
 import '../../widgets/app_background.dart';
+import '../../widgets/app_chip.dart';
 import '../../widgets/app_text_field.dart';
 import '../../widgets/glass_app_bar.dart';
 import '../../widgets/glass_container.dart';
@@ -87,6 +89,11 @@ class _FormState extends ConsumerState<_Form> {
   late final _price = TextEditingController(text: widget.product == null ? '' : _plain(widget.product!.price));
   late final _stock = TextEditingController(text: '${widget.product?.stock ?? 1}');
   late final _specs = TextEditingController(text: widget.product == null ? '' : specsToText(widget.product!.specs));
+  late final _conditionNote = TextEditingController(text: widget.product?.conditionNote ?? '');
+  // How each part is doing (optional): part key -> chosen value. The other parts stay folded away unless one already has an answer.
+  late final Map<String, String> _details = {...?widget.product?.conditionDetails};
+  late bool _showMoreParts = _details.keys.any((k) => !_mainParts.contains(k));
+  static const _mainParts = ['power', 'battery', 'screen', 'body'];
   late String? _category = widget.product?.categorySlug ?? _slugOfJob();
   late String? _condition = widget.product?.condition;
   late String _status = widget.product?.status == 'hidden' ? 'hidden' : 'active';
@@ -111,11 +118,36 @@ class _FormState extends ConsumerState<_Form> {
 
   @override
   void dispose() {
-    for (final c in [_title, _brand, _model, _info, _price, _stock, _specs]) {
+    for (final c in [_title, _brand, _model, _info, _price, _stock, _specs, _conditionNote]) {
       c.dispose();
     }
     super.dispose();
   }
+
+  Map<String, String> _answeredDetails() {
+    final asked = conditionPartsFor(_category).map((p) => p.key);
+    return {for (final e in _details.entries) if (asked.contains(e.key) && e.value.isNotEmpty) e.key: e.value};
+  }
+
+  /// Chips for one part. Tapping the chosen answer again takes it back.
+  Widget _partGroup(ThemeData theme, ConditionPart part) => Padding(
+        padding: const EdgeInsets.only(top: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Semantics(header: true, child: Text(part.label, style: theme.textTheme.titleSmall)),
+            const SizedBox(height: 8),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final (value, label) in part.options)
+                AppChip(
+                  label: label,
+                  selected: _details[part.key] == value,
+                  onTap: () => setState(() => _details[part.key] == value ? _details.remove(part.key) : _details[part.key] = value),
+                ),
+            ]),
+          ],
+        ),
+      );
 
   List<ListingPhoto> get _kept => [for (final p in widget.product?.photos ?? const <ListingPhoto>[]) if (!_removed.contains(p.publicId)) p];
 
@@ -140,6 +172,9 @@ class _FormState extends ConsumerState<_Form> {
         specs: specs.specs,
         condition: _condition,
         refurbishmentInfo: _info.text.trim(),
+        // Only the parts asked about for this category that were answered; on an update an empty set clears the old answers.
+        conditionDetails: _answeredDetails().isNotEmpty || _editing ? _answeredDetails() : null,
+        conditionNote: _conditionNote.text.trim().isNotEmpty || _editing ? _conditionNote.text.trim() : null,
         price: parseMoney(_price.text),
         stock: _fromJob ? null : int.tryParse(_stock.text.trim()),
         jobId: _fromJob ? widget.jobId : null,
@@ -264,6 +299,28 @@ class _FormState extends ConsumerState<_Form> {
                 ],
                 const SizedBox(height: 12),
                 AppTextField(controller: _specs, label: 'Specifications (optional, one per line, "RAM: 8 GB")', maxLines: 4, validator: validateSpecs),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          GlassContainer(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _sectionTitle(theme, Icons.fact_check_outlined, 'Condition of each part (optional)'),
+                Text('Buyers see these in "About this device" on the product page: the working condition, battery, screen, scratches and more.', style: theme.textTheme.bodyMedium),
+                for (final part in conditionPartsFor(_category))
+                  if (_mainParts.contains(part.key) || _showMoreParts) _partGroup(theme, part),
+                if (conditionPartsFor(_category).any((p) => !_mainParts.contains(p.key))) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: () => setState(() => _showMoreParts = !_showMoreParts),
+                    icon: Icon(_showMoreParts ? Icons.expand_less : Icons.expand_more),
+                    label: Text(_showMoreParts ? 'Show fewer details' : 'Show more (${conditionPartsFor(_category).where((p) => !_mainParts.contains(p.key)).length})'),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                AppTextField(controller: _conditionNote, label: 'Other notes (optional)', maxLines: 3, validator: (v) => (v ?? '').trim().length > 1000 ? 'Use at most 1000 characters' : null),
               ],
             ),
           ),

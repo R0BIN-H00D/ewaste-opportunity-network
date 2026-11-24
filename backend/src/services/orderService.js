@@ -13,6 +13,7 @@ const { parsePagination, buildMeta } = require('../utils/pagination');
 const { notify } = require('./notificationService');
 const { serializeOrder } = require('../serializers/order');
 const workflow = require('./workflow/order');
+const gateway = require('./paymentGateway');
 
 const { ACTORS } = workflow;
 const idOf = (v) => String(v && v._id ? v._id : v);
@@ -66,6 +67,7 @@ async function placeOrder(user, input) {
     throw ApiError.conflict('This product is no longer available', 'PRODUCT_UNAVAILABLE');
   }
   if (input.quantity > product.stock) throw ApiError.conflict(`Only ${product.stock} left in stock`, 'OUT_OF_STOCK');
+  if (input.paymentMethod === 'online') gateway.assertAvailable();
   const open = await Order.exists({ product: product._id, buyer: user.id, status: { $in: workflow.OPEN } });
   if (open) throw ApiError.conflict('You already have an open order for this product', 'ALREADY_ORDERED');
 
@@ -148,12 +150,13 @@ async function soldOut(product, exceptOrderId) {
 
 /** The buyer confirms receipt: the order is complete, the offline payment is recorded and the reuse counted (BR-05, BR-10). */
 async function completeOrder(order, user, role) {
-  const done = await transition(order, 'completed', user, role, { set: { paymentStatus: 'paid_offline' } });
+  const paidOnline = order.paymentStatus === 'paid_online';
+  const done = await transition(order, 'completed', user, role, { set: paidOnline ? {} : { paymentStatus: 'paid_offline' } });
   try {
     const total = done.priceAtOrder * done.quantity;
     const product = await MarketplaceProduct.findById(done.product).select('category').lean();
     await Promise.all([
-      Transaction.create({ type: 'order', refType: 'Order', refId: done._id, payer: done.buyer, payee: done.seller, amount: total, method: done.paymentMethod, status: 'recorded' }),
+      Transaction.create({ type: 'order', refType: 'Order', refId: done._id, payer: done.buyer, payee: done.seller, amount: total, method: done.paymentMethod, status: paidOnline ? 'confirmed' : 'recorded', ...(paidOnline ? { reference: done.gatewayPaymentId } : {}) }),
       // Verified impact: written only now that the buyer confirmed they received the device (BR-05).
       impact.record({ user: done.seller, type: 'refurbishment', refType: 'Order', refId: done._id, category: product?.category, devices: done.quantity, verifiedBy: done.buyer }),
     ]);
@@ -190,9 +193,64 @@ async function cancelOrder(id, user, { reason } = {}) {
     await MarketplaceProduct.updateOne({ _id: idOf(order.product) }, { $inc: { stock: order.quantity } });
     await MarketplaceProduct.updateOne({ _id: idOf(order.product), status: 'sold', stock: { $gt: 0 } }, { $set: { status: 'active' } });
   }
+  await refundIfPaid(order);
   const other = idOf(role === ACTORS.BUYER ? order.seller : order.buyer);
   await notify(other, { type: 'order.cancelled', title: 'Order cancelled', body: order.product?.title, data: { id: order._id, deepLink: linkTo(order._id) } });
   return fetchView(order._id, user);
 }
 
-module.exports = { placeOrder, listOrders, getOrder, changeStatus, cancelOrder };
+/* ---------- online payment (Razorpay TEST mode, demo) ---------- */
+
+/** Starts a payment for an open, unpaid online order. The amount comes from the order, never from the client. */
+async function startPayment(id, user) {
+  const { order, role } = await loadParticipant(id, user);
+  if (role !== ACTORS.BUYER) throw ApiError.forbidden('Only the buyer can pay for this order');
+  if (order.paymentMethod !== 'online') throw ApiError.conflict('This order is not set to online payment', 'NOT_ONLINE');
+  if (!workflow.OPEN.includes(order.status)) throw ApiError.conflict('This order is closed', 'ORDER_CLOSED');
+  if (order.paymentStatus !== 'unpaid') throw ApiError.conflict('This order is already paid', 'ALREADY_PAID');
+  const amount = order.priceAtOrder * order.quantity;
+  if (amount < 1) throw ApiError.conflict('Online payment needs an amount of at least ₹1', 'AMOUNT_TOO_SMALL');
+  const rz = await gateway.createOrder({ amountRupees: amount, receipt: `order_${order._id}`, notes: { orderId: String(order._id) } });
+  await Order.updateOne({ _id: order._id }, { $set: { gatewayOrderId: rz.id } });
+  return {
+    keyId: gateway.keyId(),
+    gatewayOrderId: rz.id,
+    amount: rz.amount,
+    currency: rz.currency,
+    description: order.product?.title || 'Refurbished device',
+    testMode: true,
+  };
+}
+
+/** Checks the signature from the checkout, then marks the order paid. Safe to repeat. */
+async function verifyPayment(id, user, { razorpay_order_id: gatewayOrderId, razorpay_payment_id: paymentId, razorpay_signature: signature }) {
+  const { order, role } = await loadParticipant(id, user);
+  if (role !== ACTORS.BUYER) throw ApiError.forbidden('Only the buyer can pay for this order');
+  if (order.paymentStatus === 'paid_online' && order.gatewayPaymentId === paymentId) return viewOf(order, user);
+  if (!order.gatewayOrderId || order.gatewayOrderId !== gatewayOrderId) throw ApiError.badRequest('This payment does not belong to this order');
+  if (!gateway.verifySignature({ orderId: gatewayOrderId, paymentId, signature })) {
+    throw ApiError.badRequest('The payment could not be verified', [{ field: 'razorpay_signature', message: 'Signature does not match' }]);
+  }
+  const updated = await Order.findOneAndUpdate(
+    { _id: order._id, paymentStatus: 'unpaid', status: { $in: workflow.OPEN } },
+    { $set: { paymentStatus: 'paid_online', gatewayPaymentId: paymentId, paidAt: new Date() }, $push: { statusHistory: entry(order.status, user.id, 'Paid online (test mode)') } },
+    { new: true },
+  );
+  if (!updated) throw stale();
+  await notify(idOf(order.seller), { type: 'order.paid', title: 'Order paid online (test mode)', body: order.product?.title, data: { id: order._id, deepLink: linkTo(order._id) } });
+  return fetchView(order._id, user);
+}
+
+/** A cancelled, paid order is refunded. If the gateway fails the order is marked so it can be followed up. */
+async function refundIfPaid(order) {
+  if (order.paymentStatus !== 'paid_online' || !order.gatewayPaymentId) return;
+  try {
+    const r = await gateway.refund(order.gatewayPaymentId, order.priceAtOrder * order.quantity);
+    await Order.updateOne({ _id: order._id }, { $set: { paymentStatus: 'refunded', gatewayRefundId: r.id } });
+  } catch (err) {
+    logger.error({ err: err.message, orderId: String(order._id) }, 'refund failed');
+    await Order.updateOne({ _id: order._id }, { $set: { paymentStatus: 'refund_pending' } });
+  }
+}
+
+module.exports = { startPayment, verifyPayment, placeOrder, listOrders, getOrder, changeStatus, cancelOrder };

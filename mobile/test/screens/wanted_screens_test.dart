@@ -1,3 +1,5 @@
+import 'package:ewaste_opportunity/models/geo_place.dart';
+import 'package:ewaste_opportunity/services/location_service.dart';
 import 'package:ewaste_opportunity/core/network/api_exception.dart';
 import 'package:ewaste_opportunity/core/storage/key_value_store.dart';
 import 'package:ewaste_opportunity/core/theme/app_theme.dart';
@@ -5,13 +7,16 @@ import 'package:ewaste_opportunity/models/user.dart';
 import 'package:ewaste_opportunity/models/wanted.dart';
 import 'package:ewaste_opportunity/providers/auth_controller.dart';
 import 'package:ewaste_opportunity/providers/core_providers.dart';
+import 'package:ewaste_opportunity/providers/location_providers.dart';
 import 'package:ewaste_opportunity/providers/wanted_providers.dart';
 import 'package:ewaste_opportunity/screens/wanted/wanted_screens.dart';
 import 'package:ewaste_opportunity/services/api_client.dart';
 import 'package:ewaste_opportunity/services/wanted_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
+import '../fakes.dart' show FakeGeoRepository, FakeLocationService;
 import '../helpers.dart';
 
 class FakeWantedRepository extends WantedRepository {
@@ -41,6 +46,11 @@ class FakeWantedRepository extends WantedRepository {
   }
 
   @override
+  Future<void> update(String id, {required String title, String? brand, String? minCondition, int quantity = 1, String? city, String? notes}) async {
+    calls.add('update:$id:$title:${brand ?? ''}:${minCondition ?? ''}:$quantity:${city ?? ''}:${notes ?? ''}');
+  }
+
+  @override
   Future<void> setStatus(String id, String status) async => calls.add('status:$id:$status');
 
   @override
@@ -52,18 +62,25 @@ class FakeWantedRepository extends WantedRepository {
 
 const _laptops = WantedRequest(id: 'w1', title: 'Used laptops', categoryName: 'Laptops', quantity: 3, minCondition: 'minor_damage', city: 'Bengaluru', refurbisherName: 'Green Tech');
 
-Future<void> _pump(WidgetTester tester, FakeWantedRepository repo, UserRole role) async {
+Future<void> _pump(WidgetTester tester, FakeWantedRepository repo, UserRole role, {FakeLocationService? phone, FakeGeoRepository? geo}) async {
   tester.view.physicalSize = const Size(900, 2400);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
+  final router = GoRouter(routes: [
+    GoRoute(path: '/', builder: (_, __) => const WantedPage()),
+    GoRoute(path: '/wanted/:id/accept', builder: (_, state) => WantedAcceptScreen(request: state.extra! as WantedRequest)),
+  ]);
+  addTearDown(router.dispose);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         keyValueStoreProvider.overrideWithValue(MemoryKeyValueStore()),
         authRepositoryProvider.overrideWithValue(FakeAuthRepository(loginResult: sampleMe(role: role))),
         wantedRepositoryProvider.overrideWithValue(repo),
+        if (phone != null) locationServiceProvider.overrideWithValue(phone),
+        if (geo != null) geoRepositoryProvider.overrideWithValue(geo),
       ],
-      child: MaterialApp(theme: AppTheme.light(), home: const WantedPage()),
+      child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
     ),
   );
   final container = ProviderScope.containerOf(tester.element(find.byType(MaterialApp)));
@@ -91,10 +108,38 @@ void main() {
     expect(find.text('New request'), findsNothing); // only refurbishers post requests
 
     await _tap(tester, find.widgetWithText(FilledButton, 'Accept'));
-    expect(find.text('Accept this request'), findsOneWidget);
-    await tester.enterText(find.widgetWithText(TextField, 'Message (optional)'), 'I have two');
-    await _tap(tester, find.widgetWithText(FilledButton, 'Accept').last);
+    // A page of its own, not a pop-up: the request in full, then the message.
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.text('Accept this request'), findsWidgets);
+    expect(find.text('Read what they are looking for, then tell them how you can help.'), findsOneWidget);
+    expect(find.text('Qty 3'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, 'Your message (optional)'), 'I have two');
+    await _tap(tester, find.widgetWithText(FilledButton, 'Accept this request'));
     expect(repo.calls, ['respond:w1:I have two']);
+    expect(find.text('You accepted this request'), findsOneWidget);
+  });
+
+  testWidgets('the accept page starts the message from an idea', (tester) async {
+    final repo = FakeWantedRepository(boardItems: const [_laptops]);
+    await _pump(tester, repo, UserRole.user);
+    await _tap(tester, find.widgetWithText(FilledButton, 'Accept'));
+    await _tap(tester, find.text('I can give it for free.'));
+    await _tap(tester, find.widgetWithText(FilledButton, 'Accept this request'));
+    expect(repo.calls, ['respond:w1:I can give it for free.']);
+  });
+
+  testWidgets('a refurbisher can edit a request: the form starts filled in and saves with update', (tester) async {
+    final repo = FakeWantedRepository(mineItems: const [WantedRequest(id: 'w1', title: 'Used laptops', brand: 'Dell', quantity: 3, city: 'Bengaluru', notes: 'Any model')]);
+    await _pump(tester, repo, UserRole.refurbisher);
+    await _tap(tester, find.text('Edit'));
+    expect(find.text('Edit request'), findsOneWidget);
+    expect(tester.widget<TextFormField>(find.widgetWithText(TextFormField, 'What are you looking for?')).controller!.text, 'Used laptops');
+    await tester.enterText(find.widgetWithText(TextFormField, 'What are you looking for?'), 'Used ThinkPads');
+    await tester.enterText(find.widgetWithText(TextFormField, 'How many?'), '8');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Brand (optional)'), '');
+    await _tap(tester, find.text('Save changes'));
+    expect(repo.calls, ['update:w1:Used ThinkPads:::8:Bengaluru:Any model']);
+    expect(repo.calls.any((c) => c.startsWith('create')), isFalse);
   });
 
   testWidgets('a request already accepted shows as accepted, with no button', (tester) async {
@@ -104,11 +149,20 @@ void main() {
     expect(find.widgetWithText(FilledButton, 'Accept'), findsNothing);
   });
 
+  testWidgets('a refurbisher can detect the city for a new request', (tester) async {
+    await _pump(tester, FakeWantedRepository(), UserRole.refurbisher,
+        phone: FakeLocationService.at(const GeoPoint(12.9716, 77.5946)),
+        geo: FakeGeoRepository(place: const GeoPlace(area: 'Indiranagar', city: 'Bengaluru')));
+    await _tap(tester, find.text('New request').first);
+    await _tap(tester, find.text('Detect my current location'));
+    expect(tester.widget<TextFormField>(find.widgetWithText(TextFormField, 'City (optional)')).controller!.text, 'Bengaluru');
+  });
+
   testWidgets('says so when the server refuses an acceptance', (tester) async {
     final repo = FakeWantedRepository(boardItems: const [_laptops])..respondError = const ApiException('You have already accepted this request', code: 'ALREADY_RESPONDED');
     await _pump(tester, repo, UserRole.user);
     await _tap(tester, find.widgetWithText(FilledButton, 'Accept'));
-    await _tap(tester, find.widgetWithText(FilledButton, 'Accept').last);
+    await _tap(tester, find.widgetWithText(FilledButton, 'Accept this request'));
     expect(find.text('You have already accepted this request'), findsOneWidget);
   });
 

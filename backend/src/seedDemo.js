@@ -4,6 +4,7 @@
 // Run `npm run seed` first (categories and the base demo accounts), then `npm run seed:demo`.
 // Safe to re-run: if the presentation data is already there it does nothing. Development only; it refuses to run in production.
 const bcrypt = require('bcrypt');
+const { DEMO_PRODUCT_DETAILS } = require('./demoProductDetails');
 const env = require('./config/env');
 const logger = require('./utils/logger');
 const { connectDB, disconnectDB } = require('./config/db');
@@ -160,7 +161,7 @@ async function main() {
   void jobRunning;
 
   const product = (title, slug, brand, model, condition, price, info, stock = 3, extra = {}) =>
-    M.MarketplaceProduct.create({ seller: refurb._id, title, category: cats[slug]._id, brand, model, condition, price, stock, refurbishmentInfo: info, ratingAvg: 4.5, ratingCount: 4, ...extra });
+    M.MarketplaceProduct.create({ seller: refurb._id, title, category: cats[slug]._id, brand, model, condition, price, stock, refurbishmentInfo: info, ratingAvg: 4.5, ratingCount: 4, ...(DEMO_PRODUCT_DETAILS[title] || {}), ...extra });
   const pLaptop = await product('Lenovo ThinkPad X230, 8 GB RAM, 256 GB SSD', 'laptop', 'Lenovo', 'ThinkPad X230', 'good', 14500, 'New battery and SSD fitted, keyboard cleaned, tested for 24 hours. 3 month warranty.', 2);
   const pPhone = await product('iPhone 7, 32 GB, new battery', 'smartphone', 'Apple', 'iPhone 7', 'excellent', 8999, 'Original screen, battery replaced, factory reset, no scratches on the body.', 4);
   const pMonitor = await product('Dell 24-inch full HD monitor', 'monitor', 'Dell', 'P2419H', 'like_new', 5500, 'Cleaned and tested. One tiny mark on the stand, disclosed in the photos.', 5);

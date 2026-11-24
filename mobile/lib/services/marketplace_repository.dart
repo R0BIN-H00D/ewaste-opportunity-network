@@ -5,6 +5,7 @@ import '../models/marketplace.dart';
 import '../models/page_result.dart';
 import 'api_client.dart';
 import 'photo_picker.dart';
+import 'razorpay_checkout.dart' show PaymentProof, PaymentSession;
 import 'request_repository.dart' show ReviewInput;
 
 /// What to ask `GET /api/marketplace` for. Empty values are left out, because the server refuses parameters it does not know (422).
@@ -63,6 +64,8 @@ class ProductInput {
     this.specs,
     this.condition,
     this.refurbishmentInfo,
+    this.conditionDetails,
+    this.conditionNote,
     this.price,
     this.stock,
     this.jobId,
@@ -80,6 +83,12 @@ class ProductInput {
   final Map<String, String>? specs;
   final String? condition;
   final String? refurbishmentInfo;
+
+  /// How each part is doing. `null` sends nothing; an empty map on an update clears the old answers.
+  final Map<String, String>? conditionDetails;
+
+  /// The seller's own remarks. `null` sends nothing; an empty text on an update clears them.
+  final String? conditionNote;
   final double? price;
   final int? stock;
 
@@ -170,6 +179,10 @@ class MarketplaceRepository {
       form.fields.add(MapEntry('specs', jsonEncode(input.specs)));
     field('condition', input.condition);
     field('refurbishmentInfo', input.refurbishmentInfo);
+    if (input.conditionDetails != null) {
+      form.fields.add(MapEntry('conditionDetails', jsonEncode({for (final e in input.conditionDetails!.entries) if (e.value.isNotEmpty) e.key: e.value})));
+    }
+    field('conditionNote', input.conditionNote);
     field('price', input.price);
     field('stock', input.stock);
     field('jobId', input.jobId);
@@ -244,6 +257,16 @@ class MarketplaceRepository {
 
   Future<Order> order(String id) =>
       guard(() async => _order(await _dio.get<dynamic>('/orders/$id')));
+
+  /// Starts an online (Razorpay TEST mode) payment. The amount comes from the order on the server.
+  Future<PaymentSession> startPayment(String id) => guard(() async {
+        final res = await _dio.post<dynamic>('/orders/$id/payment');
+        return PaymentSession.fromJson(((res.data as Map)['data'] as Map).cast<String, dynamic>());
+      });
+
+  /// Sends what the payment window returned; the server checks the signature before it marks the order paid.
+  Future<Order> verifyPayment(String id, PaymentProof proof) => guard(() async =>
+      _order(await _dio.post<dynamic>('/orders/$id/payment/verify', data: proof.toJson())));
 
   Future<Order> _status(String id, String status) => guard(() async => _order(
       await _dio.put<dynamic>('/orders/$id/status', data: {'status': status})));

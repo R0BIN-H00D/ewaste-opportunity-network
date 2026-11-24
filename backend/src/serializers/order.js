@@ -25,6 +25,7 @@ function serializeOrder(o, { role, profile, detail = true } = {}) {
     total: o.priceAtOrder * o.quantity,
     paymentMethod: o.paymentMethod,
     paymentStatus: o.paymentStatus,
+    paidAt: o.paidAt,
     buyer: o.buyer && o.buyer._id ? { _id: o.buyer._id, name: o.buyer.name } : { _id: idOf(o.buyer) },
     seller: {
       ...(o.seller && o.seller._id ? { _id: o.seller._id, name: o.seller.name } : { _id: idOf(o.seller) }),
@@ -43,6 +44,8 @@ function serializeOrder(o, { role, profile, detail = true } = {}) {
   out.reviewed = Boolean(o.reviewed);
   out.history = (o.statusHistory || []).map((h) => ({ status: h.status, at: h.at, note: h.note }));
   out.actions = availableActions(o, role);
+  // Online payment is a separate step from the status workflow: the buyer can pay while the order is open.
+  if (role === 'buyer' && o.paymentMethod === 'online' && o.paymentStatus === 'unpaid' && ['placed', 'confirmed', 'ready', 'delivered'].includes(o.status)) out.actions.push('pay');
   out.canReview = role === 'buyer' && o.status === 'completed' && !o.reviewed;
   return out;
 }

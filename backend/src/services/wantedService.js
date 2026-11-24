@@ -54,6 +54,14 @@ async function list(user, query) {
   return { items, meta: buildMeta(pg, total) };
 }
 
+/** One request, with whether the viewer has already accepted it (and their message), for the page where they accept it. */
+async function getOne(id, user) {
+  const doc = await WantedRequest.findById(id).populate(POPULATE).lean();
+  if (!doc) throw ApiError.notFound('Request not found');
+  const mine = await WantedResponse.findOne({ request: id, responder: user.id }).select('message createdAt').lean();
+  return { ...doc, hasResponded: Boolean(mine), ...(mine ? { myResponse: { message: mine.message || '', at: mine.createdAt } } : {}), isMine: String(doc.refurbisher?._id) === user.id };
+}
+
 /** A device owner or technician says they can help with an open request. The refurbisher is told. */
 async function respond(id, user, { message } = {}) {
   const request = await WantedRequest.findById(id).select('refurbisher title status').lean();
@@ -82,6 +90,30 @@ async function listResponses(id, user) {
   return WantedResponse.find({ request: id }).populate({ path: 'responder', select: 'name avatar role' }).sort({ createdAt: -1 }).lean();
 }
 
+/** The refurbisher changes their own request. An empty optional field is cleared. */
+async function update(id, user, input) {
+  const { category: slug, ...rest } = input;
+  const set = {};
+  const unset = {};
+  for (const [key, value] of Object.entries(rest)) {
+    if (value === undefined) continue;
+    if (value === null || value === '') unset[key] = 1;
+    else set[key] = value;
+  }
+  if (slug !== undefined) {
+    if (!slug) unset.category = 1;
+    else {
+      const cat = await Category.findOne({ slug }).select('_id').lean();
+      if (!cat) throw ApiError.badRequest('Unknown category');
+      set.category = cat._id;
+    }
+  }
+  if (unset.title) delete unset.title;
+  const doc = await WantedRequest.findOneAndUpdate({ _id: id, refurbisher: user.id }, { ...(Object.keys(set).length ? { $set: set } : {}), ...(Object.keys(unset).length ? { $unset: unset } : {}) }, { new: true }).populate(POPULATE).lean();
+  if (!doc) throw ApiError.notFound('Request not found');
+  return doc;
+}
+
 async function setStatus(id, user, { status }) {
   const doc = await WantedRequest.findOneAndUpdate({ _id: id, refurbisher: user.id }, { $set: { status } }, { new: true }).populate(POPULATE).lean();
   if (!doc) throw ApiError.notFound('Request not found');
@@ -93,4 +125,4 @@ async function remove(id, user) {
   if (!res.deletedCount) throw ApiError.notFound('Request not found');
 }
 
-module.exports = { create, list, setStatus, remove, respond, listResponses };
+module.exports = { create, list, getOne, update, setStatus, remove, respond, listResponses };

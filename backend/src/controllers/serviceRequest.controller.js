@@ -29,4 +29,8 @@ exports.confirmHandover = asyncHandler(async (req, res) => ok(res, await svc.con
 
 exports.confirmCompletion = asyncHandler(async (req, res) => ok(res, await svc.confirmCompletion(req.params.id, req.user), 'Service completed'));
 
+exports.startPayment = asyncHandler(async (req, res) => ok(res, await svc.startPayment(req.params.id, req.user), 'Payment started'));
+
+exports.verifyPayment = asyncHandler(async (req, res) => ok(res, await svc.verifyPayment(req.params.id, req.user, req.body), 'Payment received'));
+
 exports.cancel = asyncHandler(async (req, res) => ok(res, await svc.cancelRequest(req.params.id, req.user, req.body.reason), 'Request cancelled'));

@@ -7,6 +7,8 @@ import '../../core/network/api_exception.dart';
 import '../../models/listing.dart';
 import '../../models/service_request.dart';
 import '../../providers/listings_controller.dart';
+import '../../providers/marketplace_providers.dart' show paymentLauncherProvider;
+import '../../services/razorpay_checkout.dart';
 import '../../providers/technicians_controller.dart';
 import '../../routes/route_paths.dart';
 import '../../services/request_repository.dart';
@@ -219,6 +221,34 @@ class _BodyState extends ConsumerState<_Body> {
     await _act((repo) => repo.confirmHandover(r.id, acknowledgeChecklist: collecting), done: 'Handover confirmed');
   }
 
+  /// Optional online demo payment of the approved quote (test mode, no real money).
+  Future<void> _pay() async {
+    final launcher = ref.read(paymentLauncherProvider);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await ref.read(requestProvider(r.id).notifier).run((repo) async {
+        final session = await repo.startPayment(r.id);
+        try {
+          return await repo.verifyPayment(r.id, await launcher.pay(session));
+        } on PaymentCancelled {
+          return r; // closed the window: nothing changes
+        }
+      });
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment received')));
+    } on PaymentFailed catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.fieldErrors.values.isNotEmpty ? e.fieldErrors.values.first : e.message);
+      if (e.code == 'STALE_STATE' || e.statusCode == 409) await ref.read(requestProvider(r.id).notifier).refresh();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _complete() async {
     final ok = await askConfirm(
       context,
@@ -308,6 +338,7 @@ class _BodyState extends ConsumerState<_Body> {
       if (r.can('reject_quotation') && q != null) OutlinedButton.icon(onPressed: _busy ? null : () => _decline(q), icon: const Icon(Icons.close), label: const Text('Decline quote')),
       if (r.can('schedule_pickup')) FilledButton.icon(onPressed: _busy ? null : _pickup, icon: const Icon(Icons.event_outlined), label: Text(r.pickup == null ? 'Choose pickup time' : 'Change pickup time')),
       if (r.can('confirm_handover')) FilledButton.icon(onPressed: _busy ? null : _handover, icon: const Icon(Icons.handshake_outlined), label: const Text('Confirm handover')),
+      if (r.can('pay') && q != null) FilledButton.icon(onPressed: _busy ? null : _pay, icon: const Icon(Icons.payment_rounded), label: Text('Pay ${formatPrice(q.amount)}')),
       if (r.can('confirm_completion')) FilledButton.icon(onPressed: _busy ? null : _complete, icon: const Icon(Icons.task_alt), label: const Text('Confirm repair is done')),
       if (r.can('review')) FilledButton.icon(onPressed: _busy ? null : _review, icon: const Icon(Icons.star_outline_rounded), label: Text('Review ${r.technicianName ?? 'the technician'}')),
       if (r.can('cancel')) OutlinedButton.icon(onPressed: _busy ? null : _cancel, icon: const Icon(Icons.cancel_outlined), label: const Text('Cancel request')),
@@ -361,6 +392,7 @@ class _BodyState extends ConsumerState<_Body> {
                 if (r.deviceArea.isNotEmpty) ...[const Divider(height: 20), _fact(theme, 'Area', r.deviceArea)],
               ] else
                 _fact(theme, 'Technician', r.technicianName ?? 'Not chosen yet'),
+                if (r.paidOnline) ...[const Divider(height: 20), _fact(theme, 'Payment', 'Paid online')],
               const Divider(height: 20),
               // How the repair is done, which holds for the whole request (not where the device is right now).
               _fact(theme, 'Repair', r.onSite ? (asTechnician ? 'At the customer\'s place' : 'At your place') : (asTechnician ? 'Collect and return' : 'Collected and returned')),

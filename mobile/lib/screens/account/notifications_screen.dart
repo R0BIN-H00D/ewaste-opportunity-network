@@ -58,7 +58,7 @@ class NotificationsPage extends ConsumerWidget {
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: glassAppBar(context, 'Notifications'),
+      appBar: glassAppBar(context, 'Notifications', bell: false),
       body: AppBackground(
         child: SafeArea(
           child: PagedList<NotificationItem>(

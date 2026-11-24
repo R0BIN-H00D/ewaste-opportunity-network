@@ -2,8 +2,8 @@ import 'package:ewaste_opportunity/providers/auth_controller.dart';
 import 'package:ewaste_opportunity/routes/app_router.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-String? _go(String location, {bool booted = true, AuthStatus auth = AuthStatus.unauthenticated, bool seen = true, bool welcome = false}) =>
-    redirectFor(booted: booted, auth: auth, onboardingSeen: seen, location: location, welcome: welcome);
+String? _go(String location, {bool booted = true, AuthStatus auth = AuthStatus.unauthenticated, bool seen = true, bool welcome = false, bool locked = false}) =>
+    redirectFor(booted: booted, auth: auth, onboardingSeen: seen, location: location, welcome: welcome, locked: locked);
 
 void main() {
   group('while starting up', () {
@@ -55,6 +55,32 @@ void main() {
     test('app screens stay where they are', () {
       expect(_go(Routes.home, auth: AuthStatus.authenticated), isNull);
       expect(_go(Routes.account, auth: AuthStatus.authenticated), isNull);
+    });
+  });
+
+  group('a provider whose documents are not approved yet', () {
+    String? locked(String location, {bool welcome = false}) => _go(location, auth: AuthStatus.authenticated, locked: true, welcome: welcome);
+
+    test('is sent to the verification screen from everywhere that is locked', () {
+      for (final path in [Routes.home, Routes.splash, Routes.login, Routes.jobs, Routes.requests, Routes.messages, Routes.notifications, Routes.payments, Routes.activity, Routes.wanted, Routes.refurbOpportunities, Routes.recyclingRequests]) {
+        expect(locked(path), Routes.verification, reason: path);
+      }
+    });
+
+    test('can still open verification, profile, account, settings and help', () {
+      for (final path in [Routes.verification, Routes.profile, Routes.account, Routes.settings, Routes.help]) {
+        expect(locked(path), isNull, reason: path);
+      }
+    });
+
+    test('is taken to verification straight after signing up, not to the home screen', () {
+      expect(locked(Routes.register, welcome: true), Routes.verification);
+      expect(locked(Routes.splash, welcome: true), Routes.verification);
+    });
+
+    test('is not moved once approved: logging in goes straight home', () {
+      expect(_go(Routes.login, auth: AuthStatus.authenticated), Routes.home);
+      expect(_go(Routes.jobs, auth: AuthStatus.authenticated), isNull);
     });
   });
 }

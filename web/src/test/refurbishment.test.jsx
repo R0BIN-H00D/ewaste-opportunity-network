@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { setAccessToken } from '../services/api';
 import { categoryApi, deviceApi } from '../services/deviceApi';
 import { refurbApi } from '../services/refurbishmentApi';
@@ -13,7 +13,7 @@ vi.mock('../services/deviceApi', () => ({
   reportApi: { create: vi.fn() },
 }));
 vi.mock('../services/refurbishmentApi', () => ({
-  refurbApi: { opportunities: vi.fn(), offer: vi.fn(), jobs: vi.fn(), job: vi.fn(), decide: vi.fn(), withdraw: vi.fn(), handover: vi.fn(), confirmHandover: vi.fn(), advance: vi.fn(), addPhotos: vi.fn(), cancel: vi.fn(), wanted: vi.fn(), addWanted: vi.fn(), setWantedStatus: vi.fn(), deleteWanted: vi.fn(), respondWanted: vi.fn(), wantedResponses: vi.fn() },
+  refurbApi: { opportunities: vi.fn(), offer: vi.fn(), jobs: vi.fn(), job: vi.fn(), decide: vi.fn(), withdraw: vi.fn(), handover: vi.fn(), confirmHandover: vi.fn(), advance: vi.fn(), addPhotos: vi.fn(), cancel: vi.fn(), wanted: vi.fn(), getWanted: vi.fn(), addWanted: vi.fn(), updateWanted: vi.fn(), setWantedStatus: vi.fn(), deleteWanted: vi.fn(), respondWanted: vi.fn(), wantedResponses: vi.fn() },
 }));
 vi.mock('../services/api', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -74,8 +74,8 @@ describe('devices to refurbish', () => {
     refurbApi.opportunities.mockResolvedValue(page([opportunity(), opportunity({ _id: 'l2', title: 'Old iPad', hasOffered: true })]));
     renderApp('/dashboard/opportunities', signedIn(REFURB));
     expect(await screen.findByText('2 devices available')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Make an offer on Lenovo ThinkPad T450' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Make an offer on Old iPad' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Make an offer on Lenovo ThinkPad T450' })).toHaveAttribute('href', '/dashboard/opportunities/l1/offer');
+    expect(screen.queryByRole('link', { name: 'Make an offer on Old iPad' })).not.toBeInTheDocument();
     expect(screen.getByText('Offer sent')).toBeInTheDocument();
   });
 
@@ -85,14 +85,11 @@ describe('devices to refurbish', () => {
     expect(refurbApi.opportunities).not.toHaveBeenCalled();
   });
 
-  it('lets a refurbisher add a new wanted-device request', async () => {
-    refurbApi.addWanted.mockResolvedValue({ _id: 'w1', title: 'Used laptops', status: 'open', quantity: 3 });
+  it('no longer has the requests on this page, only a link to their own page', async () => {
     renderApp('/dashboard/opportunities', signedIn(REFURB));
-    fireEvent.click(await screen.findByRole('button', { name: /New request/ }));
-    fireEvent.change(screen.getByLabelText('What are you looking for?'), { target: { value: 'Used laptops' } });
-    fireEvent.change(screen.getByLabelText('How many?'), { target: { value: '3' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add request' }));
-    await waitFor(() => expect(refurbApi.addWanted).toHaveBeenCalledWith({ title: 'Used laptops', quantity: 3 }));
+    expect((await screen.findAllByRole('link', { name: 'My requests' })).every((a) => a.getAttribute('href') === '/dashboard/my-requests')).toBe(true); // the side menu and the page header
+    expect(screen.queryByRole('button', { name: /New request/ })).not.toBeInTheDocument();
+    expect(refurbApi.wanted).not.toHaveBeenCalled();
   });
 
   it('shows a friendly empty state', async () => {
@@ -100,12 +97,24 @@ describe('devices to refurbish', () => {
     expect(await screen.findByText('No devices to refurbish right now')).toBeInTheDocument();
   });
 
+  const openOffer = async () => {
+    deviceApi.get.mockResolvedValue(opportunity());
+    renderApp('/dashboard/opportunities/l1/offer', signedIn(REFURB));
+    await screen.findByRole('heading', { level: 1, name: 'Make an offer' });
+  };
+
+  it('is a page of its own with the device beside the offer', async () => {
+    await openOffer();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'The device' })).getByText('Lenovo ThinkPad T450')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'What happens next' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Devices to refurbish/ })).toHaveAttribute('href', '/dashboard/opportunities');
+  });
+
   it('checks the amount, sends the offer and opens the new job', async () => {
-    refurbApi.opportunities.mockResolvedValue(page([opportunity()]));
     refurbApi.offer.mockResolvedValue(job({ viewerRole: 'refurbisher', actions: ['withdraw'] }));
     refurbApi.job.mockResolvedValue(job({ viewerRole: 'refurbisher', actions: ['withdraw'] }));
-    renderApp('/dashboard/opportunities', signedIn(REFURB));
-    fireEvent.click(await screen.findByRole('button', { name: 'Make an offer on Lenovo ThinkPad T450' }));
+    await openOffer();
     fireEvent.change(screen.getByLabelText(/What will you pay the owner/), { target: { value: '-5' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send offer' }));
     expect(await screen.findByText('Enter an amount of 0 or more.')).toBeInTheDocument();
@@ -119,23 +128,35 @@ describe('devices to refurbish', () => {
     expect(screen.getByRole('button', { name: 'Withdraw my offer' })).toBeInTheDocument();
   });
 
+  it('fills the amount and message from the quick choices', async () => {
+    await openOffer();
+    fireEvent.click(screen.getByRole('button', { name: '₹1,000' }));
+    expect(screen.getByLabelText(/What will you pay the owner/)).toHaveValue(1000);
+    fireEvent.click(screen.getByRole('button', { name: 'Free collection' }));
+    expect(screen.getByLabelText(/What will you pay the owner/)).toHaveValue(null);
+    fireEvent.click(screen.getByRole('button', { name: 'I can collect it this week.' }));
+    expect(screen.getByLabelText(/Message for the owner/)).toHaveValue('I can collect it this week.');
+  });
+
   it('treats an empty amount as a free collection', async () => {
-    refurbApi.opportunities.mockResolvedValue(page([opportunity()]));
     refurbApi.offer.mockResolvedValue(job());
     refurbApi.job.mockResolvedValue(job());
-    renderApp('/dashboard/opportunities', signedIn(REFURB));
-    fireEvent.click(await screen.findByRole('button', { name: 'Make an offer on Lenovo ThinkPad T450' }));
+    await openOffer();
     fireEvent.click(screen.getByRole('button', { name: 'Send offer' }));
     await waitFor(() => expect(refurbApi.offer).toHaveBeenCalledWith({ listingId: 'l1', amount: 0 }));
   });
 
   it('shows the server reason when an offer is refused', async () => {
-    refurbApi.opportunities.mockResolvedValue(page([opportunity()]));
     refurbApi.offer.mockRejectedValue(apiError('You already made an offer on this device', 'ALREADY_OFFERED'));
-    renderApp('/dashboard/opportunities', signedIn(REFURB));
-    fireEvent.click(await screen.findByRole('button', { name: 'Make an offer on Lenovo ThinkPad T450' }));
+    await openOffer();
     fireEvent.click(screen.getByRole('button', { name: 'Send offer' }));
     expect(await screen.findByText('You already made an offer on this device')).toBeInTheDocument();
+  });
+
+  it('says so when the device cannot be found', async () => {
+    deviceApi.get.mockRejectedValue(apiError('Listing not found', 'NOT_FOUND', 404));
+    renderApp('/dashboard/opportunities/l1/offer', signedIn(REFURB));
+    expect(await screen.findByText('Device not found')).toBeInTheDocument();
   });
 });
 
@@ -305,14 +326,42 @@ describe('job page: the refurbisher', () => {
 describe('wanted devices board', () => {
   const wanted = (over = {}) => ({ _id: 'w1', title: 'Used laptops', quantity: 2, status: 'open', refurbisher: { name: 'Green Tech' }, hasResponded: false, ...over });
 
-  it('lets a device owner accept a refurbisher request', async () => {
+  it('opens the accept page from a request', async () => {
     refurbApi.wanted.mockResolvedValue(page([wanted()]));
-    refurbApi.respondWanted.mockResolvedValue({ _id: 'r1' });
     renderApp('/dashboard/wanted', signedIn(USER));
-    fireEvent.click(await screen.findByRole('button', { name: 'Accept request Used laptops' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
-    await waitFor(() => expect(refurbApi.respondWanted).toHaveBeenCalledWith('w1', ''));
+    expect(await screen.findByRole('link', { name: 'Accept request Used laptops' })).toHaveAttribute('href', '/dashboard/wanted/w1/accept');
     expect(refurbApi.wanted).toHaveBeenCalledWith(expect.objectContaining({ as: 'board' }), expect.anything());
+  });
+
+  it('shows the totals and lets people search and filter by category', async () => {
+    refurbApi.wanted.mockResolvedValue({ items: [
+      wanted({ _id: 'w1', title: 'Dell laptops', quantity: 10, city: 'Bengaluru', category: { name: 'Laptop' } }),
+      wanted({ _id: 'w2', title: 'iPhone 8', quantity: 5, city: 'Chennai', category: { name: 'Smartphone' } }),
+      wanted({ _id: 'w3', title: 'Galaxy phones', quantity: 3, city: 'Chennai', category: { name: 'Smartphone' } }),
+    ], meta: { page: 1, pages: 1, total: 3, limit: 24 } });
+    renderApp('/dashboard/wanted', signedIn(USER));
+    await screen.findByText('Dell laptops');
+    expect(screen.queryByText('Open requests')).not.toBeInTheDocument(); // no counter boxes
+    expect(screen.getByText('3 requests from refurbishers')).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'How it works' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Smartphone' }));
+    expect(screen.queryByText('Dell laptops')).not.toBeInTheDocument();
+    expect(screen.getByText('iPhone 8')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'All' }));
+
+    fireEvent.change(screen.getByLabelText('Search requests'), { target: { value: 'galaxy' } });
+    expect(screen.getByText('Galaxy phones')).toBeInTheDocument();
+    expect(screen.queryByText('iPhone 8')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Search requests'), { target: { value: 'zzzz' } });
+    expect(screen.getByText('Nothing matches')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'clear the filters' }));
+    expect(screen.getByText('Dell laptops')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Sort'), { target: { value: 'most' } });
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Dell laptops', 'iPhone 8', 'Galaxy phones']);
+    fireEvent.change(screen.getByLabelText('Sort'), { target: { value: 'city' } });
+    expect(screen.getAllByRole('heading', { level: 3 })[0]).toHaveTextContent('Dell laptops');
   });
 
   it('shows an already accepted request as accepted', async () => {
@@ -320,5 +369,145 @@ describe('wanted devices board', () => {
     renderApp('/dashboard/wanted', signedIn(USER));
     expect(await screen.findByText('Accepted')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Accept request Used laptops' })).not.toBeInTheDocument();
+  });
+});
+
+describe('the accept request page', () => {
+  const detail = (over = {}) => ({
+    _id: 'w1', title: 'Dell Latitude laptops', quantity: 10, status: 'open', brand: 'Dell', minCondition: 'minor_damage', city: 'Bengaluru',
+    notes: 'We refit SSDs and batteries.', category: { name: 'Laptop' }, createdAt: '2026-11-20T10:00:00.000Z',
+    refurbisher: { _id: 'r1', name: 'ReNew Electronics' }, hasResponded: false, isMine: false, ...over,
+  });
+  const open = async (over, who = signedIn(USER)) => {
+    refurbApi.getWanted.mockResolvedValue(detail(over));
+    renderApp('/dashboard/wanted/w1/accept', who);
+    await screen.findByRole('heading', { level: 1, name: 'Accept this request' });
+  };
+
+  it('shows everything about the request before accepting', async () => {
+    await open();
+    const card = within(screen.getByRole('region', { name: 'Request details' }));
+    expect(card.getByText('Dell Latitude laptops')).toBeInTheDocument();
+    expect(card.getByText('10')).toBeInTheDocument();
+    expect(card.getByText('Minor damage or better')).toBeInTheDocument();
+    expect(card.getByText('Dell')).toBeInTheDocument();
+    expect(card.getByText('Bengaluru')).toBeInTheDocument();
+    expect(card.getByText('We refit SSDs and batteries.')).toBeInTheDocument();
+    expect(card.getByText('ReNew Electronics')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /Wanted devices/ })[0]).toHaveAttribute('href', '/dashboard/wanted');
+  });
+
+  it('accepts with the message that was typed and then says it was sent', async () => {
+    refurbApi.respondWanted.mockResolvedValue({ _id: 'r1' });
+    await open();
+    fireEvent.change(screen.getByLabelText('Your message (optional)'), { target: { value: 'I have 3 working ones.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Accept this request' }));
+    await waitFor(() => expect(refurbApi.respondWanted).toHaveBeenCalledWith('w1', 'I have 3 working ones.'));
+    expect(await screen.findByText('You accepted this request')).toBeInTheDocument();
+    expect(screen.getByText('I have 3 working ones.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open messages' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Accept this request' })).not.toBeInTheDocument();
+  });
+
+  it('fills the message from an idea and accepts without a message when left empty', async () => {
+    refurbApi.respondWanted.mockResolvedValue({ _id: 'r1' });
+    await open();
+    fireEvent.click(screen.getByRole('button', { name: 'I can give it for free.' }));
+    expect(screen.getByLabelText('Your message (optional)')).toHaveValue('I can give it for free.');
+    fireEvent.change(screen.getByLabelText('Your message (optional)'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Accept this request' }));
+    await waitFor(() => expect(refurbApi.respondWanted).toHaveBeenCalledWith('w1', ''));
+  });
+
+  it('shows the reason when the server refuses', async () => {
+    refurbApi.respondWanted.mockRejectedValue({ response: { status: 409, data: { message: 'You have already accepted this request', code: 'ALREADY_RESPONDED' } } });
+    await open();
+    fireEvent.click(screen.getByRole('button', { name: 'Accept this request' }));
+    expect(await screen.findByText('You have already accepted this request')).toBeInTheDocument();
+  });
+
+  it('shows an already accepted request as accepted, with the message that was sent', async () => {
+    await open({ hasResponded: true, myResponse: { message: 'Happy to help', at: '2026-11-21T00:00:00.000Z' } });
+    expect(screen.getByText('You accepted this request')).toBeInTheDocument();
+    expect(screen.getByText('Happy to help')).toBeInTheDocument();
+  });
+
+  it('does not offer to accept a closed request or your own', async () => {
+    await open({ status: 'closed' });
+    expect(screen.getByText(/This request is closed/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Accept this request' })).not.toBeInTheDocument();
+  });
+
+  it('says so when the request cannot be found', async () => {
+    refurbApi.getWanted.mockRejectedValue({ response: { status: 404, data: { message: 'Request not found', code: 'NOT_FOUND' } } });
+    renderApp('/dashboard/wanted/w1/accept', signedIn(USER));
+    expect(await screen.findByText('Request not found')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to wanted devices' })).toBeInTheDocument();
+  });
+});
+
+describe('the refurbisher My requests page', () => {
+  const mine = (over = {}) => ({ _id: 'w1', title: 'Used laptops', quantity: 3, status: 'open', city: 'Bengaluru', category: { name: 'Laptop' }, responseCount: 0, ...over });
+
+  it('lists the requests with their status, and has a side-menu link just below Requests', async () => {
+    refurbApi.wanted.mockResolvedValue(page([mine(), mine({ _id: 'w2', title: 'Old phones', status: 'closed' })]));
+    renderApp('/dashboard/my-requests', signedIn(REFURB));
+    expect(await screen.findByRole('heading', { level: 1, name: 'My requests' })).toBeInTheDocument();
+    expect(refurbApi.wanted).toHaveBeenCalledWith(expect.objectContaining({ as: 'mine' }), expect.anything());
+    expect(await screen.findByText('Used laptops')).toBeInTheDocument();
+    expect(screen.getByText('Old phones')).toBeInTheDocument();
+    expect(screen.getByText('2 requests · 1 open')).toBeInTheDocument();
+    const menu = within(screen.getByRole('complementary', { name: 'Dashboard navigation' })).getAllByRole('link').map((a) => a.textContent.trim());
+    expect(menu.indexOf('My requests')).toBe(menu.indexOf('Requests') + 1);
+  });
+
+  it('adds a new request from the page', async () => {
+    refurbApi.wanted.mockResolvedValue(page([]));
+    refurbApi.addWanted.mockResolvedValue({ _id: 'w1', title: 'Used laptops', status: 'open', quantity: 3 });
+    renderApp('/dashboard/my-requests', signedIn(REFURB));
+    expect(await screen.findByText('You have no requests yet')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: /New request/ })[0]);
+    fireEvent.change(screen.getByLabelText('What are you looking for?'), { target: { value: 'Used laptops' } });
+    fireEvent.change(screen.getByLabelText('How many?'), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add request' }));
+    await waitFor(() => expect(refurbApi.addWanted).toHaveBeenCalledWith({ title: 'Used laptops', quantity: 3 }));
+  });
+
+  it('edits a request in a form that starts with what it says now, and can clear a field', async () => {
+    refurbApi.wanted.mockResolvedValue(page([mine({ brand: 'Dell', notes: 'Any model', minCondition: 'minor_damage' })]));
+    refurbApi.updateWanted.mockResolvedValue({});
+    renderApp('/dashboard/my-requests', signedIn(REFURB));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit request Used laptops' }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('Edit request');
+    expect(screen.getByLabelText('What are you looking for?')).toHaveValue('Used laptops');
+    expect(screen.getByLabelText('How many?')).toHaveValue(3);
+    expect(screen.getByLabelText('Brand (optional)')).toHaveValue('Dell');
+    fireEvent.change(screen.getByLabelText('What are you looking for?'), { target: { value: 'Used ThinkPads' } });
+    fireEvent.change(screen.getByLabelText('How many?'), { target: { value: '8' } });
+    fireEvent.change(screen.getByLabelText('Brand (optional)'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(refurbApi.updateWanted).toHaveBeenCalledWith('w1', expect.objectContaining({ title: 'Used ThinkPads', quantity: 8, brand: '', city: 'Bengaluru', notes: 'Any model', minCondition: 'minor_damage' })));
+    expect(refurbApi.addWanted).not.toHaveBeenCalled();
+  });
+
+  it('closes, reopens and deletes a request, and shows who accepted it', async () => {
+    refurbApi.wanted.mockResolvedValue(page([mine({ responseCount: 2 })]));
+    refurbApi.setWantedStatus.mockResolvedValue({});
+    refurbApi.deleteWanted.mockResolvedValue({});
+    refurbApi.wantedResponses.mockResolvedValue([{ _id: 'r1', responder: { name: 'Asha Rao', role: 'user' }, message: 'I have two' }]);
+    renderApp('/dashboard/my-requests', signedIn(REFURB));
+    fireEvent.click(await screen.findByRole('button', { name: '2 accepted' }));
+    expect(await screen.findByText('Asha Rao')).toBeInTheDocument();
+    expect(screen.getByText('I have two')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(refurbApi.setWantedStatus).toHaveBeenCalledWith('w1', 'closed'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete request Used laptops' }));
+    await waitFor(() => expect(refurbApi.deleteWanted).toHaveBeenCalledWith('w1'));
+  });
+
+  it('is only for refurbishers', async () => {
+    renderApp('/dashboard/my-requests', signedIn(USER));
+    await waitFor(() => expect(screen.queryByRole('heading', { level: 1, name: 'My requests' })).not.toBeInTheDocument());
+    expect(refurbApi.wanted).not.toHaveBeenCalled();
   });
 });

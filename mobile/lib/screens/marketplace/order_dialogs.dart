@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import '../../core/format.dart';
 import '../../core/order_validation.dart';
+import '../../widgets/detect_location_button.dart';
 import '../../widgets/app_chip.dart';
 
 /// What the buyer chose in the order sheet.
@@ -190,6 +191,15 @@ class _OrderSheetState extends State<_OrderSheet> {
                 children: [for (final (value, label) in paymentMethods) AppChip(label: label, selected: _payment == value, onTap: () => setState(() => _payment = value))],
               ),
               const _SheetSection(Icons.local_shipping_outlined, 'Where should it be delivered?'),
+              DetectLocationButton(onDetected: (_, place) {
+                if (place == null) return;
+                setState(() {
+                  if (place.area.isNotEmpty) _area.text = place.area;
+                  if (place.city.isNotEmpty) _city.text = place.city;
+                  if (RegExp(r'^[1-9][0-9]{5}$').hasMatch(place.postcode)) _pincode.text = place.postcode;
+                });
+              }),
+              const SizedBox(height: 12),
               TextFormField(controller: _area, validator: validateDeliveryArea, decoration: const InputDecoration(labelText: 'Area or locality', prefixIcon: Icon(Icons.place_outlined))),
               const SizedBox(height: 12),
               TextFormField(controller: _city, validator: validateDeliveryCity, decoration: const InputDecoration(labelText: 'City', prefixIcon: Icon(Icons.location_city_outlined))),

@@ -4,6 +4,7 @@ import '../models/page_result.dart';
 import '../models/service_request.dart';
 import 'api_client.dart';
 import 'photo_picker.dart';
+import 'razorpay_checkout.dart' show PaymentProof, PaymentSession;
 
 /// Repair requests as the device owner sees them. Every action answers with the updated request.
 class RequestRepository {
@@ -79,6 +80,15 @@ class RequestRepository {
         final res = await _dio.post<dynamic>('/service-requests/$id/handover', data: {if (acknowledgeChecklist) 'acknowledgeChecklist': true});
         return _one(res);
       });
+
+  /// Starts an online (Razorpay TEST mode) payment of the approved quote. The amount comes from the quote on the server.
+  Future<PaymentSession> startPayment(String id) => guard(() async {
+        final res = await _dio.post<dynamic>('/service-requests/$id/payment');
+        return PaymentSession.fromJson(((res.data as Map)['data'] as Map).cast<String, dynamic>());
+      });
+
+  /// Sends what the payment window returned; the server checks the signature before it marks the service paid.
+  Future<ServiceRequest> verifyPayment(String id, PaymentProof proof) => guard(() async => _one(await _dio.post<dynamic>('/service-requests/$id/payment/verify', data: proof.toJson())));
 
   Future<ServiceRequest> confirmCompletion(String id) => guard(() async => _one(await _dio.post<dynamic>('/service-requests/$id/confirm-completion')));
 

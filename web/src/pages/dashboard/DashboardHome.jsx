@@ -16,7 +16,7 @@ const LISTER_ROLES = ['user', 'technician', 'refurbisher'];
 // The few things each person does most, in plain words. Everything else is in the menu under "More".
 const ACTIONS = {
   user: [['List a device', '/list-device'], ['My devices', '/dashboard/listings'], ['My repairs', '/dashboard/requests'], ['Donate a device', '/donations']],
-  technician: [['Find repair requests', '/dashboard/requests?tab=board'], ['My repair jobs', '/dashboard/requests?tab=jobs'], ['Messages', '/dashboard/messages'], ['Complete your profile', '/dashboard/settings']],
+  technician: [['Find repair requests', '/dashboard/find-requests'], ['My repair jobs', '/dashboard/my-jobs'], ['Messages', '/dashboard/messages'], ['Complete your profile', '/dashboard/settings']],
   refurbisher: [['Devices to refurbish', '/dashboard/opportunities'], ['Refurbishment jobs', '/dashboard/refurbishment'], ['My products', '/dashboard/products'], ['Orders', '/dashboard/orders']],
   recycler: [['Recycling requests', '/dashboard/recycling'], ['Recycling report', '/dashboard/recycling/report'], ['Pickups', '/dashboard/pickups'], ['Messages', '/dashboard/messages']],
 };
@@ -82,7 +82,7 @@ function MyWork({ role }) {
       <h2 id="work-h" className="text-lg font-bold text-ink dark:text-white">Your work</h2>
       <dl className="grid grid-cols-2 gap-3">
         {role === 'technician' && (
-          <Link to="/dashboard/requests?tab=jobs" className="glass-subtle !p-4 text-center">
+          <Link to="/dashboard/my-jobs" className="glass-subtle !p-4 text-center">
             <dd className="font-numeric text-3xl font-extrabold text-primary dark:text-primary-tint">{jobCount ?? '–'}</dd>
             <dt className="text-xs text-ink-muted dark:text-[#9FB2A7]">Active repair jobs</dt>
           </Link>

@@ -59,6 +59,30 @@ enum JobsFilter { board, active, all }
 
 final jobsFilterProvider = StateProvider<JobsFilter>((ref) => JobsFilter.board);
 
+/// The filters on "Find repair requests", applied to the requests that have loaded: the kind of device, the city, on-site
+/// repairs only, and which end of the list comes first.
+class FindFilters {
+  const FindFilters({this.category = '', this.city = '', this.onSiteOnly = false, this.oldestFirst = false});
+
+  final String category;
+  final String city;
+  final bool onSiteOnly;
+  final bool oldestFirst;
+
+  /// How many choices are away from the default (the sort order is not counted).
+  int get count => [category.isNotEmpty, city.isNotEmpty, onSiteOnly].where((on) => on).length;
+
+  bool matches(ServiceRequest r) =>
+      (category.isEmpty || r.deviceCategory == category) && (city.isEmpty || r.deviceCity == city) && (!onSiteOnly || r.onSite);
+
+  int compare(ServiceRequest a, ServiceRequest b) {
+    final byTime = (b.updatedAt ?? DateTime(0)).compareTo(a.updatedAt ?? DateTime(0));
+    return oldestFirst ? -byTime : byTime;
+  }
+}
+
+final findFiltersProvider = StateProvider<FindFilters>((ref) => const FindFilters());
+
 /// A technician's jobs. Changing the filter or the signed-in person starts the list again.
 class JobsController extends PagedNotifier<ServiceRequest> {
   @override

@@ -1,9 +1,9 @@
-import { CONDITIONS, formatPrice, labelOf, photosOf, placeLabel } from '../lib/devices';
-import { EMPTY_VALUES, deviceSchema, listingToValues, toDevicePayload } from '../lib/deviceSchema';
+import { CONDITIONS, conditionRows, formatPrice, labelOf, midPrice, partsFor, priceRangeText, requiredPartsFor, photosOf, placeLabel, suggestCondition } from '../lib/devices';
+import { EMPTY_VALUES, deviceEditSchema, deviceSchema, listingToValues, toDevicePayload } from '../lib/deviceSchema';
 import { friendlyMessage, toApiError } from '../utils/errors';
 
 const valid = {
-  ...EMPTY_VALUES, name: 'Old laptop', category: 'laptops', brand: 'Dell', model: 'Inspiron 15', modelYear: '2018', purchaseYear: '2019', description: 'Slow, the fan is loud.', condition: 'fully_working',
+  ...EMPTY_VALUES, name: 'Old laptop', category: 'laptops', brand: 'Dell', model: 'Inspiron 15', modelYear: '2018', purchaseYear: '2019', description: 'Slow, the fan is loud.', condition: 'fully_working', conditionDetails: { ...EMPTY_VALUES.conditionDetails, water: 'none', battery: 'holds_well', screen: 'no_damage', ports: 'all_work' },
   preferredService: 'repair', pickupPreference: 'pickup', addressArea: 'Indiranagar', city: 'Bengaluru', agentPhone: '98765 43210',
 };
 const problems = (values) => {
@@ -66,8 +66,6 @@ describe('deviceSchema', () => {
     expect(problems({ ...valid, modelYear: '2020', purchaseYear: '2019' }).purchaseYear).toMatch(/cannot be earlier than the model year \(2020\)/);
     expect(problems({ ...valid, modelYear: '2019', purchaseYear: '2019' })).toEqual({});
     expect(problems({ ...valid, modelYear: '2018', purchaseYear: '2022' })).toEqual({});
-    expect(problems({ ...valid, description: '' })).toEqual({});
-    expect(problems({ ...valid, description: 'ok' })).toEqual({});
     expect(problems({ ...valid, addressArea: '12' }).addressArea).toBeDefined();
     expect(problems({ ...valid, addressArea: '### road' }).addressArea).toBeDefined();
     expect(problems({ ...valid, city: '560038' }).city).toMatch(/letters/);
@@ -90,8 +88,8 @@ describe('deviceSchema', () => {
     expect(problems({ ...valid, purchaseYear: '20' }).purchaseYear).toBeDefined();
   });
 
-  it('allows an empty description and price, a free price and a valid year', () => {
-    expect(problems({ ...valid, description: '', expectedPrice: '' })).toEqual({});
+  it('allows an empty price, a free price and a valid year', () => {
+    expect(problems({ ...valid, expectedPrice: '' })).toEqual({});
     expect(problems({ ...valid, expectedPrice: '0', purchaseYear: '2019' })).toEqual({});
   });
 
@@ -114,6 +112,75 @@ describe('toDevicePayload / listingToValues', () => {
       expectedPrice: 0, device: { purchaseYear: 2020 },
     });
     expect(values).toMatchObject({ name: 'Phone', category: 'phones', brand: 'Acme', purchaseYear: '2020', expectedPrice: '0', model: '' });
+  });
+});
+
+describe('the condition of each part', () => {
+  it('asks about the parts that fit the category', () => {
+    const keys = (slug) => partsFor(slug).map((p) => p.key);
+    expect(keys('smartphone')).toEqual(['power', 'screen', 'battery', 'body', 'charging', 'ports', 'sound', 'camera', 'water']);
+    expect(keys('television')).toEqual(['power', 'screen', 'body', 'ports', 'sound', 'water']);
+    expect(keys('keyboard')).toEqual(['body', 'ports', 'water']);
+    expect(keys('battery')).toEqual(['battery', 'body']);
+    expect(keys('something-new')).toEqual(['power', 'body', 'water']); // an unknown category still gets the basics
+    expect(keys('')).toEqual(['power', 'body', 'water']);
+  });
+
+  it('needs battery, screen, ports and buttons and water damage, only where the category has them', () => {
+    const keys = (slug) => requiredPartsFor(slug).map((p) => p.key);
+    expect(keys('smartphone')).toEqual(['battery', 'screen', 'ports', 'water']);
+    expect(keys('television')).toEqual(['screen', 'ports', 'water']);
+    expect(keys('keyboard')).toEqual(['ports', 'water']);
+    expect(keys('battery')).toEqual(['battery']);
+    expect(keys('something-new')).toEqual(['water']);
+    const empty = { ...EMPTY_VALUES.conditionDetails };
+    const missing = (details, slug = 'smartphone') => {
+      const r = deviceSchema.safeParse({ ...valid, category: slug, conditionDetails: { ...empty, ...details } });
+      return r.success ? [] : r.error.issues.filter((i) => i.path[0] === 'conditionDetails').map((i) => i.path[1]);
+    };
+    expect(missing({})).toEqual(['battery', 'screen', 'ports', 'water']);
+    expect(missing({ battery: 'holds_well', water: 'none' })).toEqual(['screen', 'ports']);
+    expect(missing({ battery: 'holds_well', screen: 'no_damage', ports: 'all_work', water: 'none' })).toEqual([]);
+    expect(missing({ ports: 'all_work', water: 'none' }, 'keyboard')).toEqual([]); // a keyboard has no battery or screen
+    // an older listing can still be edited without them
+    expect(deviceEditSchema.safeParse({ ...valid, category: 'smartphone', conditionDetails: { ...empty } }).success).toBe(true);
+  });
+
+  it('writes a price range in words and offers the middle', () => {
+    expect(priceRangeText({ min: 8000, max: 12000 })).toBe('₹8,000 to ₹12,000');
+    expect(priceRangeText(null)).toBe('');
+    expect(midPrice({ min: 8000, max: 12000 })).toBe(10000);
+    expect(midPrice({ min: 3040, max: 5120 })).toBe(4100);
+    expect(midPrice(null)).toBeNull();
+  });
+
+  it('suggests an overall condition from the answers, and nothing from no answers', () => {
+    expect(suggestCondition({})).toBe('');
+    expect(suggestCondition({ battery: '', screen: '' })).toBe('');
+    expect(suggestCondition({ power: 'works_normally', screen: 'no_damage', battery: 'holds_well' })).toBe('fully_working');
+    expect(suggestCondition({ power: 'works_normally', battery: 'drains_fast' })).toBe('minor_damage');
+    expect(suggestCondition({ screen: 'cracked', battery: 'holds_well' })).toBe('major_damage');
+    expect(suggestCondition({ water: 'damaged' })).toBe('major_damage');
+    expect(suggestCondition({ power: 'does_not_turn_on', screen: 'no_damage' })).toBe('not_working');
+  });
+
+  it('lists the answered parts with readable words, in the usual order', () => {
+    expect(conditionRows({ battery: 'drains_fast', screen: 'cracked', camera: '' })).toEqual([['Screen', 'Cracked'], ['Battery', 'Drains quickly']]);
+    expect(conditionRows(undefined)).toEqual([]);
+  });
+
+  it('sends only the answered parts that belong to the category, and clears them on an edit', () => {
+    const details = { power: 'works_normally', screen: 'cracked', battery: '', body: '', charging: '', ports: '', sound: '', camera: '', water: '' };
+    expect(toDevicePayload({ ...valid, category: 'smartphone', conditionDetails: details }).conditionDetails).toEqual({ power: 'works_normally', screen: 'cracked' });
+    // a keyboard has no screen: an answer left over from another category is not sent
+    expect(toDevicePayload({ ...valid, category: 'keyboard', conditionDetails: details }).conditionDetails).toBeUndefined();
+    expect(toDevicePayload({ ...valid, category: 'keyboard', conditionDetails: details }, { editing: true }).conditionDetails).toEqual({});
+    expect(toDevicePayload({ ...valid, category: 'smartphone', conditionDetails: { ...details, power: '', screen: '' } }).conditionDetails).toBeUndefined();
+  });
+
+  it('fills the form from a stored listing', () => {
+    const values = listingToValues({ title: 'Phone', category: { slug: 'smartphone' }, condition: 'minor_damage', conditionDetails: { battery: 'drains_fast' } });
+    expect(values.conditionDetails).toMatchObject({ battery: 'drains_fast', screen: '' });
   });
 });
 

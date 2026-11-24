@@ -103,5 +103,11 @@ export const { sessionExpired, signedOut, welcomed } = authSlice.actions;
 export default authSlice.reducer;
 
 export const PROVIDER_ROLES = ['technician', 'refurbisher', 'recycler'];
-/** Where each role lands after login. Role dashboards are built in later phases. */
-export const homePathFor = (_role, justRegistered = false) => (justRegistered ? '/dashboard/settings#profile' : '/dashboard');
+/** A technician, refurbisher or recycler whose documents an administrator has not approved yet. Most of the dashboard stays locked for them. */
+export const isLockedProvider = (user, verification) => PROVIDER_ROLES.includes(user?.role) && verification?.status !== 'approved';
+
+/** Where each role lands after sign-up. After login everyone goes to the dashboard; a provider who is still locked is sent on to the profile page from there. */
+export const homePathFor = (role, justRegistered = false) => {
+  if (!justRegistered) return '/dashboard';
+  return PROVIDER_ROLES.includes(role) ? '/dashboard/settings#verification' : '/dashboard/settings#profile';
+};

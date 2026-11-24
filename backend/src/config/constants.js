@@ -22,6 +22,35 @@ const DOC_TYPES = ['id_proof', 'qualification', 'business', 'authorization', 'ot
 
 const CONDITIONS = ['fully_working', 'minor_damage', 'major_damage', 'not_working', 'for_spare_parts'];
 const SERVICES = ['repair', 'reuse', 'donation', 'refurbishment', 'recycling'];
+
+// How each part of a device is doing, chosen from short lists (all optional). The apps show only the parts that fit the category.
+const CONDITION_PARTS = {
+  power: ['works_normally', 'unstable', 'does_not_turn_on'],
+  screen: ['no_damage', 'scratched', 'cracked', 'faulty'],
+  battery: ['holds_well', 'drains_fast', 'needs_replacing', 'swollen', 'missing'],
+  body: ['like_new', 'scratched_or_dented', 'cracked_or_bent', 'parts_missing'],
+  charging: ['normal', 'slow', 'not_charging', 'port_damaged'],
+  ports: ['all_work', 'some_faulty'],
+  sound: ['works', 'faulty'],
+  camera: ['works', 'faulty'],
+  water: ['none', 'suspected', 'damaged'],
+};
+
+// Which parts make sense for which category (a category not listed gets the basics), and which of them must be answered
+// before a device goes live. A part that does not fit the category is never required.
+const ALL_PARTS = Object.keys(CONDITION_PARTS);
+const CONDITION_PARTS_BY_CATEGORY = {
+  laptop: ALL_PARTS, smartphone: ALL_PARTS, tablet: ALL_PARTS,
+  'desktop-computer': ['power', 'body', 'ports', 'sound', 'water'],
+  monitor: ['power', 'screen', 'body', 'ports', 'sound', 'water'],
+  television: ['power', 'screen', 'body', 'ports', 'sound', 'water'],
+  keyboard: ['body', 'ports', 'water'], mouse: ['body', 'ports', 'water'],
+  printer: ['power', 'body', 'ports', 'water'], charger: ['power', 'body', 'ports'], battery: ['battery', 'body'],
+};
+const DEFAULT_CONDITION_PARTS = ['power', 'body', 'water'];
+const REQUIRED_CONDITION_PARTS = ['battery', 'screen', 'ports', 'water'];
+const partsForCategory = (slug) => CONDITION_PARTS_BY_CATEGORY[slug] || DEFAULT_CONDITION_PARTS;
+const requiredPartsForCategory = (slug) => partsForCategory(slug).filter((p) => REQUIRED_CONDITION_PARTS.includes(p));
 const LISTING_STATUS = ['draft', 'listed', 'in_service', 'completed', 'withdrawn', 'removed_by_admin'];
 const MAX_DEVICE_PHOTOS = 6;
 
@@ -65,7 +94,7 @@ const IMPACT_TYPES = ['repair', 'reuse', 'donation', 'refurbishment', 'recycling
 
 module.exports = {
   ROLES, SELF_REGISTER_ROLES, PROVIDER_ROLES, ACCOUNT_STATUS, VERIFICATION_STATUS, DOC_TYPES,
-  CONDITIONS, SERVICES, LISTING_STATUS, MAX_DEVICE_PHOTOS, CATEGORY_SEED,
+  CONDITIONS, CONDITION_PARTS, partsForCategory, requiredPartsForCategory, SERVICES, LISTING_STATUS, MAX_DEVICE_PHOTOS, CATEGORY_SEED,
   SERVICE_REQUEST_STATUS, QUOTATION_STATUS, PICKUP_STATUS, DONATION_STATUS, DONATION_REQUEST_STATUS,
   REFURB_JOB_STATUS, PRODUCT_STATUS, PRODUCT_CONDITIONS, ORDER_STATUS, RECYCLING_STATUS, MATERIAL_TYPES,
   COMPLAINT_STATUS, IMPACT_TYPES,
